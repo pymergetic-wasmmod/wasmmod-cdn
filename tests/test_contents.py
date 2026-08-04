@@ -13,6 +13,7 @@ from pymergetic.metal.cdn_client.contents import (
     inspect_upload,
     parse_pack_payload,
     unwrap_mpzl,
+    without_sig_section,
     wrap_mpzl,
 )
 
@@ -159,6 +160,41 @@ def test_inspect_elf_pack_section() -> None:
     out = ensure_zlib_artifacts({"hello.elf": elf})
     assert "hello.elf.zlib" in out
     assert unwrap_mpzl(out["hello.elf.zlib"]) == elf
+
+
+def test_without_sig_section_elf_wpse() -> None:
+    """ELF WPSE strip matches wasmmod (naked cookie drop + signed restore)."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    wasmmod_tools = Path("/home/ladmin/Devel/os-sdk/packages/metalpython/extmod/wasmmod/tools")
+    if not (wasmmod_tools / "wasmmod_elf.py").is_file():
+        pytest.skip("wasmmod_elf.py not found")
+
+    c = Path("/tmp/cdn_elf_wpse.c")
+    c.write_text("int hello(void){return 42;}\n")
+    o = Path("/tmp/cdn_elf_wpse.o")
+    subprocess.check_call(
+        ["gcc", "-c", "-ffreestanding", "-fPIC", "-O2", "-o", str(o), str(c)]
+    )
+    sys.path.insert(0, str(wasmmod_tools))
+    from wasmmod_elf import append_section  # type: ignore
+
+    base = o.read_bytes()
+    with_pack = append_section(base, "wasmmod.pack", b"pack")
+    # Unsigned + WPSE: drop cookie only (signed-body digest is clean object+pack).
+    naked = without_sig_section(with_pack)
+    assert naked == with_pack[: len(with_pack) - 28]
+    assert naked[:4] == b"\x7fELF"
+
+    with_sig = append_section(with_pack, "wasmmod.sig", b"\x00" * 16)
+    stripped = without_sig_section(with_sig)
+    assert stripped == naked
+    from wasmmod_elf import find_section  # type: ignore
+
+    assert find_section(stripped, "wasmmod.sig") is None
+    assert find_section(stripped, "wasmmod.pack") is not None
 
 
 @pytest.mark.asyncio

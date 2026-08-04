@@ -546,6 +546,45 @@ def split_der_certs(blob: bytes) -> list[bytes]:
     return out
 
 
+def _elf_sig_offset_ge(buf: bytes, old_len: int) -> bool:
+    """True if ``.wasmmod.sig`` (or bare name) has ``sh_offset >= old_len``."""
+    if len(buf) < 64 or buf[:4] != b"\x7fELF" or buf[4] != 2 or buf[5] != 1:
+        return False
+    shoff = struct.unpack_from("<Q", buf, 40)[0]
+    shentsize = struct.unpack_from("<H", buf, 58)[0]
+    shnum = struct.unpack_from("<H", buf, 60)[0]
+    shstrndx = struct.unpack_from("<H", buf, 62)[0]
+    if shentsize < 64 or shnum == 0 or shstrndx >= shnum:
+        return False
+    if shoff + shnum * shentsize > len(buf):
+        return False
+    shstr = buf[shoff + shstrndx * shentsize :]
+    str_off = struct.unpack_from("<Q", shstr, 24)[0]
+    str_sz = struct.unpack_from("<Q", shstr, 32)[0]
+    if str_off + str_sz > len(buf):
+        return False
+    strtab = buf[str_off : str_off + str_sz]
+    want = SIG_SECTION.encode("utf-8")
+    want_dot = b"." + want if not want.startswith(b".") else want
+    for i in range(shnum):
+        sh = buf[shoff + i * shentsize :]
+        name_off = struct.unpack_from("<I", sh, 0)[0]
+        typ = struct.unpack_from("<I", sh, 4)[0]
+        if typ not in (1, 7):  # PROGBITS / NOTE
+            continue
+        if name_off >= len(strtab):
+            continue
+        end = strtab.find(b"\x00", name_off)
+        if end < 0:
+            end = len(strtab)
+        sname = strtab[name_off:end]
+        if sname != want and sname != want_dot and sname.lstrip(b".") != want.lstrip(b"."):
+            continue
+        sec_off = struct.unpack_from("<Q", sh, 24)[0]
+        return sec_off >= old_len
+    return False
+
+
 def without_sig_section(buf: bytes) -> bytes:
     """Artifact bytes ECDSA covers (omit ``wasmmod.sig``)."""
     if len(buf) < 8:
@@ -605,21 +644,32 @@ def without_sig_section(buf: bytes) -> bytes:
         return bytes(out)
 
     if buf[:4] == b"\x7fELF":
-        # WPSE cookie restore (matches wasmmod tools/wasmmod_elf.py).
+        # WPSE cookie restore (matches wasmmod tools/wasmmod_elf.py / wasmmod-read).
         wpse = struct.Struct("<4sQQHHI")
+        cookie = None
         if len(buf) >= wpse.size and buf[-wpse.size : -wpse.size + 4] == b"WPSE":
             _magic, old_len, old_shoff, old_shnum, old_shstrndx, _pad = wpse.unpack_from(
                 buf, len(buf) - wpse.size
             )
             if 0 < old_len <= len(buf) - wpse.size:
-                # Confirm sig section lives in the appended region.
-                if extract_custom_section_elf(buf, SIG_SECTION) is not None:
-                    out = bytearray(buf[:old_len])
-                    struct.pack_into("<Q", out, 40, old_shoff)
-                    struct.pack_into("<H", out, 60, old_shnum)
-                    struct.pack_into("<H", out, 62, old_shstrndx)
-                    return bytes(out)
-        raise ValueError("ELF strip of wasmmod.sig needs WPSE cookie")
+                cookie = (old_len, old_shoff, old_shnum, old_shstrndx)
+        has_sig = extract_custom_section_elf(buf, SIG_SECTION) is not None
+        if not has_sig:
+            # Naked digest: drop trailing cookie if present.
+            if cookie is not None:
+                return buf[: len(buf) - wpse.size]
+            return buf
+        if cookie is None:
+            raise ValueError("ELF strip of wasmmod.sig needs WPSE cookie")
+        old_len, old_shoff, old_shnum, old_shstrndx = cookie
+        # Require sig payload to live at/after old_len (last-append WPSE restore).
+        if not _elf_sig_offset_ge(buf, old_len):
+            raise ValueError("ELF strip of wasmmod.sig needs WPSE cookie")
+        out = bytearray(buf[:old_len])
+        struct.pack_into("<Q", out, 40, old_shoff)
+        struct.pack_into("<H", out, 60, old_shnum)
+        struct.pack_into("<H", out, 62, old_shstrndx)
+        return bytes(out)
 
     raise ValueError("not a wasm/aot/elf artifact")
 
