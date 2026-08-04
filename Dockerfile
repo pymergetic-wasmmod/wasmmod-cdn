@@ -7,7 +7,7 @@ FROM python:3.12-slim AS base
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    SETUPTOOLS_SCM_PRETEND_VERSION=0.1.0a2 \
+    SETUPTOOLS_SCM_PRETEND_VERSION=0.1.0a3 \
     PYTHONPATH=/app \
     METAL_CDN_HOST=0.0.0.0 \
     METAL_CDN_PORT=8000 \
@@ -30,12 +30,16 @@ COPY client ./client
 COPY pymergetic ./pymergetic
 
 # Install in-tree client first (not published to PyPI in this tree).
-RUN pip install --no-cache-dir ./client . \
-    && useradd --create-home --uid 10001 app \
-    && mkdir -p /data/packs \
-    && chown -R app:app /data /app \
-    && test -f pymergetic/metal/cdn/web/static/repl/micropython.mjs \
-        || echo "WARNING: micropython.mjs missing — run scripts/sync-repl-assets.sh / scripts/dev-up.sh before docker build"
+# Keep the micropython.mjs warning outside the &&-chain so a missing asset
+# cannot mask a failed pip/useradd (shell: A && B || echo → success on echo).
+RUN set -eux; \
+    pip install --no-cache-dir ./client .; \
+    useradd --create-home --uid 10001 app; \
+    mkdir -p /data/packs; \
+    chown -R app:app /data /app; \
+    if [ ! -f pymergetic/metal/cdn/web/static/repl/micropython.mjs ]; then \
+      echo "WARNING: micropython.mjs missing — run scripts/sync-repl-assets.sh / scripts/dev-up.sh before docker build"; \
+    fi
 USER app
 
 EXPOSE 8000

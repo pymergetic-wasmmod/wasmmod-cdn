@@ -36,8 +36,6 @@ metal-cdn serve --reload
 # → http://127.0.0.1:8000/cdn/docs  OpenAPI
 ```
 
-TLS edge (host forwards **80→8080**, **443→8443**): see [docs/PROXY.md](docs/PROXY.md).
-
 ## Docker / local demo
 
 One script: rebuild browser µPy (if needed), sync REPL assets, `docker build`/`run`, seed sample packs:
@@ -52,6 +50,18 @@ Flags: `--no-upy` (reuse synced assets), `--no-seed`, `--seed-only` (publish int
 Env: `METALPYTHON`, `METAL_CDN_URL`, `METAL_CDN_PORT`, `METAL_CDN_SESSION_SECRET`.
 
 The image installs the in-tree `client/` wheel before the server (not from PyPI). Persist `/data` via the `metal-cdn-data` volume. Schema is created on first boot (`create_all`); for upgrades run `metal-cdn db upgrade` against the same volume.
+
+## Public TLS edge
+
+Live: **`https://cdn.pymergetic.com/cdn/`** (host forwards **80→8080**, **443→8443**).
+
+Build/run app, nginx proxy, cert paths, issue/renew: **[docs/PROXY.md](docs/PROXY.md)**.
+
+```sh
+./scripts/dev-up.sh --no-upy                 # app on :8000
+docker compose --profile proxy up -d nginx   # TLS edge on :8080/:8443
+curl -sf https://cdn.pymergetic.com/cdn/health
+```
 
 ## Shell sessions (browser µPy)
 
