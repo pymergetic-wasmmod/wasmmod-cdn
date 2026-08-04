@@ -220,6 +220,13 @@ step_seed() {
     pub_pkg hostcall "${host_files[@]}"
   fi
 
+  local ticks_files=()
+  [[ -f "$packs/ticks.wasm" ]] && ticks_files+=("$packs/ticks.wasm")
+  [[ -f "$packs/ticks.elf" ]] && ticks_files+=("$packs/ticks.elf")
+  if [[ ${#ticks_files[@]} -gt 0 ]]; then
+    pub_pkg ticks "${ticks_files[@]}"
+  fi
+
   pub_pkg mixed                "$packs/mixed.wasm"
   pub_pkg bridge               "$packs/bridge.wasm"
   pub_pkg test_a               "$packs/test_a.wasm"
