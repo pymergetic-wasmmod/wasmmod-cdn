@@ -192,21 +192,28 @@
   }
 
   /**
-   * Stock mp_js_do_exec compiles with FILE_INPUT + is_repl=false, so expression
-   * values are popped (hello() → 42 never surfaces). Interactive lines: eval when
-   * possible, else exec; print(repr) for non-None — same as a normal REPL.
+   * Stock mp_js_do_exec uses FILE_INPUT (expression values discarded). For a
+   * one-line expression, eval + print(repr). Do NOT wrap import/from or
+   * multi-line blocks — nested eval/exec breaks CDN multi-fetch + asyncify
+   * (e.g. import test_a2.test_b2.test_c2 → ImportError: no module named 'test_a2').
    */
   function withReplDisplay(src) {
-    const quoted = JSON.stringify(String(src));
+    const text = String(src ?? "").replace(/\s+$/, "");
+    if (!text) return text;
+    if (text.includes("\n") || /^(import\s|from\s)/.test(text)) {
+      return text;
+    }
+    const quoted = JSON.stringify(text);
     return (
+      "_g = globals()\n" +
       "try:\n" +
       "    _metal_v = eval(" +
       quoted +
-      ")\n" +
+      ", _g, _g)\n" +
       "except SyntaxError:\n" +
       "    exec(" +
       quoted +
-      ")\n" +
+      ", _g, _g)\n" +
       "else:\n" +
       "    if _metal_v is not None:\n" +
       "        print(repr(_metal_v))\n"
@@ -304,8 +311,9 @@
     }
     await ensureSession({ quiet: false });
     void postSessionEvent("try_package", { package: pkg, path: "/try/" + pkg });
-    // Plain FQN import + autoexec exports() helper.
-    await run(["import " + pkg, "exports(" + pkg + ")"].join("\n"), { echo: true });
+    // Separate runs: import must not go through eval/exec wrap (CDN nested packs).
+    await run("import " + pkg, { echo: true });
+    await run("exports(" + pkg + ")", { echo: true });
   }
 
   if (toggleBtn) toggleBtn.addEventListener("click", () => toggle());

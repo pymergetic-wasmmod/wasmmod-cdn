@@ -619,10 +619,18 @@ def _artifact_response(
     cache = f"public, max-age={cache_s}"
     if immutable:
         cache += ", immutable"
+    headers = {
+        "ETag": etag,
+        "Cache-Control": cache,
+        "Content-Length": str(len(data)),
+    }
+    # Browser wasmmod probes with HEAD (falls back to GET on 405); answer both.
+    if request.method.upper() == "HEAD":
+        return Response(status_code=200, media_type="application/octet-stream", headers=headers)
     return Response(
         content=data,
         media_type="application/octet-stream",
-        headers={"ETag": etag, "Cache-Control": cache},
+        headers=headers,
     )
 
 
@@ -641,7 +649,7 @@ async def _load_artifact_bytes(storage: StorageDep, *, channel: str, filename: s
     return await storage.get_bytes(key)
 
 
-@artifacts_router.get("/lead/{filename}")
+@artifacts_router.api_route("/lead/{filename}", methods=["GET", "HEAD"])
 async def get_artifact_lead(
     filename: str,
     request: Request,
@@ -657,7 +665,7 @@ async def get_artifact_lead(
     )
 
 
-@artifacts_router.get("/pin/{version}/{filename}")
+@artifacts_router.api_route("/pin/{version}/{filename}", methods=["GET", "HEAD"])
 async def get_artifact_pinned(
     version: str,
     filename: str,

@@ -138,6 +138,9 @@ async def test_user_and_publish_flow(client: AsyncClient) -> None:
     br = await client.get("/artifacts/lead/hello.wasm")
     assert br.status_code == 200
     assert br.content.startswith(b"\x00asm")
+    hr = await client.head("/artifacts/lead/hello.wasm")
+    assert hr.status_code == 200
+    assert hr.headers.get("content-length") == str(len(br.content))
 
     home = await client.get("/", follow_redirects=True)
     assert home.status_code == 200
