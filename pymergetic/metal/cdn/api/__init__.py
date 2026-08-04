@@ -935,7 +935,7 @@ async def section_raw_lead(
     try:
         body = extract_container_section(data, index=index)
         sections = list_container_sections(data)
-        name = sections[index].name if 0 <= index < len(sections) else f"section_{index}"
+        name = next((s.name for s in sections if s.index == index), f"section_{index}")
         body = slice_bytes(body, offset=offset, limit=limit)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -957,7 +957,7 @@ async def section_raw_pin(
     try:
         body = extract_container_section(data, index=index)
         sections = list_container_sections(data)
-        name = sections[index].name if 0 <= index < len(sections) else f"section_{index}"
+        name = next((s.name for s in sections if s.index == index), f"section_{index}")
         body = slice_bytes(body, offset=offset, limit=limit)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

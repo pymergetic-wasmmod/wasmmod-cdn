@@ -255,6 +255,56 @@ class CdnClient:
         """GET ``.../inspect`` for a stored artifact."""
         return self.request("GET", f"{self._artifact_prefix(filename, version=version)}/inspect")
 
+    def list_symbols_remote(
+        self, filename: str, *, version: str | None = None
+    ) -> list[dict[str, Any]]:
+        """GET ``.../symbols``."""
+        data = self.request("GET", f"{self._artifact_prefix(filename, version=version)}/symbols")
+        return list(data) if isinstance(data, list) else []
+
+    def addr2line_remote(
+        self, filename: str, addr: int, *, version: str | None = None
+    ) -> list[dict[str, Any]]:
+        """GET ``.../addr2line?addr=``."""
+        data = self.request(
+            "GET",
+            f"{self._artifact_prefix(filename, version=version)}/addr2line",
+            query={"addr": str(addr)},
+        )
+        return list(data) if isinstance(data, list) else []
+
+    def locations_remote(
+        self, filename: str, name: str, *, version: str | None = None
+    ) -> list[dict[str, Any]]:
+        """GET ``.../locations?name=``."""
+        data = self.request(
+            "GET",
+            f"{self._artifact_prefix(filename, version=version)}/locations",
+            query={"name": name},
+        )
+        return list(data) if isinstance(data, list) else []
+
+    def disasm_remote(
+        self,
+        filename: str,
+        index: int,
+        *,
+        offset: int = 0,
+        limit: int = 64,
+        version: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """GET ``.../disasm?index=&offset=&limit=``."""
+        data = self.request(
+            "GET",
+            f"{self._artifact_prefix(filename, version=version)}/disasm",
+            query={
+                "index": str(index),
+                "offset": str(offset),
+                "limit": str(limit),
+            },
+        )
+        return list(data) if isinstance(data, list) else []
+
     def get_embedded_file(
         self, filename: str, path: str, *, version: str | None = None
     ) -> dict[str, Any]:

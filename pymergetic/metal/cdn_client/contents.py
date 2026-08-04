@@ -931,7 +931,8 @@ def _list_sections_elf(buf: bytes) -> list[ContainerSectionInfo]:
             role = "other"
         out.append(
             ContainerSectionInfo(
-                index=len(out),
+                # Real ELF shndx so it matches SymbolInfo.section_index / disasm.
+                index=i,
                 name=name,
                 type_id=typ,
                 offset=off,
@@ -962,9 +963,9 @@ def extract_container_section(data: bytes, *, index: int) -> bytes:
         raise FileNotFoundError(f"section index {index}")
     naked = unwrap_mpzl(data)
     sections = list_container_sections(naked)
-    if index >= len(sections):
+    sec = next((s for s in sections if s.index == index), None)
+    if sec is None:
         raise FileNotFoundError(f"section index {index}")
-    sec = sections[index]
     end = sec.offset + sec.size
     if end > len(naked):
         raise ValueError(f"section {index} truncated")

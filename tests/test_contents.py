@@ -511,9 +511,14 @@ def test_pack_symbols_addr2line_disasm_hello_elf() -> None:
     assert any(loc.role in ("sym", "dwarf", "def", "twin") for loc in named)
 
     assert hello.section_index is not None
+    secs = list_container_sections(data)
+    text = next(s for s in secs if s.name == ".text")
+    assert hello.section_index == text.index  # shndx parity (not compacted)
     lines = pack_disasm(data, hello.section_index, offset=hello.offset, limit=8)
     assert lines
     assert all(ln.text for ln in lines)
+    raw = extract_container_section(data, index=hello.section_index)
+    assert len(raw) == text.size
 
 
 def test_pack_mpy_disasm_hello_elf() -> None:
