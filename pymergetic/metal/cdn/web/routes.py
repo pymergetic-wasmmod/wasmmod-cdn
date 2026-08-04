@@ -172,6 +172,7 @@ async def _shell_context(
     experimental_message: str | None = None
     experimental_repl = False
     repl_ready = False
+    repl_asset_v = ""
     settings = None
     if request is not None:
         settings = getattr(request.app.state, "settings", None)
@@ -180,8 +181,21 @@ async def _shell_context(
             experimental_message = getattr(settings, "experimental_message", None)
         if settings is not None and getattr(settings, "experimental_repl", False):
             experimental_repl = True
-            repl_mjs = Path(__file__).resolve().parent / "static" / "repl" / "micropython.mjs"
+            repl_dir = Path(__file__).resolve().parent / "static" / "repl"
+            repl_mjs = repl_dir / "micropython.mjs"
+            repl_wasm = repl_dir / "micropython.wasm"
             repl_ready = repl_mjs.is_file()
+            # Cache-bust query for mjs (+ locateFile wasm) across deploys.
+            try:
+                mtimes = []
+                if repl_mjs.is_file():
+                    mtimes.append(int(repl_mjs.stat().st_mtime))
+                if repl_wasm.is_file():
+                    mtimes.append(int(repl_wasm.stat().st_mtime))
+                if mtimes:
+                    repl_asset_v = format(max(mtimes), "x")
+            except OSError:
+                repl_asset_v = ""
         if current_user is None:
             current_user = await _session_user(request)
     return {
@@ -195,6 +209,7 @@ async def _shell_context(
         "experimental_message": experimental_message,
         "experimental_repl": experimental_repl,
         "repl_ready": repl_ready,
+        "repl_asset_v": repl_asset_v,
         "current_user": current_user,
     }
 

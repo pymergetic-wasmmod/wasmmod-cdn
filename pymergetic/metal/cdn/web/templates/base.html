@@ -156,7 +156,8 @@
     aria-expanded="false"
     data-base-path="{{ base_path }}"
     data-cdn-base="{{ (base_path or '') and (base_path) or '' }}"
-    data-mjs-url="{{ href('static', 'repl', 'micropython.mjs') }}"
+    data-mjs-url="{{ href('static', 'repl', 'micropython.mjs') }}{% if repl_asset_v %}?v={{ repl_asset_v }}{% endif %}"
+    data-repl-asset-v="{{ repl_asset_v }}"
     data-autoexec-url="{{ href('repl', 'autoexec.py') }}"
   >
     <div class="mpy-repl-bar">

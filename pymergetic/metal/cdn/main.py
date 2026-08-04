@@ -123,9 +123,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_web(settings.base_path)
     app.include_router(build_api_router(), prefix=prefix)
     app.include_router(web_router, prefix=prefix)
+
+    class _ReplAwareStaticFiles(StaticFiles):
+        """µPy REPL assets must not be sticky-cached across deploys."""
+
+        async def get_response(self, path: str, scope):  # type: ignore[no-untyped-def]
+            response = await super().get_response(path, scope)
+            # micropython.mjs/.wasm — autoexec is already no-store; without this the
+            # browser can keep an old binary while the banner looks "new".
+            if path.startswith("repl/micropython."):
+                response.headers["Cache-Control"] = "no-cache, must-revalidate"
+            return response
+
     app.mount(
         join_base(settings.base_path, "static"),
-        StaticFiles(directory=str(STATIC_DIR)),
+        _ReplAwareStaticFiles(directory=str(STATIC_DIR)),
         name="static",
     )
     return app

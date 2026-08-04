@@ -17,6 +17,18 @@
   const statusEl = document.getElementById("mpy-repl-status");
   const basePath = panel.dataset.basePath || "";
   const mjsUrl = panel.dataset.mjsUrl || (basePath + "/static/repl/micropython.mjs");
+  const assetV = panel.dataset.replAssetV || "";
+  /** Append deploy bust to wasm/mjs sibling fetches (import() query is not enough). */
+  function bustUrl(url) {
+    if (!assetV) return url;
+    try {
+      const u = new URL(url, window.location.href);
+      u.searchParams.set("v", assetV);
+      return u.href;
+    } catch (_) {
+      return url + (url.includes("?") ? "&" : "?") + "v=" + encodeURIComponent(assetV);
+    }
+  }
   const autoexecUrl = panel.dataset.autoexecUrl || (basePath + "/repl/autoexec.py");
 
   let mp = null;
@@ -132,10 +144,18 @@
       const mod = await import(mjsUrl);
       const loadMicroPython = mod.loadMicroPython || mod.default?.loadMicroPython;
       if (!loadMicroPython) throw new Error("loadMicroPython missing from micropython.mjs");
-      mp = await loadMicroPython({
+      // Stock locateFile is `url || scriptDirectory + path`. Passing url= busted
+      // .wasm forces a fresh binary (mjs ?v= alone does not bust the sibling wasm).
+      const loadOpts = {
         stdout: (line) => append(String(line).replace(/\n$/, ""), "mpy-out"),
         stderr: (line) => append(String(line).replace(/\n$/, ""), "mpy-err"),
-      });
+      };
+      if (assetV) {
+        loadOpts.url = bustUrl(
+          String(mjsUrl).replace(/micropython\.mjs(\?.*)?$/i, "micropython.wasm"),
+        );
+      }
+      mp = await loadMicroPython(loadOpts);
       // Stock µPy runPythonAsync omits ccall { async: true }; wasmmod js.fetch needs it.
       // Keep metalpython api.js untouched — wrap here via mp._module.
       patchRunPythonAsyncify(mp);

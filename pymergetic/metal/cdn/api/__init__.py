@@ -678,7 +678,9 @@ async def get_artifact_pinned(
         data,
         request=request,
         cache_s=settings.artifact_cache_pin_s,
-        immutable=True,
+        # Storage pins are write-once; HTTP must NOT be immutable — force-republish
+        # (e.g. sign-after-seed) keeps the same URL with a new body/ETag.
+        immutable=False,
     )
 
 
