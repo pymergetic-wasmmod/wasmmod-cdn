@@ -305,6 +305,22 @@ class CdnClient:
         )
         return list(data) if isinstance(data, list) else []
 
+    def mpy_disasm_remote(
+        self,
+        filename: str,
+        path: str,
+        *,
+        limit: int = 80,
+        version: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """GET ``.../files/mpy-disasm?path=&limit=``."""
+        data = self.request(
+            "GET",
+            f"{self._artifact_prefix(filename, version=version)}/files/mpy-disasm",
+            query={"path": path, "limit": str(limit)},
+        )
+        return list(data) if isinstance(data, list) else []
+
     def get_embedded_file(
         self, filename: str, path: str, *, version: str | None = None
     ) -> dict[str, Any]:
