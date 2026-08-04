@@ -8,11 +8,11 @@ import zlib
 import pytest
 
 from pymergetic.metal.cdn_client.contents import (
+    ensure_zlib_artifacts,
     inspect_artifact,
     inspect_upload,
     parse_pack_payload,
     unwrap_mpzl,
-    ensure_zlib_artifacts,
     wrap_mpzl,
 )
 

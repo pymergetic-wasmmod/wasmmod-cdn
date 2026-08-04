@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Sessions — metal-cdn{% endblock %}
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">shell</p>
+  <h1>Sessions</h1>
+  <p class="lede">
+    Browser REPL / CDN loader sessions for
+    <strong>{{ principal_label }}</strong>.
+    Hits in the last 30 minutes (pack loads, index fetches, Try / autoexec).
+  </p>
+</section>
+
+{% if not shell_sessions %}
+<p class="muted">No shell sessions yet — open the µPy panel to bind a CDN loader.</p>
+{% else %}
+<ul class="session-list">
+  {% for s in shell_sessions %}
+  {% set act = shell_activities.get(s.id|string) %}
+  <li class="session-card">
+    <header class="session-card-head">
+      <code class="session-id" title="{{ s.id }}">{{ s.id|string|truncate(8, True, '') }}</code>
+      <span class="muted">{{ s.principal_label }}</span>
+      <span class="muted session-time">last {{ s.last_activity_at }}</span>
+    </header>
+    <div class="session-loader">
+      <p class="session-loader-label">loader entered</p>
+      <ul class="session-tree">
+        <li><span class="k">base</span> <code>{{ s.cdn_base or '—' }}</code></li>
+        <li><span class="k">channel</span> <code>{{ s.channel }}</code></li>
+        <li><span class="k">driver</span> <code>{{ s.driver or '—' }}{% if s.hook_on %} · hook on{% endif %}</code></li>
+      </ul>
+    </div>
+    {% if act %}
+    {% set counts = act.buckets|map(attribute='count')|list %}
+    {% set peak = counts|max if counts else 1 %}
+    {% if peak < 1 %}{% set peak = 1 %}{% endif %}
+    <div class="session-spark" role="img" aria-label="Hits over last {{ act.window_minutes }} minutes">
+      {% for b in act.buckets %}
+      <span
+        class="session-spark-bar{% if b.count %} is-hot{% endif %}"
+        style="--h: {{ (b.count / peak * 100)|round(1) }}%"
+        title="{{ b.minute }} · {{ b.count }}"
+      ></span>
+      {% endfor %}
+    </div>
+    <p class="muted session-spark-caption">
+      {{ act.recent|length }} event(s) in window
+      {% if act.recent %}
+      · last
+      <code>{{ act.recent[0].kind }}{% if act.recent[0].package %} {{ act.recent[0].package }}{% endif %}</code>
+      {% endif %}
+    </p>
+    {% if act.recent %}
+    <ul class="session-events">
+      {% for ev in act.recent[:8] %}
+      <li>
+        <span class="session-ev-kind">{{ ev.kind }}</span>
+        {% if ev.package %}<code>{{ ev.package }}</code>{% elif ev.path %}<code class="muted">{{ ev.path|truncate(40, True, '…') }}</code>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

@@ -40,7 +40,8 @@ def _warn_experimental(client: CdnClient) -> None:
     if not status.get("experimental"):
         return
     msg = status.get("experimental_message") or (
-        "Experimental CDN: data may be wiped before go-live — not for production."
+        "Experimental CDN: data will be wiped — often. "
+        "Short tests only; do not run weekend-long experiments against it. Not for production."
     )
     report(PROG, msg, "Set METAL_CDN_EXPERIMENTAL=false after go-live")
 

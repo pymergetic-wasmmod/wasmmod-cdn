@@ -38,6 +38,28 @@ metal-cdn serve --reload
 
 TLS edge (host forwards **80→8080**, **443→8443**): see [docs/PROXY.md](docs/PROXY.md).
 
+## Docker / local demo
+
+One script: rebuild browser µPy (if needed), sync REPL assets, `docker build`/`run`, seed sample packs:
+
+```sh
+cd packages/metal-cdn
+./scripts/dev-up.sh
+# → http://127.0.0.1:8000/cdn/   (µPy: packages() | import hello)
+```
+
+Flags: `--no-upy` (reuse synced assets), `--no-seed`, `--seed-only` (publish into a running container).  
+Env: `METALPYTHON`, `METAL_CDN_URL`, `METAL_CDN_PORT`, `METAL_CDN_SESSION_SECRET`.
+
+The image installs the in-tree `client/` wheel before the server (not from PyPI). Persist `/data` via the `metal-cdn-data` volume. Schema is created on first boot (`create_all`); for upgrades run `metal-cdn db upgrade` against the same volume.
+
+## Shell sessions (browser µPy)
+
+- `GET /repl/autoexec.py` mints/reuses a `ShellSession`, embeds `SESSION_ID`, and runs `wasm.cdn` + `install_hook` + `wasm.session_id(SESSION_ID)`.
+- Pack/index GETs with the session cookie are attributed as shell events (Sessions tab).
+- **Login** claims prior anon sessions onto the user (anon id kept for history). **Logout** clears `user_id` and mints a fresh anon.
+- Nav shows email + Logout when signed in; otherwise Login.
+
 ## Client CLI
 
 ```sh
@@ -89,7 +111,11 @@ from pymergetic.metal.cdn_client import CdnClient
 | Method | Path | Role |
 |--------|------|------|
 | GET | `/health` / `/ready` / `/metrics` | Liveness / readiness / Prometheus |
-| POST | `/auth/*` | Register, login, token, API keys |
+| POST | `/auth/*` | Register, login (claims anon shell sessions), token, API keys |
+| GET | `/api/sessions` | List shell sessions for cookie principal |
+| GET | `/api/sessions/{id}/activity` | Last-N-minute hit buckets + recent events |
+| POST | `/api/sessions/events` | Best-effort REPL events (`try_package`, `import`, …) |
+| GET | `/repl/autoexec.py` | Browser µPy bootstrap (`SESSION_ID`, CDN, helpers) |
 | POST | `/packages/{name}/claim` | Claim ownership (`org/pkg` ok) |
 | GET | `/index/lead` | Device-facing `index.json` |
 | GET | `/packages/{name}/closure` | Exact-deps install order |

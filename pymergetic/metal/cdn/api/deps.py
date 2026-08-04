@@ -16,6 +16,7 @@ from pymergetic.metal.cdn.services.audit import AuditService
 from pymergetic.metal.cdn.services.channel import IndexService, PublishService
 from pymergetic.metal.cdn.services.identity import AclService, ApiKeyService, UserService
 from pymergetic.metal.cdn.services.orgs import OrgService
+from pymergetic.metal.cdn.services.shell_sessions import ShellSessionService
 from pymergetic.metal.cdn.services.trust import TrustService
 from pymergetic.metal.cdn.settings import Settings
 from pymergetic.metal.cdn.storage import ObjectStorage
@@ -87,6 +88,12 @@ def get_trust_service(session: Annotated[AsyncSession, Depends(get_session)]) ->
     return TrustService(session)
 
 
+def get_shell_session_service(
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ShellSessionService:
+    return ShellSessionService(session)
+
+
 async def get_optional_user(
     request: Request,
     users: Annotated[UserService, Depends(get_user_service)],
@@ -151,6 +158,7 @@ ApiKeyServiceDep = Annotated[ApiKeyService, Depends(get_api_key_service)]
 OrgServiceDep = Annotated[OrgService, Depends(get_org_service)]
 AuditServiceDep = Annotated[AuditService, Depends(get_audit_service)]
 TrustServiceDep = Annotated[TrustService, Depends(get_trust_service)]
+ShellSessionServiceDep = Annotated[ShellSessionService, Depends(get_shell_session_service)]
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 OptionalUserDep = Annotated[UserRead | None, Depends(get_optional_user)]
 CurrentUserDep = Annotated[UserRead, Depends(get_current_user)]

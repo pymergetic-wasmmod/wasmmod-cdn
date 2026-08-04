@@ -8,22 +8,30 @@
   {% block head %}{% endblock %}
 </head>
 <body class="{% if active_page == 'docs' %}page-docs{% endif %}">
-  {% if experimental %}
-  <div class="exp-banner" role="status">
-    <strong>Experimental</strong>
-    <span>{{ experimental_message or "Data may be wiped before go-live — not for production." }}</span>
+  <div class="site-top">
+    {% if experimental %}
+    <div class="exp-banner" role="status">
+      <strong>Experimental</strong>
+      <span>{{ experimental_message or "Experimental CDN: data will be wiped — often. Short tests only; do not run weekend-long experiments against it. Not for production." }}</span>
+    </div>
+    {% endif %}
+    <header class="banner">
+      <a class="brand" href="{{ href('channels', 'lead') }}">metal-cdn</a>
+      <nav class="top-nav">
+        <a href="{{ href('channels', 'lead') }}" class="{% if active_page == 'browse' or not active_page %}is-active{% endif %}">Browse</a>
+        <a href="{{ href('authors') }}" class="{% if active_page == 'users' %}is-active{% endif %}">Users</a>
+        <a href="{{ href('publish') }}" class="{% if active_page == 'publish' %}is-active{% endif %}">Publish</a>
+        <a href="{{ href('sessions') }}" class="{% if active_page == 'sessions' %}is-active{% endif %}">Sessions</a>
+        <a href="{{ href('docs') }}" class="{% if active_page == 'docs' %}is-active{% endif %}">API</a>
+        {% if current_user %}
+        <span class="nav-user" title="{{ current_user.email }}">{{ current_user.email }}</span>
+        <button type="button" class="nav-logout" id="nav-logout">Logout</button>
+        {% else %}
+        <a href="{{ href('login') }}" class="{% if active_page == 'login' %}is-active{% endif %}">Login</a>
+        {% endif %}
+      </nav>
+    </header>
   </div>
-  {% endif %}
-  <header class="banner">
-    <a class="brand" href="{{ href('channels', 'lead') }}">metal-cdn</a>
-    <nav class="top-nav">
-      <a href="{{ href('channels', 'lead') }}" class="{% if active_page == 'browse' or not active_page %}is-active{% endif %}">Browse</a>
-      <a href="{{ href('authors') }}" class="{% if active_page == 'users' %}is-active{% endif %}">Users</a>
-      <a href="{{ href('publish') }}" class="{% if active_page == 'publish' %}is-active{% endif %}">Publish</a>
-      <a href="{{ href('docs') }}" class="{% if active_page == 'docs' %}is-active{% endif %}">API</a>
-      <a href="{{ href('login') }}" class="{% if active_page == 'login' %}is-active{% endif %}">Login</a>
-    </nav>
-  </header>
 
   <div class="shell">
     <aside
@@ -140,6 +148,46 @@
       <span>ok</span>
     </a>
   </footer>
+
+  {% if experimental_repl %}
+  <div
+    id="mpy-repl"
+    class="mpy-repl is-mini"
+    aria-expanded="false"
+    data-base-path="{{ base_path }}"
+    data-cdn-base="{{ (base_path or '') and (base_path) or '' }}"
+    data-mjs-url="{{ href('static', 'repl', 'micropython.mjs') }}"
+    data-autoexec-url="{{ href('repl', 'autoexec.py') }}"
+  >
+    <div class="mpy-repl-bar">
+      <button type="button" id="mpy-repl-toggle" class="mpy-repl-toggle" title="Toggle MicroPython shell size">
+        <span class="mpy-repl-title">µPy</span>
+        <span id="mpy-repl-status" class="mpy-repl-status muted">{% if repl_ready %}idle{% else %}loading…{% endif %}</span>
+      </button>
+    </div>
+    <div class="mpy-repl-body">
+      <div class="mpy-repl-term" id="mpy-repl-term" tabindex="-1">
+        <div id="mpy-repl-out" class="mpy-repl-out" aria-live="polite"></div>
+        <div class="mpy-repl-line">
+          <span class="mpy-repl-prompt" aria-hidden="true">>>> </span>
+          <label class="visually-hidden" for="mpy-repl-in">Python input</label>
+          <input id="mpy-repl-in" type="text" autocomplete="off" spellcheck="false" />
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  (() => {
+    const el = document.getElementById("mpy-repl");
+    if (!el) return;
+    const prefix = (el.dataset.basePath || "").replace(/\/$/, "");
+    const pathPref = (window.location.pathname.match(/^(\/cdn)(?=\/|$)/) || [])[1] || "";
+    el.dataset.cdnBase = window.location.origin + (prefix || pathPref || "");
+  })();
+  </script>
+  <script src="{{ href('static', 'repl.js') }}" defer></script>
+  {% endif %}
+
   <script>
   (() => {
     const nav = document.getElementById("pkg-nav");
@@ -247,5 +295,30 @@
     }
   })();
   </script>
+  {% if current_user %}
+  <script>
+  (function () {
+    const btn = document.getElementById("nav-logout");
+    if (!btn) return;
+    const apiBase = "{{ base_path }}";
+    btn.addEventListener("click", async () => {
+      const headers = { "Content-Type": "application/json" };
+      try {
+        const csrfRes = await fetch(apiBase + "/auth/csrf", { credentials: "same-origin" });
+        if (csrfRes.ok) {
+          const data = await csrfRes.json();
+          if (data.csrf_token) headers["X-CSRF-Token"] = data.csrf_token;
+        }
+      } catch (_) {}
+      await fetch(apiBase + "/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+        headers,
+      });
+      window.location.href = apiBase + "/channels/lead";
+    });
+  })();
+  </script>
+  {% endif %}
 </body>
 </html>

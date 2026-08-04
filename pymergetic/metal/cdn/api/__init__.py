@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from typing import Annotated
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi import status as http_status
@@ -24,6 +24,7 @@ from pymergetic.metal.cdn.api.deps import (
     OrgServiceDep,
     PublishServiceDep,
     SettingsDep,
+    ShellSessionServiceDep,
     StorageDep,
     TrustServiceDep,
     UserServiceDep,
@@ -37,6 +38,7 @@ from pymergetic.metal.cdn.api.extended import (
     orgs_router,
     register_package_extensions,
 )
+from pymergetic.metal.cdn.api.sessions import sessions_router
 from pymergetic.metal.cdn.db import Database
 from pymergetic.metal.cdn.layout import ChannelLayout
 from pymergetic.metal.cdn.middleware.csrf import ensure_csrf_token
@@ -68,6 +70,7 @@ from pymergetic.metal.cdn.models import (
     UserRead,
     YankRequest,
 )
+from pymergetic.metal.cdn.services.shell_sessions import SESSION_ANON_KEY
 from pymergetic.metal.cdn_client.contents import (
     ArtifactContents,
     EmbeddedFileView,
@@ -119,13 +122,13 @@ async def ready(
     try:
         async with db.engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
-    except Exception as exc:  # noqa: BLE001 — surface as not-ready
+    except Exception as exc:
         db_status = f"error: {exc}"
     try:
         probe = "__ready_probe__"
         await storage.put_bytes(probe, b"ok")
         await storage.delete(probe)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         storage_status = f"error: {exc}"
     ok = db_status == "ok" and storage_status == "ok"
     if not ok:
@@ -169,10 +172,21 @@ async def register(
 
 
 @auth_router.post("/login", response_model=UserRead)
-async def login(body: LoginRequest, request: Request, users: UserServiceDep) -> UserRead:
+async def login(
+    body: LoginRequest,
+    request: Request,
+    users: UserServiceDep,
+    shells: ShellSessionServiceDep,
+) -> UserRead:
     user = await users.authenticate(body.email, body.password)
     if user is None:
         raise HTTPException(status_code=401, detail="invalid credentials")
+    raw_anon = request.session.get(SESSION_ANON_KEY)
+    if raw_anon:
+        try:
+            await shells.claim_anon(UUID(str(raw_anon)), user.id)
+        except ValueError:
+            pass
     request.session[SESSION_USER_KEY] = str(user.id)
     ensure_csrf_token(request)
     return user
@@ -193,7 +207,11 @@ async def issue_token(
 
 @auth_router.post("/logout", status_code=http_status.HTTP_204_NO_CONTENT)
 async def logout(request: Request) -> None:
-    request.session.clear()
+    # Drop identity only; mint a fresh anon so post-logout hits do not
+    # reattach to previously claimed shell sessions.
+    request.session.pop(SESSION_USER_KEY, None)
+    request.session[SESSION_ANON_KEY] = str(uuid4())
+    ensure_csrf_token(request)
 
 
 @auth_router.get("/me", response_model=UserRead)
@@ -753,4 +771,5 @@ def build_api_router() -> APIRouter:
     api_router.include_router(packages_router)
     api_router.include_router(publish_router)
     api_router.include_router(artifacts_router)
+    api_router.include_router(sessions_router)
     return api_router

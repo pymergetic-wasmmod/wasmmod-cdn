@@ -124,10 +124,18 @@ class Settings(BaseSettings):
     )
     experimental_message: str = Field(
         default=(
-            "Experimental CDN: data may be wiped before go-live. "
-            "Do not use for production workloads yet."
+            "Experimental CDN: data will be wiped — often. "
+            "Short tests only; do not run weekend-long experiments against it. "
+            "Not for production."
         ),
         description="User-facing warning text when experimental=true",
+    )
+    experimental_repl: bool = Field(
+        default=True,
+        description=(
+            "Show the minimizable MicroPython shell and package Try buttons "
+            "(needs static/repl/micropython.mjs from ports/webassembly)"
+        ),
     )
 
     @field_validator("base_path")

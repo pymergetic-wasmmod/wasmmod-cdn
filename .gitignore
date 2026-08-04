@@ -29,3 +29,10 @@ deploy/certbot/www/
 *.crt
 *.db
 *.sqlite3
+
+# Browser MicroPython REPL binaries (copied from ports/webassembly build)
+pymergetic/metal/cdn/web/static/repl/*.mjs
+pymergetic/metal/cdn/web/static/repl/*.wasm
+pymergetic/metal/cdn/web/static/repl/*.map
+!pymergetic/metal/cdn/web/static/repl/README.md
+!pymergetic/metal/cdn/web/static/repl/.gitkeep

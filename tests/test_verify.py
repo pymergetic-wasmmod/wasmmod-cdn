@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import struct
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from cryptography import x509
@@ -36,7 +36,7 @@ def _minimal_wasm(*sections: bytes) -> bytes:
 
 
 def _make_ca_and_leaf():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     ca_key = ec.generate_private_key(ec.SECP256R1())
     ca_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "test-ca")])
     ca_cert = (

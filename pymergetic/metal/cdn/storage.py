@@ -170,7 +170,7 @@ class S3ObjectStorage(ObjectStorage):
             async with self._client() as client:
                 await client.head_object(Bucket=self.bucket, Key=key)
             return True
-        except Exception:  # noqa: BLE001 — missing key / network
+        except Exception:
             return False
 
     async def delete(self, key: str) -> None:

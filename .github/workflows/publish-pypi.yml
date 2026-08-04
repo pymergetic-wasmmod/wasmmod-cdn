@@ -1,0 +1,95 @@
+# Build and publish client + server wheels to PyPI on version tags.
+# Prefer Trusted Publishing (OIDC): configure two PyPI projects with this
+# GitHub repo as publisher (environment name: pypi).
+name: publish-pypi
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build only (skip PyPI upload)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: python -m pip install -U pip build twine
+
+      - name: Build client wheel
+        run: |
+          python -m build --outdir dist-client client
+          twine check dist-client/*
+
+      - name: Build server wheel
+        run: |
+          python -m build --outdir dist-server .
+          twine check dist-server/*
+
+      - name: Show versions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for label, root in (("client", "dist-client"), ("server", "dist-server")):
+              wheels = sorted(Path(root).glob("*.whl"))
+              print(f"{label}: {[p.name for p in wheels]}")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-packages
+          path: |
+            dist-client/
+            dist-server/
+
+  publish-client:
+    needs: build
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pymergetic-metal-cdn-client
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-packages
+      - name: Publish client to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-client/
+
+  publish-server:
+    needs: build
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pymergetic-metal-cdn
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-packages
+      - name: Publish server to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-server/

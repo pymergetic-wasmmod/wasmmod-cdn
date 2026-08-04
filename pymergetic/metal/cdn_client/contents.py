@@ -540,7 +540,7 @@ def without_sig_section(buf: bytes) -> bytes:
             if aligned <= len(buf) and (aligned == len(buf) or aligned + 8 <= len(buf)):
                 next_p = aligned
             else:
-                next_p = end if end <= len(buf) else len(buf)
+                next_p = min(end, len(buf))
             skip = False
             if typ == AOT_SECTION_TYPE_CUSTOM and size >= 6:
                 sub = struct.unpack_from("<I", buf, content)[0]
@@ -942,7 +942,7 @@ def inspect_upload(files: dict[str, bytes]) -> PackageContents:
     for name, data in sorted(files.items()):
         try:
             arts.append(inspect_artifact(data, filename=name))
-        except Exception as exc:  # noqa: BLE001 — never fail publish for intel
+        except Exception as exc:
             arts.append(ArtifactContents(filename=name, error=str(exc), size=len(data)))
     return merge_contents(arts)
 

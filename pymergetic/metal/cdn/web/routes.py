@@ -4,16 +4,28 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from pymergetic.metal.cdn import __version__
-from pymergetic.metal.cdn.api.deps import IndexServiceDep
+from pymergetic.metal.cdn.api.deps import (
+    SESSION_USER_KEY,
+    IndexServiceDep,
+    OptionalUserDep,
+    ShellSessionServiceDep,
+)
+from pymergetic.metal.cdn.db import Database
 from pymergetic.metal.cdn.layout import ChannelLayout, ChannelRef
+from pymergetic.metal.cdn.middleware.csrf import ensure_csrf_token
+from pymergetic.metal.cdn.models import UserRead
 from pymergetic.metal.cdn.paths import author_path, channel_path, join_base, package_path
 from pymergetic.metal.cdn.services.channel import IndexService
+from pymergetic.metal.cdn.services.identity import UserService
+from pymergetic.metal.cdn.services.shell_sessions import ensure_principal
+from pymergetic.metal.cdn.web.repl_autoexec import render_autoexec
 from pymergetic.metal.cdn_client.format import human_size
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
@@ -54,6 +66,94 @@ def _url(*parts: str) -> str:
     return join_base(_base_path, *parts)
 
 
+def _cdn_base_url(request: Request) -> str:
+    """Absolute CDN root for wasm.cdn (scheme://host[/base_path]).
+
+    Prefer ``?cdn=`` from the shell UI (``data-cdn-base``) when present; otherwise
+    derive from the autoexec request itself.
+    """
+    q = (request.query_params.get("cdn") or "").strip().rstrip("/")
+    if q.startswith(("http://", "https://")) and " " not in q and len(q) < 512:
+        return q
+    origin = f"{request.url.scheme}://{request.url.netloc}"
+    if _base_path in ("", "/"):
+        return origin
+    return origin + _base_path.rstrip("/")
+
+
+@web_router.get(
+    "/repl/autoexec.py",
+    response_class=PlainTextResponse,
+    include_in_schema=True,
+    tags=["repl"],
+    summary="Browser REPL session bootstrap (Python)",
+)
+async def repl_autoexec(
+    request: Request,
+    indexes: IndexServiceDep,
+    shells: ShellSessionServiceDep,
+    user: OptionalUserDep,
+) -> PlainTextResponse:
+    """Return ``autoexec.py``: wasm.cdn + install_hook, intro, packages()/help()."""
+    settings = getattr(request.app.state, "settings", None)
+    if settings is not None and not getattr(settings, "experimental_repl", True):
+        raise HTTPException(status_code=404, detail="experimental_repl disabled")
+    catalog = await indexes.list_catalog()
+    names = sorted({row.name for row in catalog})
+    cdn_base = _cdn_base_url(request)
+    user_id, anon_id, principal = ensure_principal(request, user)
+    ensure_csrf_token(request)
+    ua = (request.headers.get("user-agent") or "")[:512]
+    shell = await shells.ensure_session(
+        user_id=user_id,
+        anon_id=anon_id,
+        cdn_base=cdn_base,
+        channel="lead",
+        driver="metal-cdn",
+        hook_on=True,
+        user_agent=ua,
+        principal_label=principal,
+    )
+    await shells.record_event(
+        shell.id,
+        kind="autoexec",
+        path="/repl/autoexec.py",
+    )
+    script = render_autoexec(
+        cdn_base=cdn_base,
+        app_version=__version__,
+        packages=names,
+        channel="lead",
+        session_id=str(shell.id),
+        principal=principal,
+        driver=shell.driver or "metal-cdn",
+    )
+    return PlainTextResponse(
+        script,
+        media_type="text/x-python; charset=utf-8",
+        headers={"Cache-Control": "no-store", "X-Shell-Session-Id": str(shell.id)},
+    )
+
+
+async def _session_user(request: Request) -> UserRead | None:
+    raw = request.session.get(SESSION_USER_KEY)
+    if not raw:
+        return None
+    try:
+        user_id = UUID(str(raw))
+    except ValueError:
+        return None
+    db: Database | None = getattr(request.app.state, "db", None)
+    if db is None:
+        return None
+    async for session in db.session():
+        user = await UserService(session).get(user_id)
+        if user is not None and user.is_active:
+            return user
+        return None
+    return None
+
+
 async def _shell_context(
     indexes: IndexService,
     *,
@@ -61,6 +161,7 @@ async def _shell_context(
     active_package: str | None = None,
     page: str = "browse",
     request: Request | None = None,
+    current_user: UserRead | None = None,
 ) -> dict[str, Any]:
     catalog = await indexes.list_catalog()
     nav_roots = await indexes.browse_package_nav()
@@ -69,11 +170,20 @@ async def _shell_context(
         package_versions = await indexes.package_versions(active_package)
     experimental = False
     experimental_message: str | None = None
+    experimental_repl = False
+    repl_ready = False
+    settings = None
     if request is not None:
         settings = getattr(request.app.state, "settings", None)
         if settings is not None and getattr(settings, "experimental", False):
             experimental = True
             experimental_message = getattr(settings, "experimental_message", None)
+        if settings is not None and getattr(settings, "experimental_repl", False):
+            experimental_repl = True
+            repl_mjs = Path(__file__).resolve().parent / "static" / "repl" / "micropython.mjs"
+            repl_ready = repl_mjs.is_file()
+        if current_user is None:
+            current_user = await _session_user(request)
     return {
         "catalog": catalog,
         "nav_roots": nav_roots,
@@ -83,6 +193,9 @@ async def _shell_context(
         "active_page": page,
         "experimental": experimental,
         "experimental_message": experimental_message,
+        "experimental_repl": experimental_repl,
+        "repl_ready": repl_ready,
+        "current_user": current_user,
     }
 
 
@@ -156,6 +269,32 @@ async def login_page(request: Request, indexes: IndexServiceDep) -> HTMLResponse
 async def publish_page(request: Request, indexes: IndexServiceDep) -> HTMLResponse:
     ctx = await _shell_context(indexes, active_channel="lead", page="publish", request=request)
     return templates.TemplateResponse(request, "publish.html", ctx)
+
+
+@web_router.get("/sessions", response_class=HTMLResponse, include_in_schema=False)
+async def sessions_page(
+    request: Request,
+    indexes: IndexServiceDep,
+    shells: ShellSessionServiceDep,
+    user: OptionalUserDep,
+) -> HTMLResponse:
+    user_id, anon_id, label = ensure_principal(request, user)
+    ensure_csrf_token(request)
+    rows = await shells.list_mine(user_id=user_id, anon_id=anon_id, principal_label=label)
+    activities: dict[str, Any] = {}
+    for row in rows[:12]:
+        activities[str(row.id)] = await shells.activity(row.id, window_minutes=30)
+    ctx = await _shell_context(
+        indexes, active_channel="lead", page="sessions", request=request, current_user=user
+    )
+    ctx.update(
+        {
+            "shell_sessions": rows,
+            "shell_activities": activities,
+            "principal_label": label,
+        }
+    )
+    return templates.TemplateResponse(request, "sessions.html", ctx)
 
 
 async def _channel_page(

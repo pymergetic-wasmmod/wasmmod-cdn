@@ -50,7 +50,8 @@ Host tools can call `inspect_upload` / `inspect_artifact` directly.
 
 ## Experimental / pre-live
 
-Default **`METAL_CDN_EXPERIMENTAL=true`** advertises a wipe warning:
+Default **`METAL_CDN_EXPERIMENTAL=true`** advertises a wipe warning (data **will** be
+wiped often — short tests only, not long-running experiments):
 
 - UI: top banner on all browse pages
 - API: `GET /status`, `GET /health`, `GET /ready` include `experimental` + message

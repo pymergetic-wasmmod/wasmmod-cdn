@@ -109,11 +109,7 @@ def _chain_to_roots(certs, roots, *, hashes, InvalidSignature, ec, rsa, padding)
     for root in roots:
         if last.issuer == root.subject or last.subject == root.subject:
             try:
-                if last.subject == root.subject and last.issuer == root.subject:
-                    _check_issued(
-                        last, root, hashes=hashes, InvalidSignature=InvalidSignature, ec=ec, rsa=rsa, padding=padding
-                    )
-                elif last.issuer == root.subject:
+                if last.subject == root.subject and last.issuer == root.subject or last.issuer == root.subject:
                     _check_issued(
                         last, root, hashes=hashes, InvalidSignature=InvalidSignature, ec=ec, rsa=rsa, padding=padding
                     )

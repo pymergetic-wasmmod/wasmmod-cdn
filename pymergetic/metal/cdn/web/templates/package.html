@@ -210,12 +210,23 @@
         <button type="button" class="artifact-open" aria-expanded="false">
           <code>{{ a.path }}</code>
         </button>
-        <span class="muted">{{ a.kind.value }} · {{ a.encoding.value }} · {{ a.size|human_size }}</span>
-        <a class="icon-btn download-btn" href="{{ dl_href }}" download="{{ a.path }}" title="Download {{ a.path }}" aria-label="Download {{ a.path }}">
-          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-            <path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/>
-          </svg>
-        </a>
+        <span class="muted artifact-meta">{{ a.kind.value }} · {{ a.encoding.value }} · {{ a.size|human_size }}</span>
+        <div class="artifact-actions">
+          <a class="icon-btn download-btn" href="{{ dl_href }}" download="{{ a.path }}" title="Download {{ a.path }}" aria-label="Download {{ a.path }}">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/>
+            </svg>
+          </a>
+          {% if experimental_repl and repl_ready and (a.path.endswith('.wasm') or a.path.endswith('.wasm.zlib') or '.aot' in a.path) %}
+          <button type="button" class="icon-btn try-btn" data-mpy-try="{{ name }}"
+                  title="Try in µPy shell: import {{ name }}; dir(...)"
+                  aria-label="Try {{ name }} in MicroPython shell">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path fill="currentColor" d="M8 5.14v14l11-7-11-7Z"/>
+            </svg>
+          </button>
+          {% endif %}
+        </div>
       </div>
       <div class="artifact-panel" hidden></div>
     </li>
@@ -484,10 +495,33 @@
     dialogDl.setAttribute("download", filename);
   }
 
+  function resetSourceBody(className, text) {
+    // hljs 11 refuses to re-highlight if dataset.highlighted is still set.
+    delete dialogBody.dataset.highlighted;
+    dialogBody.className = className || "source-body";
+    dialogBody.textContent = text == null ? "" : text;
+  }
+
+  function paintSource(text, lang) {
+    delete dialogBody.dataset.highlighted;
+    if (window.hljs && lang && window.hljs.getLanguage(lang)) {
+      try {
+        const out = window.hljs.highlight(text, { language: lang, ignoreIllegals: true });
+        dialogBody.className = "source-body hljs language-" + lang;
+        dialogBody.innerHTML = out.value;
+        dialogBody.dataset.highlighted = "yes";
+        return;
+      } catch (err) {
+        console.warn("hljs highlight failed", lang, err);
+      }
+    }
+    dialogBody.className = "source-body" + (lang ? (" language-" + lang) : "");
+    dialogBody.textContent = text;
+  }
+
   async function openSource(filesBase, filesRaw, path) {
     dialogTitle.textContent = path;
-    dialogBody.className = "source-body";
-    dialogBody.textContent = "Loading…";
+    resetSourceBody("source-body", "Loading…");
     dialogMeta.hidden = true;
     dialogMeta.textContent = "";
     setDownload(filesRaw + "?path=" + encodeURIComponent(path), path.split("/").pop() || path);
@@ -497,7 +531,7 @@
     const res = await fetch(metaUrl, { headers: { Accept: "application/json" } });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      dialogBody.textContent = data.detail || ("failed (" + res.status + ")");
+      resetSourceBody("source-body", data.detail || ("failed (" + res.status + ")"));
       return;
     }
 
@@ -510,28 +544,27 @@
       (data.kind ? (" · kind " + data.kind) : "");
 
     if (!isBinary) {
-      const lang = guessLang(path);
-      dialogBody.className = "source-body hljs" + (lang ? (" language-" + lang) : "");
-      dialogBody.textContent = data.text;
-      if (window.hljs) {
-        try { window.hljs.highlightElement(dialogBody); } catch (_) { /* ignore */ }
-      }
+      paintSource(data.text, guessLang(path));
       return;
     }
 
     const rawUrl = filesRaw + "?path=" + encodeURIComponent(path);
     const rawRes = await fetch(rawUrl, { headers: { Accept: "application/octet-stream" } });
     if (!rawRes.ok) {
-      dialogBody.textContent = `(binary ${fmtSize(data.size || 0)} — download failed ${rawRes.status})`;
+      resetSourceBody(
+        "source-body",
+        `(binary ${fmtSize(data.size || 0)} — download failed ${rawRes.status})`
+      );
       return;
     }
     const buf = await rawRes.arrayBuffer();
+    delete dialogBody.dataset.highlighted;
     dialogBody.className = "source-body hex-body";
     dialogBody.innerHTML = hexdumpHtml(buf, HEX_PREVIEW);
   }
 
   list.addEventListener("click", async (ev) => {
-    if (ev.target.closest(".file-download") || ev.target.closest(".download-btn")) return;
+    if (ev.target.closest(".file-download") || ev.target.closest(".download-btn") || ev.target.closest(".try-btn")) return;
     const fileBtn = ev.target.closest(".file-link");
     if (fileBtn) {
       ev.preventDefault();

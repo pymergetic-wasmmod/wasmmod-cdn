@@ -20,6 +20,7 @@ from pymergetic.metal.cdn.middleware import (
     CsrfMiddleware,
     RateLimitMiddleware,
     RequestLogMiddleware,
+    ShellHitMiddleware,
 )
 from pymergetic.metal.cdn.paths import join_base
 from pymergetic.metal.cdn.services.identity import UserService
@@ -79,6 +80,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.storage = storage
 
     # Last added = outermost.
+    app.add_middleware(ShellHitMiddleware, path_prefix=prefix)
     app.add_middleware(RequestLogMiddleware, json_logs=settings.json_logs)
     app.add_middleware(
         CsrfMiddleware,

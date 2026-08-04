@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from pymergetic.metal.cdn.layout import ChannelLayout
 from pymergetic.metal.cdn.models import ChannelIndex, PackageEntry
 from pymergetic.metal.cdn.services.channel import IndexService
 from pymergetic.metal.cdn.storage import LocalObjectStorage

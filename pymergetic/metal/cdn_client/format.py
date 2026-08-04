@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-def human_size(n: int | float | None, *, binary: bool = True) -> str:
+def human_size(n: float | None, *, binary: bool = True) -> str:
     """Format byte counts as ``9.5 KiB (9755 B)`` (or just ``512 B`` under 1 KiB)."""
     if n is None:
         return "?"

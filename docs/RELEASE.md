@@ -9,13 +9,13 @@ Use annotated PEP 440 tags on a clean `main` commit:
 
 ```sh
 # prerelease
-./scripts/tag-release.sh 0.1.0a2
+./scripts/tag-release.sh 0.1.0a3
 
 # or stable
 ./scripts/tag-release.sh 0.1.0
 ```
 
-That creates `v0.1.0a2` (script prefixes `v` when missing).
+That creates `v0.1.0a3` (script prefixes `v` when missing).
 
 ## Verify
 
@@ -23,27 +23,42 @@ That creates `v0.1.0a2` (script prefixes `v` when missing).
 git describe --tags
 pip install -e ./client -e ".[dev]" --config-settings editable_mode=compat
 metal-cdn --version
-# → 0.1.0a2  (no .devN+g… on the tagged commit)
+# → 0.1.0a3  (no .devN+g… on the tagged commit)
 ```
 
-## Push
+## Push (triggers CI + PyPI)
 
 ```sh
 git push origin main
-git push origin v0.1.0a2
+git push origin v0.1.0a3
 ```
 
+Pushing a `v*` tag runs [`.github/workflows/publish-pypi.yml`](../.github/workflows/publish-pypi.yml):
+builds both wheels and publishes them via **Trusted Publishing** (OIDC).
+
+Configure once on PyPI for each project (`pymergetic-metal-cdn-client`,
+`pymergetic-metal-cdn`):
+
+- Owner: `pymergetic`
+- Repository: `metal-cdn`
+- Workflow: `publish-pypi.yml`
+- Environment: `pypi`
+
+Dry-run (build only): Actions → **publish-pypi** → Run workflow → dry_run=true.
+
 Untagged / dirty trees produce local development versions
-(`0.1.0a2.dev1+gXXXX`), which is expected between releases.
+(`0.1.0a3.dev1+gXXXX`), which is expected between releases.
+
+## Manual upload (fallback)
+
+```sh
+python -m build --outdir dist-client client
+python -m build --outdir dist-server .
+twine upload dist-client/* dist-server/*
+```
 
 ## Client floor for wasmmod
 
-After tagging **`v0.1.0a2`** (or later) and publishing the client wheel:
-
-```sh
-cd client && python -m build && twine upload dist/*
-```
-
-Update wasmmod [`requirements-publish.txt`](../../metalpython/extmod/wasmmod/requirements-publish.txt)
-floor and `CLIENT_MIN_VERSION` only when wasmmod needs new client APIs
-(already set to `>=0.1.0a2` for trust / files/raw / verify helpers).
+After tagging and publishing the client wheel, bump wasmmod
+[`requirements-publish.txt`](../../metalpython/extmod/wasmmod/requirements-publish.txt)
+only when wasmmod needs newer client APIs.

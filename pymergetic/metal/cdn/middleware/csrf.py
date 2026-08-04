@@ -52,7 +52,9 @@ class CsrfMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         session = request.scope.get("session")
-        if not isinstance(session, dict) or not session.get("user_id"):
+        if not isinstance(session, dict) or not (
+            session.get("user_id") or session.get("anon_id")
+        ):
             return await call_next(request)
 
         expected = session.get(CSRF_SESSION_KEY)

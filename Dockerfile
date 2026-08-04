@@ -1,15 +1,22 @@
 # syntax=docker/dockerfile:1
 FROM python:3.12-slim AS base
 
+# PYTHONPATH=/app: pip install puts the package in site-packages but omits
+# gitignored REPL binaries (*.mjs/*.wasm). The COPY'd tree under /app keeps them;
+# console scripts must prefer /app so the µPy shell can load assets.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    SETUPTOOLS_SCM_PRETEND_VERSION=0.1.0a2 \
+    PYTHONPATH=/app \
     METAL_CDN_HOST=0.0.0.0 \
     METAL_CDN_PORT=8000 \
     METAL_CDN_BASE_PATH=/cdn \
     METAL_CDN_DATA_DIR=/data \
     METAL_CDN_STORAGE_ROOT=/data/packs \
-    METAL_CDN_DATABASE_URL=sqlite+aiosqlite:////data/metal_cdn.db
+    METAL_CDN_DATABASE_URL=sqlite+aiosqlite:////data/metal_cdn.db \
+    METAL_CDN_EXPERIMENTAL=true \
+    METAL_CDN_EXPERIMENTAL_REPL=true
 
 WORKDIR /app
 
@@ -17,14 +24,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# Client package-dir is ".." relative to client/ — keep both under /app.
 COPY pyproject.toml README.md LICENSE ./
+COPY client ./client
 COPY pymergetic ./pymergetic
 
-RUN pip install --no-cache-dir .
-
-RUN useradd --create-home --uid 10001 app \
+# Install in-tree client first (not published to PyPI in this tree).
+RUN pip install --no-cache-dir ./client . \
+    && useradd --create-home --uid 10001 app \
     && mkdir -p /data/packs \
-    && chown -R app:app /data /app
+    && chown -R app:app /data /app \
+    && test -f pymergetic/metal/cdn/web/static/repl/micropython.mjs \
+        || echo "WARNING: micropython.mjs missing — run scripts/sync-repl-assets.sh / scripts/dev-up.sh before docker build"
 USER app
 
 EXPOSE 8000

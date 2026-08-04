@@ -1,6 +1,6 @@
 {
   "include": ["pymergetic", "tests"],
-  "exclude": ["**/.venv", "**/__pycache__", ".data", "client/*.egg-info"],
+  "exclude": ["**/.venv", "**/__pycache__", ".data", "client/*.egg-info", "**/*.tpl.py"],
   "extraPaths": ["."],
   "venvPath": ".",
   "venv": ".venv",

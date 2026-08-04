@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import struct
+from datetime import UTC
 from pathlib import Path
 
 import pytest
@@ -91,14 +92,14 @@ async def test_trust_crud_and_raw_file(client: AsyncClient, tmp_path: Path) -> N
     headers = {"Authorization": f"Bearer {token}"}
 
     # Minimal self-signed PEM as trust root
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
 
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.x509.oid import NameOID
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     key = ec.generate_private_key(ec.SECP256R1())
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "cdn-test-ca")])
     cert = (
