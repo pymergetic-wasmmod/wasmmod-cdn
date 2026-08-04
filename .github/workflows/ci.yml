@@ -45,6 +45,8 @@ jobs:
       - name: Build client + server sdists/wheels
         run: |
           python -m pip install -U pip build twine
-          python -m build --outdir dist-client client
-          python -m build --outdir dist-server .
+          # Build wheel and sdist from the git checkout (not wheel-from-sdist):
+          # client/setuptools-scm root=.. fails under /tmp extraction.
+          python -m build --wheel --sdist --outdir dist-client client
+          python -m build --wheel --sdist --outdir dist-server .
           twine check dist-client/* dist-server/*
