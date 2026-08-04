@@ -32,6 +32,9 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 templates.env.globals["app_name"] = "metal-cdn"
 templates.env.globals["app_version"] = __version__
+templates.env.globals["project_url"] = "https://github.com/pymergetic/metal-cdn"
+templates.env.globals["pypi_url"] = "https://pypi.org/project/pymergetic-metal-cdn/"
+templates.env.globals["wasmmod_url"] = "https://github.com/pymergetic/wasmmod"
 templates.env.globals["base_path"] = ""
 templates.env.filters["human_size"] = human_size
 templates.env.globals["human_size"] = human_size

@@ -703,6 +703,22 @@ footer {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem 1rem;
+  min-width: 0;
+}
+.footer-links a {
+  color: var(--muted);
+  text-decoration: none;
+}
+.footer-links a:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
 .footer-health {
   display: inline-flex;
   align-items: center;

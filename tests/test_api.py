@@ -149,6 +149,10 @@ async def test_user_and_publish_flow(client: AsyncClient) -> None:
     assert b"Packages" in home.content
     assert b"footer-ver" in home.content
     assert b"footer-health" in home.content
+    assert b"footer-links" in home.content
+    assert b"github.com/pymergetic/metal-cdn" in home.content
+    assert b"pypi.org/project/pymergetic-metal-cdn" in home.content
+    assert b"github.com/pymergetic/wasmmod" in home.content
     assert b">ok<" in home.content
 
     pin = await client.get("/channels/pin/0.1.0")
