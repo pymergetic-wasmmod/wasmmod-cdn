@@ -298,13 +298,16 @@ def _package_from_path(rel: str) -> str | None:
     if not parts:
         return None
     name = parts[-1]
-    for suffix in (".wasm.zlib", ".aot.zlib", ".wasm", ".zlib"):
+    for suffix in (".wasm.zlib", ".elf.zlib", ".aot.zlib", ".wasm", ".elf", ".zlib"):
         if name.endswith(suffix):
             name = name[: -len(suffix)]
             break
-    # strip arch.aotN infix: hello.x86_64.aot6
+    # strip arch.aotN / arch.elf infix: hello.x86_64.aot6 / hello.x86_64
     if ".aot" in name:
         name = name.split(".aot", 1)[0]
         if "." in name:
             name = name.rsplit(".", 1)[0]
+    elif "." in name:
+        # possible arch tag left after .elf strip already handled above
+        pass
     return name[:128] if name else None

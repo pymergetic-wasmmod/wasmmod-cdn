@@ -1,4 +1,4 @@
-"""Inspect wasmmod .wasm / .aot (and MPZL .zlib) for CDN index ``contents``.
+"""Inspect wasmmod .wasm / .aot / .elf (and MPZL .zlib) for CDN index ``contents``.
 
 Shared by metal-cdn (on upload) and host tools. Inventory / metadata only —
 file bodies are not embedded. Models are Pydantic so index JSON stays typed.
@@ -37,6 +37,7 @@ KIND_NAMES = {1: "py", 2: "mpy", 3: "raw", 4: "pyc"}
 class ArtifactBinaryKind(str, Enum):
     WASM = "wasm"
     AOT = "aot"
+    ELF = "elf"
     UNKNOWN = "unknown"
 
 
@@ -236,11 +237,11 @@ def wrap_mpzl(data: bytes, *, level: int = 9) -> bytes:
     return MPZL_MAGIC + struct.pack("<I", len(data)) + z
 
 
-_NAKED_ARTIFACT = re.compile(r"^.+\.(?:wasm|aot\d*)$", re.IGNORECASE)
+_NAKED_ARTIFACT = re.compile(r"^.+\.(?:wasm|aot\d*|elf)$", re.IGNORECASE)
 
 
 def ensure_zlib_artifacts(files: dict[str, bytes]) -> dict[str, bytes]:
-    """Ensure MPZL ``.zlib`` twins exist for naked ``.wasm`` / ``.aotN``.
+    """Ensure MPZL ``.zlib`` twins exist for naked ``.wasm`` / ``.aotN`` / ``.elf``.
 
     Fetch prefers ``.wasm.zlib``; naked copies are kept so older clients and
     inspect URLs keep working. If only a ``.zlib`` was uploaded, leave as-is.
@@ -458,6 +459,48 @@ def extract_custom_section_aot(buf: bytes, section_name: str) -> bytes | None:
     return None
 
 
+def extract_custom_section_elf(buf: bytes, section_name: str) -> bytes | None:
+    """ELF64 LE PROGBITS/NOTE named ``.wasmmod.*`` (or without leading dot)."""
+    if len(buf) < 64 or buf[:4] != b"\x7fELF" or buf[4] != 2 or buf[5] != 1:
+        return None
+    shoff = struct.unpack_from("<Q", buf, 40)[0]
+    shentsize = struct.unpack_from("<H", buf, 58)[0]
+    shnum = struct.unpack_from("<H", buf, 60)[0]
+    shstrndx = struct.unpack_from("<H", buf, 62)[0]
+    if shentsize < 64 or shnum == 0 or shstrndx >= shnum:
+        return None
+    if shoff + shnum * shentsize > len(buf):
+        return None
+    shstr = buf[shoff + shstrndx * shentsize :]
+    str_off = struct.unpack_from("<Q", shstr, 24)[0]
+    str_sz = struct.unpack_from("<Q", shstr, 32)[0]
+    if str_off + str_sz > len(buf):
+        return None
+    strtab = buf[str_off : str_off + str_sz]
+    want = section_name.encode("utf-8")
+    want_dot = want if want.startswith(b".") else (b"." + want)
+    for i in range(shnum):
+        sh = buf[shoff + i * shentsize :]
+        name_off = struct.unpack_from("<I", sh, 0)[0]
+        typ = struct.unpack_from("<I", sh, 4)[0]
+        if typ not in (1, 7):  # PROGBITS / NOTE
+            continue
+        if name_off >= len(strtab):
+            continue
+        end = strtab.find(b"\x00", name_off)
+        if end < 0:
+            end = len(strtab)
+        sname = strtab[name_off:end]
+        if sname != want and sname != want_dot and sname.lstrip(b".") != want.lstrip(b"."):
+            continue
+        off = struct.unpack_from("<Q", sh, 24)[0]
+        size = struct.unpack_from("<Q", sh, 32)[0]
+        if off + size > len(buf) or size == 0:
+            return None
+        return buf[off : off + size]
+    return None
+
+
 def extract_custom_section(data: bytes, section_name: str) -> bytes | None:
     if len(data) < 4:
         return None
@@ -465,6 +508,8 @@ def extract_custom_section(data: bytes, section_name: str) -> bytes | None:
         return extract_custom_section_wasm(data, section_name)
     if data[:4] == b"\x00aot":
         return extract_custom_section_aot(data, section_name)
+    if data[:4] == b"\x7fELF":
+        return extract_custom_section_elf(data, section_name)
     return None
 
 
@@ -559,7 +604,24 @@ def without_sig_section(buf: bytes) -> bytes:
                 break
         return bytes(out)
 
-    raise ValueError("not a wasm/aot artifact")
+    if buf[:4] == b"\x7fELF":
+        # WPSE cookie restore (matches wasmmod tools/wasmmod_elf.py).
+        wpse = struct.Struct("<4sQQHHI")
+        if len(buf) >= wpse.size and buf[-wpse.size : -wpse.size + 4] == b"WPSE":
+            _magic, old_len, old_shoff, old_shnum, old_shstrndx, _pad = wpse.unpack_from(
+                buf, len(buf) - wpse.size
+            )
+            if 0 < old_len <= len(buf) - wpse.size:
+                # Confirm sig section lives in the appended region.
+                if extract_custom_section_elf(buf, SIG_SECTION) is not None:
+                    out = bytearray(buf[:old_len])
+                    struct.pack_into("<Q", out, 40, old_shoff)
+                    struct.pack_into("<H", out, 60, old_shnum)
+                    struct.pack_into("<H", out, 62, old_shstrndx)
+                    return bytes(out)
+        raise ValueError("ELF strip of wasmmod.sig needs WPSE cookie")
+
+    raise ValueError("not a wasm/aot/elf artifact")
 
 
 def parse_sig_payload(payload: bytes, *, naked: bytes) -> SigSectionInfo:
@@ -810,6 +872,8 @@ def inspect_artifact(data: bytes, *, filename: str = "") -> ArtifactContents:
         kind = ArtifactBinaryKind.WASM
     elif len(naked) >= 4 and naked[:4] == b"\x00aot":
         kind = ArtifactBinaryKind.AOT
+    elif len(naked) >= 4 and naked[:4] == b"\x7fELF":
+        kind = ArtifactBinaryKind.ELF
     else:
         kind = ArtifactBinaryKind.UNKNOWN
 
@@ -879,6 +943,8 @@ def _score(art: ArtifactContents) -> int:
     if art.signed:
         score += 2
     if art.kind is ArtifactBinaryKind.WASM:
+        score += 1
+    elif art.kind is ArtifactBinaryKind.ELF:
         score += 1
     return score
 

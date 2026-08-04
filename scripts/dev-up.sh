@@ -160,6 +160,15 @@ step_seed() {
   echo "==> publish samples → $CDN_URL"
   [[ -f "$packs/hello.wasm" ]] || { echo "FAIL: missing $packs/hello.wasm" >&2; exit 1; }
   pub_one hello                "$packs/hello.wasm"
+  if [[ -f "$packs/hello.elf" ]]; then
+    # Same package name; CDN keeps multiple artifact filenames (hello.wasm + hello.elf).
+    echo -n "    publish hello.elf … "
+    meta="$(python3 -c 'import json,sys; print(json.dumps({"package":"hello","version":"0.1.0","lead":True,"pin":True,"force":True,"deps":{}}))')"
+    code="$(curl -sS -o /tmp/metal-cdn-dev-pub.json -w '%{http_code}' -X POST "$CDN_URL/publish" \
+      -F "meta=$meta;type=application/json" \
+      -F "files=@$packs/hello.elf;type=application/octet-stream")"
+    echo "HTTP $code"
+  fi
   pub_one client               "$packs/client.wasm"
   pub_one mixed                "$packs/mixed.wasm"
   pub_one bridge               "$packs/bridge.wasm"

@@ -79,15 +79,24 @@ class ChannelLayout:
         if name.endswith(".wasm"):
             kind = "wasm"
         else:
-            # hello.aot6 / hello.x86_64.aot6 / hello.aot
-            m = re.match(
-                r"^(?P<stem>.+?)(?:\.(?P<arch>[A-Za-z0-9_]+))?\.aot(?P<ver>\d*)$",
+            # hello.elf / hello.x86_64.elf
+            m_elf = re.match(
+                r"^(?P<stem>.+?)(?:\.(?P<arch>[A-Za-z0-9_]+))?\.elf$",
                 name,
             )
-            if not m:
-                raise ValueError(f"unrecognized artifact name: {filename}")
-            kind = "aot"
-            arch = m.group("arch")
-            ver = m.group("ver")
-            aot_version = int(ver) if ver else None
+            if m_elf:
+                kind = "elf"
+                arch = m_elf.group("arch")
+            else:
+                # hello.aot6 / hello.x86_64.aot6 / hello.aot
+                m = re.match(
+                    r"^(?P<stem>.+?)(?:\.(?P<arch>[A-Za-z0-9_]+))?\.aot(?P<ver>\d*)$",
+                    name,
+                )
+                if not m:
+                    raise ValueError(f"unrecognized artifact name: {filename}")
+                kind = "aot"
+                arch = m.group("arch")
+                ver = m.group("ver")
+                aot_version = int(ver) if ver else None
         return kind, arch, aot_version, encoding

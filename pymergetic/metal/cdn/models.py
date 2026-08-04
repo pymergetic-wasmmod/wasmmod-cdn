@@ -474,6 +474,7 @@ class GcResult(BaseModel):
 class ArtifactKind(str, Enum):
     WASM = "wasm"
     AOT = "aot"
+    ELF = "elf"
 
 
 class ArtifactEncoding(str, Enum):

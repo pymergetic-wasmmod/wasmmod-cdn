@@ -11,6 +11,12 @@ def test_classify_artifacts() -> None:
     assert ver == 6
     assert enc == "raw"
 
+    kind, arch, ver, enc = ChannelLayout.classify_artifact("hello.elf")
+    assert (kind, arch, ver, enc) == ("elf", None, None, "raw")
+
+    kind, arch, ver, enc = ChannelLayout.classify_artifact("hello.x86_64.elf.zlib")
+    assert (kind, arch, ver, enc) == ("elf", "x86_64", None, "mpzl")
+
 
 def test_channel_keys() -> None:
     lead = ChannelLayout.lead()

@@ -129,6 +129,38 @@ def test_ensure_zlib_adds_twin() -> None:
     assert list(zonly) == ["hello.wasm.zlib"]
 
 
+def test_inspect_elf_pack_section() -> None:
+    """ELF64 ET_REL with .wasmmod.pack is kind=elf and readable."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    wasmmod_tools = Path("/home/ladmin/Devel/os-sdk/packages/metalpython/extmod/wasmmod/tools")
+    if not (wasmmod_tools / "wasmmod_elf.py").is_file():
+        pytest.skip("wasmmod_elf.py not found")
+
+    c = Path("/tmp/cdn_elf_hello.c")
+    c.write_text("int hello(void){return 42;}\n")
+    o = Path("/tmp/cdn_elf_hello.o")
+    subprocess.check_call(
+        ["gcc", "-c", "-ffreestanding", "-fno-pic", "-O2", "-o", str(o), str(c)]
+    )
+    sys.path.insert(0, str(wasmmod_tools))
+    from wasmmod_elf import append_section  # type: ignore
+
+    pack = _pack_v3("hello", [], exports=[("", "hello", "hello", 0)])
+    elf = append_section(o.read_bytes(), "wasmmod.pack", pack)
+    info = inspect_artifact(elf, filename="hello.elf")
+    assert info.kind.value == "elf"
+    assert info.pack is not None
+    assert info.pack.name == "hello"
+    assert info.pack.exports[0].export == "hello"
+
+    out = ensure_zlib_artifacts({"hello.elf": elf})
+    assert "hello.elf.zlib" in out
+    assert unwrap_mpzl(out["hello.elf.zlib"]) == elf
+
+
 @pytest.mark.asyncio
 async def test_publish_stores_contents(tmp_path) -> None:
     from httpx import ASGITransport, AsyncClient
