@@ -24,7 +24,8 @@ Devices still verify pack signatures with wasmmod — this service does not repl
 | **Browse** | Package tree, lead / `@version` pins, dependents |
 | **Artifacts** | Expand a `.wasm` / `.zlib` / AOT blob → pack file list |
 | **Source viewer** | Highlighted text (py / c / rs / toml / …) or hex for binaries |
-| **µPy shell** | In-browser MicroPython + wasmmod: `import hello`, `packages()` |
+| **µPy shell** | In-browser MicroPython + wasmmod: ▶ → `import` + `exports()` |
+| **Sessions** | Per-browser loader sessions — autoexec / pack / index hits |
 | **Publish** | Multipart UI + CLI / thin client for CI |
 
 <p align="center">
@@ -108,20 +109,38 @@ curl -sf https://cdn.pymergetic.com/cdn/health
 
 ## Try packs in the shell
 
-The floating **µPy** panel warms MicroPython in the background. When status is **ready**:
+The floating **µPy** panel warms MicroPython in the background. When status is **ready**, hit ▶ on an artifact (or type it yourself):
 
 ```python
-packages()          # live lead catalog
-import hello as m
-print(dir(m))
-m.greet()           # pack Python
+import hello
+exports(hello)      # public names + types (+ docstring line when set)
+hello.greet()
 ```
 
+<p align="center">
+  <img src="screenshots/upy-exports.png" alt="µPy shell — import hello; exports(hello)" width="720" />
+</p>
+
+```text
+loaded hello · 5 public
+  add (WasmFunc)
+  hello (WasmFunc)
+  greet (function)
+  answer (function)
+  util (module)
+```
+
+- `packages()` — live lead catalog (or autoexec snapshot)
+- `exports(mod)` — shipped in autoexec (same place as `help()`)
 - `GET /repl/autoexec.py` mints/reuses a `ShellSession`, sets `wasm.cdn` + import hook + `SESSION_ID`
 - Pack/index hits with the session cookie show up under **Sessions**
 - **Login** claims prior anon sessions; **Logout** mints a fresh anon
 
-Play button on a `.wasm` / `.zlib` / AOT row runs `import <pkg>` in the shell.
+▶ on a `.wasm` / `.zlib` / AOT row runs exactly `import <pkg>` then `exports(<pkg>)`.
+
+<p align="center">
+  <img src="screenshots/sessions.png" alt="Sessions — anon principal, loader entered, pack/index/autoexec hits" width="720" />
+</p>
 
 ---
 

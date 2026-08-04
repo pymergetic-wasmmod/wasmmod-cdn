@@ -284,6 +284,8 @@ async def sessions_page(
     activities: dict[str, Any] = {}
     for row in rows[:12]:
         activities[str(row.id)] = await shells.activity(row.id, window_minutes=30)
+    # Cookie principal id (Starlette session anon_id / user_id) — not the shell SESSION_ID.
+    principal_web_id = str(user_id or anon_id or "")
     ctx = await _shell_context(
         indexes, active_channel="lead", page="sessions", request=request, current_user=user
     )
@@ -292,6 +294,7 @@ async def sessions_page(
             "shell_sessions": rows,
             "shell_activities": activities,
             "principal_label": label,
+            "principal_web_id": principal_web_id,
         }
     )
     return templates.TemplateResponse(request, "sessions.html", ctx)

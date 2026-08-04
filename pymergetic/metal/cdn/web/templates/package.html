@@ -219,7 +219,7 @@
           </a>
           {% if experimental_repl and repl_ready and (a.path.endswith('.wasm') or a.path.endswith('.wasm.zlib') or '.aot' in a.path) %}
           <button type="button" class="icon-btn try-btn" data-mpy-try="{{ name }}"
-                  title="Try in µPy shell: import {{ name }}; dir(...)"
+                  title="Try in µPy shell: import {{ name }}; exports({{ name }})"
                   aria-label="Try {{ name }} in MicroPython shell">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path fill="currentColor" d="M8 5.14v14l11-7-11-7Z"/>

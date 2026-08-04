@@ -123,17 +123,34 @@ def packages(limit=40):
     print("#", n, "package(s) · channel", CHANNEL, "·", src)
 
 
+def exports(mod):
+    """Print public names on a loaded pack/module (Try button / REPL)."""
+    names = [n for n in dir(mod) if not n.startswith("_")]
+    label = getattr(mod, "__name__", "?")
+    print("loaded", label, "·", len(names), "public")
+    for n in names:
+        obj = getattr(mod, n)
+        doc = getattr(obj, "__doc__", None)
+        kind = type(obj).__name__
+        if doc:
+            line = str(doc).strip().split("\n", 1)[0][:72]
+            print(" ", n, "(" + kind + "):", line)
+        else:
+            print(" ", n, "(" + kind + ")")
+
+
 def help(topic=None):
     """REPL help. Topics: packages, import, cdn, index."""
     t = (topic or "").strip().lower() if topic else ""
     if t in ("", "help"):
         print("metal-cdn shell")
         print("├── packages()           list pack names (live catalog / snapshot)")
+        print("├── exports(mod)         public attrs (+ docstring line)")
         print("├── help('import')       how to load a pack")
         print("├── help('cdn')          CDN / hook session")
         print("├── help('index')        HTTP index URLs")
         print("├── import hello         load pack from CDN")
-        print("└── dir(hello)           inspect exports")
+        print("└── exports(hello)       inspect after import")
         return
     if t == "packages":
         print("packages(limit=40) prefers wasm.catalog() when online,")
@@ -143,8 +160,14 @@ def help(topic=None):
     if t == "import":
         print("After autoexec, the import hook is installed:")
         print("  import hello")
-        print("  import test_a as m; print(dir(m))")
+        print("  exports(hello)")
+        print("  import test_a.test_b   # dotted FQN ok")
+        print("  exports(test_a.test_b)")
         print("Packs resolve via wasm.cdn →", CDN)
+        return
+    if t in ("exports", "export"):
+        print("exports(mod) — public names (no leading _), type, first docstring line.")
+        print("  import hello; exports(hello)")
         return
     if t in ("cdn", "hook", "session"):
         print("SESSION_ID:", SESSION_ID or "(none)")
@@ -158,7 +181,7 @@ def help(topic=None):
         print("Re-bind:  wasm.cdn(CDN); wasm.install_hook(); wasm.session_id(SESSION_ID)")
         print("Clear:    wasm.uninstall_hook()")
         return
-    if t in ("index", "catalog", "api"):
+    if t in ("index", "catalog"):
         print("Lead index JSON:", INDEX_URL)
         print("Browse UI:      ", BROWSE_URL)
         print("Pin index:      ", CDN + "/index/pin/<version>")

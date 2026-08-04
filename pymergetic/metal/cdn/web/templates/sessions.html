@@ -6,7 +6,8 @@
   <h1>Sessions</h1>
   <p class="lede">
     Browser REPL / CDN loader sessions for
-    <strong>{{ principal_label }}</strong>.
+    <strong>{{ principal_label }}</strong>{% if principal_web_id %}
+    <code class="muted" title="web session principal id">[{{ principal_web_id }}]</code>{% endif %}.
     Hits in the last 30 minutes (pack loads, index fetches, Try / autoexec).
   </p>
 </section>

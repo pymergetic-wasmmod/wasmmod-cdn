@@ -24,6 +24,7 @@ def test_render_autoexec_contains_boot_and_help() -> None:
     assert "wasm.install_hook()" in src
     assert "wasm.session_id(SESSION_ID)" in src
     assert "def packages(" in src
+    assert "def exports(" in src
     assert "wasm.catalog" in src
     assert "def help(" in src
     assert '"hello"' in src
@@ -49,6 +50,9 @@ def _settings(tmp_path: Path) -> Settings:
         experimental=True,
         experimental_repl=True,
         session_secret="test-secret",
+        # Avoid Secure cookies from repo .env PUBLIC_ORIGIN=https://… (httpx + http://test).
+        public_origin=None,
+        behind_proxy=False,
         rate_limit_enabled=False,
         csrf_enabled=True,
     )
@@ -175,6 +179,11 @@ async def test_sessions_page(tmp_path: Path) -> None:
     assert page.status_code == 200
     assert "Sessions" in page.text
     assert "loader entered" in page.text
+    assert "<strong>anon</strong>" in page.text
+    # web principal id (cookie anon_id) in brackets next to label
+    assert 'title="web session principal id"' in page.text
+    assert "[-" not in page.text  # not empty brackets
+    assert "[" in page.text and "]" in page.text
 
 
 @pytest.mark.asyncio

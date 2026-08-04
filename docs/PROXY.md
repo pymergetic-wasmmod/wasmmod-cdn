@@ -14,6 +14,8 @@ Current public edge: **`https://cdn.pymergetic.com/cdn/`**
 # router / firewall DNAT (already in place on this host)
 # 80  -> host:8080
 # 443 -> host:8443
+# Do NOT publish :8443 publicly — only :443. Nginx must not put :8443 in Location
+# (see absolute_redirect/port_in_redirect + explicit https://$host/… in cdn.conf).
 ```
 
 ## Build / run (app on :8000)

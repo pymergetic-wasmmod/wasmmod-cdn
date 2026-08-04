@@ -191,6 +191,28 @@
     runtime.__metalAsyncify = true;
   }
 
+  /**
+   * Stock mp_js_do_exec compiles with FILE_INPUT + is_repl=false, so expression
+   * values are popped (hello() → 42 never surfaces). Interactive lines: eval when
+   * possible, else exec; print(repr) for non-None — same as a normal REPL.
+   */
+  function withReplDisplay(src) {
+    const quoted = JSON.stringify(String(src));
+    return (
+      "try:\n" +
+      "    _metal_v = eval(" +
+      quoted +
+      ")\n" +
+      "except SyntaxError:\n" +
+      "    exec(" +
+      quoted +
+      ")\n" +
+      "else:\n" +
+      "    if _metal_v is not None:\n" +
+      "        print(repr(_metal_v))\n"
+    );
+  }
+
   async function run(code, { echo = true, bootstrap = false, quiet = false } = {}) {
     if (!quiet) expand({ boot: false });
     if (!bootstrap) {
@@ -204,11 +226,12 @@
     if (echo) {
       text.split("\n").forEach((ln) => append(">>> " + ln, "mpy-in"));
     }
+    const execText = bootstrap ? text : withReplDisplay(text);
     try {
       if (typeof runtime.runPythonAsync === "function") {
-        await runtime.runPythonAsync(text);
+        await runtime.runPythonAsync(execText);
       } else {
-        runtime.runPython(text);
+        runtime.runPython(execText);
       }
     } catch (err) {
       const msg =
@@ -269,6 +292,11 @@
   async function tryPackage(name) {
     const pkg = String(name || "").trim();
     if (!pkg) return;
+    // Safe dotted identifier only (catalog / pack names).
+    if (!/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(pkg)) {
+      append("Try: invalid package name " + JSON.stringify(pkg), "mpy-err");
+      return;
+    }
     expand({ boot: false });
     if (!sessionReady) {
       firstOpenWait = true;
@@ -276,19 +304,8 @@
     }
     await ensureSession({ quiet: false });
     void postSessionEvent("try_package", { package: pkg, path: "/try/" + pkg });
-    const alias = "m";
-    await run(
-      [
-        "try:",
-        "  import wasm",
-        "except ImportError as e:",
-        "  print('Try needs wasmmod in the browser host:', e)",
-        "else:",
-        "  import " + pkg + " as " + alias,
-        "  print(dir(" + alias + "))",
-      ].join("\n"),
-      { echo: true }
-    );
+    // Plain FQN import + autoexec exports() helper.
+    await run(["import " + pkg, "exports(" + pkg + ")"].join("\n"), { echo: true });
   }
 
   if (toggleBtn) toggleBtn.addEventListener("click", () => toggle());

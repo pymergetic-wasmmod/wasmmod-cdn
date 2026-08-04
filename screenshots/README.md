@@ -6,6 +6,9 @@ Stills from the live / local metal-cdn UI (used in the root README).
 |------|--------|
 | `browse-hello.png` | Package page — tree, about, dependents, mini µPy |
 | `upy-shell.png` | Expanded µPy shell — session, CDN hook, live catalog |
+| `upy-exports.png` | `import hello` + `exports(hello)` public API dump |
+| `sessions.png` | Sessions page — anon loader, sparkline, pack/index/autoexec |
+| `sessions-upy.png` | Sessions + expanded µPy (shell SESSION_ID in banner) |
 | `artifacts-pack.png` | `hello.wasm` expanded — pack v3 file list |
 | `source-python.png` | Syntax-highlighted pack `.py` |
 | `source-pack-toml.png` | Syntax-highlighted embedded `pack.toml` |
