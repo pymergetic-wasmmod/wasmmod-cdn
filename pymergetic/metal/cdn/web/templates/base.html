@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}metal-cdn{% endblock %}</title>
+  <link rel="stylesheet" href="{{ href('static', 'site.css') }}" />
+  {% block head %}{% endblock %}
+</head>
+<body class="{% if active_page == 'docs' %}page-docs{% endif %}">
+  {% if experimental %}
+  <div class="exp-banner" role="status">
+    <strong>Experimental</strong>
+    <span>{{ experimental_message or "Data may be wiped before go-live — not for production." }}</span>
+  </div>
+  {% endif %}
+  <header class="banner">
+    <a class="brand" href="{{ href('channels', 'lead') }}">metal-cdn</a>
+    <nav class="top-nav">
+      <a href="{{ href('channels', 'lead') }}" class="{% if active_page == 'browse' or not active_page %}is-active{% endif %}">Browse</a>
+      <a href="{{ href('authors') }}" class="{% if active_page == 'users' %}is-active{% endif %}">Users</a>
+      <a href="{{ href('publish') }}" class="{% if active_page == 'publish' %}is-active{% endif %}">Publish</a>
+      <a href="{{ href('docs') }}" class="{% if active_page == 'docs' %}is-active{% endif %}">API</a>
+      <a href="{{ href('login') }}" class="{% if active_page == 'login' %}is-active{% endif %}">Login</a>
+    </nav>
+  </header>
+
+  <div class="shell">
+    <aside
+      class="sidebar"
+      aria-label="Package tree"
+      id="pkg-nav"
+      data-active="{{ (active_package or '')|e }}"
+    >
+      <p class="sidebar-label">Packages</p>
+      <label class="tree-filter">
+        <span class="visually-hidden">Filter packages</span>
+        <input
+          type="search"
+          id="pkg-nav-filter"
+          placeholder="Filter packages…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </label>
+      <p class="tree-filter-empty" id="pkg-nav-filter-empty" hidden>No matches</p>
+      {% macro nav_nodes(nodes, depth=0) -%}
+      <ul class="tree {% if depth == 0 %}tree-roots{% else %}tree-children{% endif %}"{% if depth > 0 %} hidden{% endif %}>
+        {% for node in nodes %}
+        <li class="tree-node {% if node.is_folder %}is-folder{% endif %} {% if node.is_package and not node.is_folder %}is-leaf{% endif %} {% if node.is_package %}is-package{% endif %}"
+            data-name="{{ node.name|lower }}"
+            {% if node.full_name %}data-package="{{ node.full_name }}" data-search="{{ node.full_name|lower }}"{% else %}data-search="{{ node.name|lower }}"{% endif %}>
+          {% if node.is_folder %}
+          <div class="tree-row">
+            <button type="button" class="tree-toggle" aria-expanded="false">
+              <span class="tree-chevron" aria-hidden="true"></span>
+            </button>
+            {% if node.is_package %}
+            {% set default_ch = node.versions[0].channel if node.versions else 'lead' %}
+            <a
+              class="tree-pkg tree-name {% if active_package == node.full_name %}is-active{% endif %}"
+              href="{{ package_href(default_ch if active_package != node.full_name else active_channel, node.full_name) }}"
+              data-package="{{ node.full_name }}"
+            >{{ node.name }}</a>
+            {% if node.versions|length > 1 %}
+            <label class="tree-ver-wrap">
+              <span class="visually-hidden">Version</span>
+              <select class="tree-ver-select" data-package="{{ node.full_name }}" aria-label="Version for {{ node.full_name }}">
+                {% for v in node.versions %}
+                <option
+                  value="{{ v.channel }}"
+                  data-href="{{ package_href(v.channel, node.full_name) }}"
+                  {% if active_package == node.full_name and active_channel == v.channel %}selected
+                  {% elif active_package != node.full_name and loop.first %}selected{% endif %}
+                >{{ v.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {% elif node.versions %}
+            <span class="tree-ver">{{ node.versions[0].version }}</span>
+            {% endif %}
+            {% else %}
+            <span class="tree-name">{{ node.name }}</span>
+            {% endif %}
+            <span class="tree-count">{{ node.children|length }}</span>
+          </div>
+          {{ nav_nodes(node.children, depth + 1) }}
+          {% else %}
+          {% set default_ch = node.versions[0].channel if node.versions else 'lead' %}
+          <div class="tree-leaf">
+            <a
+              class="tree-pkg {% if active_package == node.full_name %}is-active{% endif %}"
+              href="{{ package_href(default_ch if active_package != node.full_name else active_channel, node.full_name) }}"
+              data-package="{{ node.full_name }}"
+            >
+              <span class="tree-name">{{ node.name }}</span>
+            </a>
+            {% if node.versions|length > 1 %}
+            <label class="tree-ver-wrap">
+              <span class="visually-hidden">Version</span>
+              <select class="tree-ver-select" data-package="{{ node.full_name }}" aria-label="Version for {{ node.full_name }}">
+                {% for v in node.versions %}
+                <option
+                  value="{{ v.channel }}"
+                  data-href="{{ package_href(v.channel, node.full_name) }}"
+                  {% if active_package == node.full_name and active_channel == v.channel %}selected
+                  {% elif active_package != node.full_name and loop.first %}selected{% endif %}
+                >{{ v.label }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            {% elif node.versions %}
+            <span class="tree-ver">{{ node.versions[0].version }}</span>
+            {% endif %}
+          </div>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {%- endmacro %}
+      {% if nav_roots is defined and nav_roots %}
+      {{ nav_nodes(nav_roots) }}
+      {% else %}
+      <p class="tree-empty">No packages yet</p>
+      {% endif %}
+    </aside>
+
+    <main class="{% block main_class %}{% endblock %}">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <footer>
+    <div class="footer-product">
+      <span class="product">metal-cdn</span>
+      <span class="footer-ver" title="package version">{{ app_version }}</span>
+    </div>
+    <a class="footer-health" href="{{ href('health') }}" title="service health">
+      <span class="health-dot" aria-hidden="true"></span>
+      <span>ok</span>
+    </a>
+  </footer>
+  <script>
+  (() => {
+    const nav = document.getElementById("pkg-nav");
+    if (!nav) return;
+    const active = nav.dataset.active || "";
+    const filterInput = document.getElementById("pkg-nav-filter");
+    const filterEmpty = document.getElementById("pkg-nav-filter-empty");
+
+    function setOpen(li, open) {
+      const btn = li.querySelector(":scope > .tree-row > .tree-toggle")
+        || li.querySelector(":scope > .tree-toggle");
+      const kids = li.querySelector(":scope > .tree-children");
+      li.classList.toggle("is-open", open);
+      if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (kids) kids.hidden = !open;
+    }
+
+    function openAncestors(leaf) {
+      let el = leaf;
+      while (el && el !== nav) {
+        if (el.classList && el.classList.contains("is-folder")) setOpen(el, true);
+        el = el.parentElement;
+      }
+    }
+
+    if (active) {
+      const leaf = nav.querySelector(`.tree-node[data-package="${CSS.escape(active)}"]`);
+      if (leaf) openAncestors(leaf);
+    }
+
+    nav.addEventListener("click", (ev) => {
+      const btn = ev.target.closest(".tree-toggle");
+      if (!btn || !nav.contains(btn)) return;
+      const li = btn.closest(".tree-node");
+      if (!li) return;
+      setOpen(li, !li.classList.contains("is-open"));
+    });
+
+    nav.addEventListener("change", (ev) => {
+      const sel = ev.target.closest(".tree-ver-select");
+      if (!sel) return;
+      const opt = sel.selectedOptions[0];
+      const href = opt && opt.dataset.href;
+      if (href) window.location.href = href;
+    });
+
+    function applyFilter(raw) {
+      const q = String(raw || "").trim().toLowerCase();
+      const nodes = nav.querySelectorAll(".tree-node");
+      if (!q) {
+        nodes.forEach((li) => {
+          li.hidden = false;
+          if (li.classList.contains("is-folder")) setOpen(li, false);
+        });
+        if (filterEmpty) filterEmpty.hidden = true;
+        if (active) {
+          const leaf = nav.querySelector(`.tree-node[data-package="${CSS.escape(active)}"]`);
+          if (leaf) openAncestors(leaf);
+        }
+        return;
+      }
+
+      nodes.forEach((li) => { li.hidden = true; });
+      let hits = 0;
+      nav.querySelectorAll(".tree-node[data-package]").forEach((leaf) => {
+        const hay = leaf.dataset.search || leaf.dataset.package || "";
+        if (!hay.includes(q)) return;
+        hits += 1;
+        leaf.hidden = false;
+        openAncestors(leaf);
+        let p = leaf.parentElement;
+        while (p && p !== nav) {
+          if (p.classList && p.classList.contains("tree-node")) p.hidden = false;
+          p = p.parentElement;
+        }
+      });
+      nav.querySelectorAll(".tree-node.is-folder").forEach((folder) => {
+        const hay = folder.dataset.search || folder.dataset.name || "";
+        if (!hay.includes(q)) return;
+        hits += 1;
+        folder.hidden = false;
+        setOpen(folder, true);
+        folder.querySelectorAll(".tree-node").forEach((n) => { n.hidden = false; });
+        let p = folder.parentElement;
+        while (p && p !== nav) {
+          if (p.classList && p.classList.contains("tree-node")) {
+            p.hidden = false;
+            if (p.classList.contains("is-folder")) setOpen(p, true);
+          }
+          p = p.parentElement;
+        }
+      });
+      if (filterEmpty) filterEmpty.hidden = hits > 0;
+    }
+
+    if (filterInput) {
+      filterInput.addEventListener("input", () => applyFilter(filterInput.value));
+      filterInput.addEventListener("keydown", (ev) => {
+        if (ev.key === "Escape") {
+          filterInput.value = "";
+          applyFilter("");
+          filterInput.blur();
+        }
+      });
+    }
+  })();
+  </script>
+</body>
+</html>

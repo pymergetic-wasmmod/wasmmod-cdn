@@ -1,0 +1,319 @@
+"""Artifact contents inspection for CDN index JSON."""
+
+from __future__ import annotations
+
+import struct
+import zlib
+
+import pytest
+
+from pymergetic.metal.cdn_client.contents import (
+    inspect_artifact,
+    inspect_upload,
+    parse_pack_payload,
+    unwrap_mpzl,
+    ensure_zlib_artifacts,
+    wrap_mpzl,
+)
+
+
+def _uleb(n: int) -> bytes:
+    out = bytearray()
+    while True:
+        b = n & 0x7F
+        n >>= 7
+        out.append(b | (0x80 if n else 0))
+        if not n:
+            return bytes(out)
+
+
+def _custom_section(name: str, payload: bytes) -> bytes:
+    name_b = name.encode()
+    body = _uleb(len(name_b)) + name_b + payload
+    return bytes([0]) + _uleb(len(body)) + body
+
+
+def _minimal_wasm(*sections: bytes) -> bytes:
+    return b"\x00asm\x01\x00\x00\x00" + b"".join(sections)
+
+
+def _pack_v3(name: str, files: list[tuple[str, int, bytes]], exports: list[tuple[str, str, str, int]] | None = None) -> bytes:
+    name_b = name.encode()
+    out = bytearray(b"MPWP")
+    out += struct.pack("<HH", 3, 0)
+    out += struct.pack("<H", len(name_b)) + name_b
+    out += struct.pack("<I", len(files))
+    for rel, kind, data in files:
+        rel_b = rel.encode()
+        out += struct.pack("<H", len(rel_b)) + rel_b
+        out += struct.pack("<B", kind)
+        out += struct.pack("<B", 0)
+        out += struct.pack("<I", len(data))
+        out += struct.pack("<I", len(data))
+        out += data
+    exports = exports or []
+    out += struct.pack("<I", len(exports))
+    for module, func, export, sig in exports:
+        for s in (module, func, export):
+            b = s.encode()
+            out += struct.pack("<H", len(b)) + b
+        out += struct.pack("<B", sig)
+    return bytes(out)
+
+
+def _source(name: str, version: str, files: list[tuple[str, bytes]]) -> bytes:
+    out = bytearray(b"MPSR")
+    out += struct.pack("<HH", 1, 0)
+    for s in (name, version):
+        b = s.encode()
+        out += struct.pack("<H", len(b)) + b
+    out += struct.pack("<H", 0)  # tags
+    out += struct.pack("<I", len(files))
+    for rel, data in files:
+        rel_b = rel.encode()
+        out += struct.pack("<H", len(rel_b)) + rel_b
+        out += struct.pack("<B", 0)
+        out += struct.pack("<I", len(data))
+        out += struct.pack("<I", len(data))
+        out += data
+    return bytes(out)
+
+
+def test_unwrap_mpzl() -> None:
+    raw = b"\x00asm\x01\x00\x00\x00hello"
+    blob = b"MPZL" + struct.pack("<I", len(raw)) + zlib.compress(raw, 9)
+    assert unwrap_mpzl(blob) == raw
+    assert unwrap_mpzl(raw) == raw
+
+
+def test_inspect_pack_and_source() -> None:
+    pack = _pack_v3(
+        "hello",
+        [("__init__.py", 1, b"x=1\n"), ("util.py", 1, b"y=2\n")],
+        exports=[("", "add", "add", 2)],
+    )
+    src = _source("hello", "0.1.0", [("src/__init__.py", b"x=1\n")])
+    wasm = _minimal_wasm(
+        _custom_section("wasmmod.pack", pack),
+        _custom_section("wasmmod.source", src),
+    )
+    info = inspect_artifact(wasm, filename="hello.wasm")
+    assert info.kind.value == "wasm"
+    assert info.signed is False
+    assert info.pack is not None
+    assert info.pack.name == "hello"
+    assert [f.path for f in info.pack.files] == ["__init__.py", "util.py"]
+    assert info.pack.exports[0].export == "add"
+    assert info.source is not None
+    assert info.source.pkg_version == "0.1.0"
+
+    z = b"MPZL" + struct.pack("<I", len(wasm)) + zlib.compress(wasm, 9)
+    contents = inspect_upload({"hello.wasm.zlib": z})
+    assert contents.schema_version == 1
+    assert contents.name == "hello"
+    assert contents.pkg_version == "0.1.0"
+    assert contents.has_pack is True
+    assert contents.has_source is True
+    assert "util.py" in contents.pack_files
+    assert "add" in contents.exports
+
+
+def test_ensure_zlib_adds_twin() -> None:
+    raw = b"\0asm" + b"\x01\0\0\0"
+    out = ensure_zlib_artifacts({"hello.wasm": raw})
+    assert set(out) == {"hello.wasm", "hello.wasm.zlib"}
+    assert unwrap_mpzl(out["hello.wasm.zlib"]) == raw
+    assert out["hello.wasm"] == raw
+
+    zonly = ensure_zlib_artifacts({"hello.wasm.zlib": wrap_mpzl(raw)})
+    assert list(zonly) == ["hello.wasm.zlib"]
+
+
+@pytest.mark.asyncio
+async def test_publish_stores_contents(tmp_path) -> None:
+    from httpx import ASGITransport, AsyncClient
+
+    from pymergetic.metal.cdn.main import create_app
+    from pymergetic.metal.cdn.settings import Settings
+
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        storage_root=tmp_path / "packs",
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'c.db'}",
+        base_path="/cdn",
+        require_auth=True,
+        allow_open_registration=True,
+        session_secret="test-secret",
+        csrf_enabled=False,
+        rate_limit_enabled=False,
+        debug=False,
+    )
+    app = create_app(settings)
+    pack = _pack_v3("demo", [("__init__.py", 1, b"pass\n")])
+    wasm = _minimal_wasm(_custom_section("wasmmod.pack", pack))
+    transport = ASGITransport(app=app)
+    async with (
+        AsyncClient(transport=transport, base_url="http://test") as ac,
+        app.router.lifespan_context(app),
+    ):
+        await ac.post(
+            "/cdn/auth/register",
+            json={"email": "c@example.com", "password": "secret123", "display_name": "C"},
+        )
+        tok = (
+            await ac.post(
+                "/cdn/auth/token",
+                json={"email": "c@example.com", "password": "secret123", "name": "t"},
+            )
+        ).json()["key"]
+        await ac.post(
+            "/cdn/packages/demo/claim",
+            headers={"Authorization": f"Bearer {tok}"},
+        )
+        import json
+
+        pub = await ac.post(
+            "/cdn/publish",
+            data={
+                "meta": json.dumps(
+                    {"package": "demo", "version": "1.0.0", "lead": True, "pin": True, "deps": {}}
+                )
+            },
+            files=[("files", ("demo.wasm", wasm, "application/octet-stream"))],
+            headers={"Authorization": f"Bearer {tok}"},
+        )
+        assert pub.status_code == 201, pub.text
+        body = pub.json()
+        assert body["contents"]["has_pack"] is True
+        assert "__init__.py" in body["contents"]["pack_files"]
+
+        entry = (await ac.get("/cdn/packages/demo")).json()
+        assert entry["contents"]["name"] == "demo"
+        assert entry["contents"]["pack_files"] == ["__init__.py"]
+
+        insp = await ac.get("/cdn/artifacts/lead/demo.wasm/inspect")
+        assert insp.status_code == 200, insp.text
+        assert insp.json()["pack"]["name"] == "demo"
+
+        file_view = await ac.get("/cdn/artifacts/lead/demo.wasm/files", params={"path": "__init__.py"})
+        assert file_view.status_code == 200, file_view.text
+        assert file_view.json()["text"] == "pass\n"
+
+
+def test_parse_pack_rejects_garbage() -> None:
+    with pytest.raises(ValueError):
+        parse_pack_payload(b"nope")
+
+
+def test_extract_embedded_source_and_pack() -> None:
+    from pymergetic.metal.cdn_client.contents import extract_embedded_file
+
+    pack = _pack_v3("hello", [("__init__.py", 1, b"x = 1\n")])
+    src = _source("hello", "0.1.0", [("src/__init__.py", b"print('hi')\n")])
+    wasm = _minimal_wasm(
+        _custom_section("wasmmod.pack", pack),
+        _custom_section("wasmmod.source", src),
+    )
+    view = extract_embedded_file(wasm, "src/__init__.py")
+    assert view.section == "source"
+    assert view.text == "print('hi')\n"
+    assert view.binary is False
+
+    pack_view = extract_embedded_file(wasm, "__init__.py")
+    assert pack_view.section == "pack"
+    assert pack_view.kind == "py"
+    assert pack_view.text == "x = 1\n"
+
+
+def _mpws(sig: bytes, chain: bytes = b"") -> bytes:
+    out = bytearray(b"MPWS")
+    out.append(1)
+    out.append(0)
+    out += len(sig).to_bytes(2, "big")
+    out += sig
+    out += len(chain).to_bytes(2, "big")
+    out += chain
+    return bytes(out)
+
+
+def test_inspect_mpws_signature() -> None:
+    # Minimal DER SEQUENCE { INTEGER 0 } as stand-in leaf cert
+    leaf = bytes([0x30, 0x03, 0x02, 0x01, 0x00])
+    sig = b"\x30" + bytes(range(70))  # fake ECDSA blob
+    payload = _mpws(sig, leaf)
+    wasm = _minimal_wasm(_custom_section("wasmmod.sig", payload))
+    art = inspect_artifact(wasm, filename="hello.wasm")
+    assert art.signed is True
+    assert art.sig is not None
+    assert art.sig.format == "mpws"
+    assert art.sig.version == 1
+    assert art.sig.sig_len == len(sig)
+    assert art.sig.chain_len == len(leaf)
+    assert art.sig.signed_len == 8  # header only after strip
+    assert len(art.sig.certs) == 1
+    assert art.sig.certs[0].role == "leaf"
+    assert len(art.sig.sig_sha256) == 64
+
+
+def test_parse_deps_and_publish_fill() -> None:
+    from pymergetic.metal.cdn_client.contents import (
+        DEPS_SECTION,
+        inspect_artifact,
+        parse_deps_payload,
+    )
+
+    payload = bytearray(b"MPWD")
+    payload += struct.pack("<H", 1)
+    payload += struct.pack("<I", 1)
+    for s in ("hello", "0.1.0"):
+        b = s.encode()
+        payload += struct.pack("<H", len(b)) + b
+    deps = parse_deps_payload(bytes(payload))
+    assert deps[0].name == "hello" and deps[0].version == "0.1.0"
+
+    wasm = _minimal_wasm(_custom_section(DEPS_SECTION, bytes(payload)))
+    art = inspect_artifact(wasm, filename="client.wasm")
+    assert art.deps[0].name == "hello"
+    contents = inspect_upload({"client.wasm": wasm})
+    assert contents.deps == {"hello": "0.1.0"}
+    assert contents.has_deps is True
+
+
+def test_export_typesig_from_wasm() -> None:
+    """Pack binder tag 255 is SIG_AUTO; inspect fills real Wasm types."""
+    from pymergetic.metal.cdn_client.contents import describe_binder_sig
+
+    assert describe_binder_sig(255) == "auto"
+    assert describe_binder_sig(2) == "(i32, i32) -> i32"
+
+    # type: (i32,i32)->i32 ; function[0]=type0 ; export "add" -> func 0
+    type_sec = bytes(
+        [
+            1,  # 1 type
+            0x60,
+            2,
+            0x7F,
+            0x7F,  # 2 params i32 i32
+            1,
+            0x7F,  # 1 result i32
+        ]
+    )
+    func_sec = bytes([1, 0])  # 1 func, type idx 0
+    # export "add" func 0
+    name = b"add"
+    export_sec = bytes([1, len(name)]) + name + bytes([0, 0])
+    wasm = _minimal_wasm(
+        bytes([1]) + _uleb(len(type_sec)) + type_sec,
+        bytes([3]) + _uleb(len(func_sec)) + func_sec,
+        # empty code section required? not for our parser
+        bytes([7]) + _uleb(len(export_sec)) + export_sec,
+        _custom_section(
+            "wasmmod.pack",
+            _pack_v3("hello", [], exports=[("", "add", "add", 255)]),
+        ),
+    )
+    art = inspect_artifact(wasm, filename="hello.wasm")
+    assert art.pack is not None
+    assert art.pack.exports[0].sig == 255
+    assert art.pack.exports[0].typesig == "(i32, i32) -> i32"
+

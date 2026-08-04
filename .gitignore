@@ -9,14 +9,23 @@ build/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+pymergetic/metal/cdn/_version.py
+client/*.egg-info/
+pymergetic_metal_cdn_client.egg-info/
 .DS_Store
 *.swp
-
-# Local publish trees / keys (never commit secrets)
+.env
+.data/
 out/
 .publish/
 .keys/
+deploy/nginx/certs/*.crt
+deploy/nginx/certs/*.key
+deploy/certbot/conf/
+deploy/certbot/www/
 *.pem
 *.der
 *.sig
 *.crt
+*.db
+*.sqlite3

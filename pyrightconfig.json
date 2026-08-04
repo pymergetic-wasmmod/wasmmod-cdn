@@ -1,0 +1,18 @@
+{
+  "include": ["pymergetic", "tests"],
+  "exclude": ["**/.venv", "**/__pycache__", ".data", "client/*.egg-info"],
+  "extraPaths": ["."],
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.12",
+  "pythonPlatform": "Linux",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "error",
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": ["."],
+      "pythonVersion": "3.12"
+    }
+  ]
+}

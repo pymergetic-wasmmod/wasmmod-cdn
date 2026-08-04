@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: metal
+      POSTGRES_PASSWORD: metal
+      POSTGRES_DB: metal_cdn
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metal -d metal_cdn"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Optional S3-compatible backend for later; app defaults to local filesystem.
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: metal
+      MINIO_ROOT_PASSWORD: metalmetal
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    profiles: ["s3"]
+
+  # TLS edge: host should forward public 80→8080 and 443→8443.
+  # App (metal-cdn serve) stays on the host at 127.0.0.1:8000.
+  nginx:
+    image: nginx:1.27-alpine
+    profiles: ["proxy"]
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - ./deploy/nginx/cdn.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/nginx/certs:/etc/nginx/certs:ro
+      - ./deploy/certbot/www:/var/www/certbot:ro
+      - ./deploy/certbot/conf:/etc/letsencrypt:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # If app runs in another container, change proxy_pass in cdn.conf to that service.
+    # Default assumes app on host :8000 — use host-gateway:
+    #   proxy_pass http://host.docker.internal:8000;
+    network_mode: bridge
+
+  certbot:
+    image: certbot/certbot:latest
+    profiles: ["proxy"]
+    volumes:
+      - ./deploy/certbot/www:/var/www/certbot
+      - ./deploy/certbot/conf:/etc/letsencrypt
+
+volumes:
+  pgdata:
+  minio-data:

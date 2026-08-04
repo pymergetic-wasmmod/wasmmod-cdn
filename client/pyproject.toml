@@ -1,0 +1,43 @@
+[project]
+name = "pymergetic-metal-cdn-client"
+dynamic = ["version"]
+description = "Thin stdlib HTTP client for metal-cdn (Bearer token API)"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Rouven Raudzus", email = "raudzus@pymergetic.com" }]
+dependencies = [
+  "pydantic>=2.7",
+  "cryptography>=42",
+]
+
+[project.urls]
+Homepage = "https://github.com/pymergetic/metal-cdn"
+Documentation = "https://github.com/pymergetic/metal-cdn/blob/main/client/README.md"
+
+[build-system]
+requires = ["setuptools>=68", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+# Sources live in the repo-root namespace tree (shared with the server package).
+[tool.setuptools.package-dir]
+"" = ".."
+
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["pymergetic.metal.cdn_client*"]
+namespaces = true
+
+[tool.setuptools.package-data]
+"pymergetic.metal.cdn_client" = ["py.typed"]
+
+[tool.setuptools_scm]
+# pyproject lives in client/; git root is the parent repo.
+# Version is exposed via importlib.metadata (editable/wheel); no version_file
+# write (setuptools-scm resolves that path from client/ cwd and fails).
+root = ".."
+fallback_version = "0.1.0a2"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

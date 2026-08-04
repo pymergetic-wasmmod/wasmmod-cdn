@@ -1,0 +1,88 @@
+# Reusable workflow: upload prebuilt wasmmod artifacts to a metal-cdn instance.
+# Pack → AOT → sign → zlib should run in the caller (see wasmmod's publish-pack.yml).
+name: publish-pack
+
+on:
+  workflow_call:
+    inputs:
+      package:
+        description: CDN package name
+        required: true
+        type: string
+      version:
+        description: Package version
+        required: true
+        type: string
+      artifacts:
+        description: Space-separated artifact paths (relative to repo root)
+        required: true
+        type: string
+      cdn_url:
+        description: metal-cdn base URL (e.g. https://cdn.example/cdn)
+        required: true
+        type: string
+      claim:
+        description: Claim package before publish
+        required: false
+        type: boolean
+        default: true
+      force:
+        required: false
+        type: boolean
+        default: false
+      aot_version:
+        description: Optional AOT format version
+        required: false
+        type: string
+        default: ""
+    secrets:
+      METAL_CDN_TOKEN:
+        required: true
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install CDN client
+        run: pip install pymergetic-metal-cdn-client
+
+      - name: Publish
+        env:
+          METAL_CDN_URL: ${{ inputs.cdn_url }}
+          METAL_CDN_TOKEN: ${{ secrets.METAL_CDN_TOKEN }}
+          PACKAGE: ${{ inputs.package }}
+          VERSION: ${{ inputs.version }}
+          ARTIFACTS: ${{ inputs.artifacts }}
+          CLAIM: ${{ inputs.claim }}
+          FORCE: ${{ inputs.force }}
+          AOT_VERSION: ${{ inputs.aot_version }}
+        run: |
+          python - <<'PY'
+          import os, shlex, sys
+          from pathlib import Path
+          from pymergetic.metal.cdn_client import CdnClient, ClientError
+
+          package = os.environ["PACKAGE"]
+          version = os.environ["VERSION"]
+          files = [Path(p) for p in shlex.split(os.environ["ARTIFACTS"])]
+          missing = [p for p in files if not p.is_file()]
+          if missing:
+              sys.exit(f"missing artifacts: {missing}")
+          client = CdnClient(os.environ["METAL_CDN_URL"], token=os.environ["METAL_CDN_TOKEN"])
+          if os.environ.get("CLAIM", "").lower() == "true":
+              try:
+                  print("claim:", client.claim(package))
+              except ClientError as exc:
+                  print("claim:", exc, file=sys.stderr)
+          kwargs = {"force": os.environ.get("FORCE", "").lower() == "true"}
+          aot = os.environ.get("AOT_VERSION", "").strip()
+          if aot:
+              kwargs["aot_version"] = int(aot)
+          print(client.publish(package=package, version=version, files=files, **kwargs))
+          PY

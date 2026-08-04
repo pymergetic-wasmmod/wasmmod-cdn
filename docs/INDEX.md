@@ -62,8 +62,20 @@ Version `1` — exact deps only; no ranges.
   artifact files in `packs/` or point at pin-relative URLs later. First cut:
   duplicate files in lead (same names as pin).
 
-## Non-goals (v1)
+## Additive fields (still schema 1)
+
+| Field | Meaning |
+|-------|---------|
+| `packages.*.yanked` / `yank_reason` | Tombstone |
+| `packages.*.deprecated` / `successor` | Soft redirect (`name` or `name@version`) |
+| `signature` | Optional HMAC-SHA256 of canonical JSON (excl. `signature`) |
+
+## Device fetch
+
+- `GET /index/lead` and `GET /index/pin/{version}` — raw `index.json` (+ ETag)
+- Roots: `name` (lead) or `name@version` (pin); install order via `GET /packages/{name}/closure`
+- Devices still verify **pack** signatures; index HMAC is optional integrity for the catalog
+
+## Non-goals (still)
 
 - Dep version ranges / solvers
-- Yank / redirect tables (roadmap)
-- Signing the index itself (devices already verify pack sigs)
