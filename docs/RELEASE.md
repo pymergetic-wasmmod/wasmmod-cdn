@@ -5,60 +5,74 @@ Versions come from **git tags** via [setuptools-scm](https://github.com/pypa/set
 
 ## Tag format
 
-Use annotated PEP 440 tags on a clean `main` commit:
-
 ```sh
-# prerelease
-./scripts/tag-release.sh 0.1.0a3
-
-# or stable
-./scripts/tag-release.sh 0.1.0
-```
-
-That creates `v0.1.0a3` (script prefixes `v` when missing).
-
-## Verify
-
-```sh
-git describe --tags
-pip install -e ./client -e ".[dev]" --config-settings editable_mode=compat
-metal-cdn --version
-# → 0.1.0a3  (no .devN+g… on the tagged commit)
-```
-
-## Push (triggers CI + PyPI)
-
-```sh
+./scripts/tag-release.sh 0.1.0a3   # → annotated tag v0.1.0a3
 git push origin main
 git push origin v0.1.0a3
 ```
 
-Pushing a `v*` tag runs [`.github/workflows/publish-pypi.yml`](../.github/workflows/publish-pypi.yml):
-builds both wheels and publishes them via **Trusted Publishing** (OIDC).
+## PyPI Trusted Publishing (monorepo)
 
-Configure once on PyPI for each project (`pymergetic-metal-cdn-client`,
-`pymergetic-metal-cdn`):
+PyPI allows **only one pending publisher per (repo + workflow file)**.
+This repo therefore has **two** workflows:
 
-- Owner: `pymergetic`
-- Repository: `metal-cdn`
-- Workflow: `publish-pypi.yml`
-- Environment: `pypi`
+| Workflow file | PyPI project |
+|---------------|--------------|
+| `publish-pypi-client.yml` | `pymergetic-metal-cdn-client` |
+| `publish-pypi-server.yml` | `pymergetic-metal-cdn` |
 
-Dry-run (build only): Actions → **publish-pypi** → Run workflow → dry_run=true.
+### Pending publishers (new projects)
 
-Untagged / dirty trees produce local development versions
-(`0.1.0a3.dev1+gXXXX`), which is expected between releases.
+Account → Publishing → pending publisher — **twice**:
 
-## Manual upload (fallback)
+**Client**
+
+| Field | Value |
+|-------|--------|
+| PyPI Project Name | `pymergetic-metal-cdn-client` |
+| Owner | `pymergetic` |
+| Repository | `metal-cdn` |
+| Workflow name | `publish-pypi-client.yml` |
+| Environment | *(empty)* |
+
+**Server**
+
+| Field | Value |
+|-------|--------|
+| PyPI Project Name | `pymergetic-metal-cdn` |
+| Owner | `pymergetic` |
+| Repository | `metal-cdn` |
+| Workflow name | `publish-pypi-server.yml` |
+| Environment | *(empty)* |
+
+Remove any old pending row that still points at `publish-pypi.yml` (that
+filename is gone / cannot cover both packages).
+
+### Ship / re-tag
+
+After the two pending publishers exist and the split workflows are on `main`:
 
 ```sh
-python -m build --outdir dist-client client
-python -m build --outdir dist-server .
-twine upload dist-client/* dist-server/*
+git tag -d v0.1.0a3 && git push origin :refs/tags/v0.1.0a3
+git tag -a v0.1.0a3 -m "metal-cdn 0.1.0a3"
+git push origin v0.1.0a3
 ```
 
-## Client floor for wasmmod
+### Manual upload (always works)
 
-After tagging and publishing the client wheel, bump wasmmod
-[`requirements-publish.txt`](../../metalpython/extmod/wasmmod/requirements-publish.txt)
-only when wasmmod needs newer client APIs.
+```sh
+gh run download <run-id> -n python-packages -D /tmp/metal-cdn-pypi
+# or local build:
+# python -m build --wheel --sdist --outdir dist-client client
+# python -m build --wheel --sdist --outdir dist-server .
+twine upload /tmp/metal-cdn-pypi/dist-client/* /tmp/metal-cdn-pypi/dist-server/*
+```
+
+Optional repo secret `PYPI_API_TOKEN` skips OIDC entirely.
+
+## Verify
+
+```sh
+pip install -e ./client -e ".[dev]" --config-settings editable_mode=compat
+metal-cdn --version   # → 0.1.0a3 on the tagged commit
+```

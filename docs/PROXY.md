@@ -93,6 +93,7 @@ Issued by Let’s Encrypt (HTTP-01) via the `certbot` compose service.
 | `deploy/certbot/www/` | `/var/www/certbot` | ACME webroot |
 
 ```text
+# SAN: cdn.pymergetic.com, pymergetic.com, www.pymergetic.com
 deploy/certbot/conf/live/cdn.pymergetic.com/fullchain.pem
 deploy/certbot/conf/live/cdn.pymergetic.com/privkey.pem
 ```
@@ -125,7 +126,9 @@ Needs public **80→8080**. Nginx can be up on the self-signed cert first.
 ```sh
 docker compose --profile proxy run --rm certbot certonly \
   --webroot -w /var/www/certbot \
-  -d cdn.pymergetic.com --email raudzus@pymergetic.com \
+  --cert-name cdn.pymergetic.com \
+  -d cdn.pymergetic.com -d pymergetic.com -d www.pymergetic.com \
+  --email raudzus@pymergetic.com \
   --agree-tos --no-eff-email --non-interactive
 
 # ssl_certificate* in deploy/nginx/cdn.conf →
@@ -135,6 +138,7 @@ docker compose --profile proxy exec nginx nginx -s reload
 ```
 
 Browse: `https://cdn.pymergetic.com/cdn/`
+(Apex / www share the same cert; `/` is the blank landing until you put something there.)
 
 ## Renew
 

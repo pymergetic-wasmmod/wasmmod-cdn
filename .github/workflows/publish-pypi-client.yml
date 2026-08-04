@@ -1,0 +1,44 @@
+# Publish pymergetic-metal-cdn-client (own workflow file = own PyPI pending publisher).
+name: publish-pypi-client
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build only (skip PyPI upload)
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build client
+        run: |
+          python -m pip install -U pip build twine
+          python -m build --wheel --sdist --outdir dist-client client
+          twine check dist-client/*
+
+      - name: Publish client to PyPI
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-client/
+          password: ${{ secrets.PYPI_API_TOKEN }}

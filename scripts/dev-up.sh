@@ -106,6 +106,8 @@ step_docker() {
     -e "METAL_CDN_SESSION_SECRET=$secret" \
     -e METAL_CDN_EXPERIMENTAL=true \
     -e METAL_CDN_EXPERIMENTAL_REPL=true \
+    -e "METAL_CDN_PUBLIC_ORIGIN=${METAL_CDN_PUBLIC_ORIGIN:-https://cdn.pymergetic.com}" \
+    -e "METAL_CDN_BEHIND_PROXY=${METAL_CDN_BEHIND_PROXY:-true}" \
     -v metal-cdn-data:/data \
     "$IMAGE"
   echo "==> wait for $CDN_URL/health"

@@ -99,7 +99,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         SessionMiddleware,
         secret_key=settings.session_secret,
         same_site="lax",
-        https_only=False,
+        https_only=bool(
+            settings.public_origin and settings.public_origin.startswith("https://")
+        ),
     )
     if settings.behind_proxy:
         app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
