@@ -12,6 +12,7 @@
 #   METAL_CDN_IMAGE metal-cdn
 #   METAL_CDN_NAME  metal-cdn
 #   METAL_CDN_PORT  8000
+#   METAL_CDN_REQUIRE_SIGNED  off|present|verify (default: present)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -108,6 +109,7 @@ step_docker() {
     -e METAL_CDN_EXPERIMENTAL_REPL=true \
     -e "METAL_CDN_PUBLIC_ORIGIN=${METAL_CDN_PUBLIC_ORIGIN:-https://cdn.pymergetic.com}" \
     -e "METAL_CDN_BEHIND_PROXY=${METAL_CDN_BEHIND_PROXY:-true}" \
+    -e "METAL_CDN_REQUIRE_SIGNED=${METAL_CDN_REQUIRE_SIGNED:-present}" \
     -v metal-cdn-data:/data \
     "$IMAGE"
   echo "==> wait for $CDN_URL/health"
@@ -151,9 +153,10 @@ step_seed() {
     exit 1
   }
   packs="$mp/extmod/wasmmod/examples/packs"
-  echo "==> build example packs"
+  examples="$mp/extmod/wasmmod/examples"
+  echo "==> build + sign example packs (wasmmod.sig / examples/.keys)"
   # Prefer system cmake over broken emsdk shims on PATH
-  PATH="/usr/bin:/bin:${PATH}" make -C "$mp/extmod/wasmmod/examples" packs
+  PATH="/usr/bin:/bin:${PATH}" make -C "$examples" sign-packs
   echo "==> publish samples → $CDN_URL"
   [[ -f "$packs/hello.wasm" ]] || { echo "FAIL: missing $packs/hello.wasm" >&2; exit 1; }
   pub_one hello                "$packs/hello.wasm"
@@ -169,6 +172,9 @@ step_seed() {
   echo "==> lead packages:"
   curl -sf "$CDN_URL/index/lead" | python3 -c \
     "import sys,json; print('   ', ', '.join(sorted(json.load(sys.stdin).get('packages',{}))))"
+  echo -n "==> signature check hello … "
+  curl -sf "$CDN_URL/artifacts/lead/hello.wasm/inspect" | python3 -c \
+    'import sys,json; d=json.load(sys.stdin); ok=bool(d.get("signed") and d.get("sig")); print("signed" if ok else "UNSIGNED"); raise SystemExit(0 if ok else 1)'
 }
 
 # ── main ──────────────────────────────────────────────────────────────

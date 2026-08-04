@@ -67,6 +67,24 @@ def _boot():
     _row("├──", "session")
     _row("│   ├──", "id", SESSION_ID or "(none)")
     _row("│   └──", "principal", PRINCIPAL)
+    # Signature gate: compile-time wasm.VERIFY + runtime wasm.verify() + baked trust.
+    try:
+        vmode = int(getattr(wasm, "VERIFY", 0) or 0)
+    except Exception:
+        vmode = 0
+    try:
+        vgate = bool(wasm.verify())
+    except Exception:
+        vgate = False
+    try:
+        trust_n = int(wasm.trust_count())
+    except Exception:
+        trust_n = 0
+    if vmode:
+        _row("├──", "verify", "on (mode " + str(vmode) + ")" if vgate else "runtime off")
+        _row("│   └──", "trust", str(trust_n) + " root(s)")
+    else:
+        _row("├──", "verify", "off (unsigned ok)")
     _row("├──", "cdn")
     _row("│   ├──", "base", CDN)
     _row("│   ├──", "index", INDEX_URL)
