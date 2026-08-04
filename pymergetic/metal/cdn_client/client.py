@@ -289,6 +289,42 @@ class CdnClient:
         except URLError as exc:
             raise ClientError(f"connection failed: {exc.reason}") from exc
 
+    def list_sections(
+        self, filename: str, *, version: str | None = None
+    ) -> list[Any]:
+        """GET ``.../sections`` container section inventory."""
+        return self.request(
+            "GET", f"{self._artifact_prefix(filename, version=version)}/sections"
+        )
+
+    def download_section(
+        self, filename: str, index: int, *, version: str | None = None
+    ) -> bytes:
+        """GET ``.../sections/raw?index=`` raw section payload bytes."""
+        url_path = f"{self._artifact_prefix(filename, version=version)}/sections/raw"
+        headers: dict[str, str] = {"Accept": "application/octet-stream"}
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        req = Request(
+            self._url(url_path, query={"index": str(index)}),
+            headers=headers,
+            method="GET",
+        )
+        try:
+            with urlopen(req, timeout=self.timeout) as resp:
+                return resp.read()
+        except HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            detail = body
+            try:
+                parsed = json.loads(body)
+                detail = str(parsed.get("detail", body))
+            except json.JSONDecodeError:
+                pass
+            raise ClientError(detail, status=exc.code) from exc
+        except URLError as exc:
+            raise ClientError(f"connection failed: {exc.reason}") from exc
+
     def list_trust(self) -> list[Any]:
         return self.request("GET", "admin/trust")
 

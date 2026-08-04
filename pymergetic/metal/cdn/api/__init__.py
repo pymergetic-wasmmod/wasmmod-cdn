@@ -73,10 +73,13 @@ from pymergetic.metal.cdn.models import (
 from pymergetic.metal.cdn.services.shell_sessions import SESSION_ANON_KEY
 from pymergetic.metal.cdn_client.contents import (
     ArtifactContents,
+    ContainerSectionInfo,
     EmbeddedFileView,
+    extract_container_section,
     extract_embedded_bytes,
     extract_embedded_file,
     inspect_artifact,
+    list_container_sections,
 )
 
 api_router = APIRouter()
@@ -766,6 +769,66 @@ async def embedded_file_raw_pin(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return _embedded_raw_response(body, path=path)
+
+
+@artifacts_router.get("/lead/{filename}/sections", response_model=list[ContainerSectionInfo])
+async def sections_lead(filename: str, storage: StorageDep) -> list[ContainerSectionInfo]:
+    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+    return list_container_sections(data)
+
+
+@artifacts_router.get("/pin/{version}/{filename}/sections", response_model=list[ContainerSectionInfo])
+async def sections_pin(
+    version: str, filename: str, storage: StorageDep
+) -> list[ContainerSectionInfo]:
+    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    return list_container_sections(data)
+
+
+def _section_raw_response(body: bytes, *, index: int, name: str) -> Response:
+    from urllib.parse import quote
+
+    safe = name.replace("/", "_") or f"section_{index}"
+    return Response(
+        content=body,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(safe)}",
+            "Cache-Control": "private, max-age=60",
+            "X-Section-Index": str(index),
+            "X-Section-Name": name,
+        },
+    )
+
+
+@artifacts_router.get("/lead/{filename}/sections/raw")
+async def section_raw_lead(filename: str, index: int, storage: StorageDep) -> Response:
+    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+    try:
+        body = extract_container_section(data, index=index)
+        sections = list_container_sections(data)
+        name = sections[index].name if 0 <= index < len(sections) else f"section_{index}"
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _section_raw_response(body, index=index, name=name)
+
+
+@artifacts_router.get("/pin/{version}/{filename}/sections/raw")
+async def section_raw_pin(
+    version: str, filename: str, index: int, storage: StorageDep
+) -> Response:
+    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    try:
+        body = extract_container_section(data, index=index)
+        sections = list_container_sections(data)
+        name = sections[index].name if 0 <= index < len(sections) else f"section_{index}"
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return _section_raw_response(body, index=index, name=name)
 
 
 def build_api_router() -> APIRouter:

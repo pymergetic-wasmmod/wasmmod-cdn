@@ -173,7 +173,14 @@ async def _shell_context(
     experimental_repl = False
     repl_ready = False
     repl_asset_v = ""
+    site_css_v = ""
     settings = None
+    try:
+        css = Path(__file__).resolve().parent / "static" / "site.css"
+        if css.is_file():
+            site_css_v = format(int(css.stat().st_mtime), "x")
+    except OSError:
+        site_css_v = ""
     if request is not None:
         settings = getattr(request.app.state, "settings", None)
         if settings is not None and getattr(settings, "experimental", False):
@@ -210,6 +217,7 @@ async def _shell_context(
         "experimental_repl": experimental_repl,
         "repl_ready": repl_ready,
         "repl_asset_v": repl_asset_v,
+        "site_css_v": site_css_v,
         "current_user": current_user,
     }
 

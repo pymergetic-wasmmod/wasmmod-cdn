@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}metal-cdn{% endblock %}</title>
-  <link rel="stylesheet" href="{{ href('static', 'site.css') }}" />
+  <link rel="stylesheet" href="{{ href('static', 'site.css') }}{% if site_css_v %}?v={{ site_css_v }}{% endif %}" />
   {% block head %}{% endblock %}
 </head>
 <body class="{% if active_page == 'docs' %}page-docs{% endif %}">

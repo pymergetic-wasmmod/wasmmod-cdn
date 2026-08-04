@@ -9,8 +9,10 @@ import pytest
 
 from pymergetic.metal.cdn_client.contents import (
     ensure_zlib_artifacts,
+    extract_container_section,
     inspect_artifact,
     inspect_upload,
+    list_container_sections,
     parse_pack_payload,
     unwrap_mpzl,
     without_sig_section,
@@ -107,6 +109,12 @@ def test_inspect_pack_and_source() -> None:
     assert info.pack.exports[0].export == "add"
     assert info.source is not None
     assert info.source.pkg_version == "0.1.0"
+
+    # Container sections inventory (customs + any standard sections present).
+    names = [s.name for s in info.sections]
+    assert "wasmmod.pack" in names
+    assert "wasmmod.source" in names
+    assert all(s.role == "meta" for s in info.sections if s.name.startswith("wasmmod."))
 
     z = b"MPZL" + struct.pack("<I", len(wasm)) + zlib.compress(wasm, 9)
     contents = inspect_upload({"hello.wasm.zlib": z})
@@ -384,4 +392,68 @@ def test_export_typesig_from_wasm() -> None:
     assert art.pack is not None
     assert art.pack.exports[0].sig == 255
     assert art.pack.exports[0].typesig == "(i32, i32) -> i32"
+
+
+def _wasm_code_section(body: bytes) -> bytes:
+    return bytes([10]) + _uleb(len(body)) + body
+
+
+def test_list_container_sections_wasm_code() -> None:
+    code_body = b"\x01\x04\x00\x41\x2a\x0b"  # 1 func: i32.const 42; end
+    wasm = _minimal_wasm(
+        _custom_section("wasmmod.pack", _pack_v3("hello", [])),
+        _wasm_code_section(code_body),
+    )
+    secs = list_container_sections(wasm)
+    by_name = {s.name: s for s in secs}
+    assert "code" in by_name
+    assert by_name["code"].role == "code"
+    assert by_name["code"].type_id == 10
+    assert by_name["code"].size == len(code_body)
+    payload = extract_container_section(wasm, index=by_name["code"].index)
+    assert payload == code_body
+
+    info = inspect_artifact(wasm, filename="hello.wasm")
+    assert any(s.name == "code" and s.role == "code" for s in info.sections)
+
+    # MPZL unwrap path
+    z = wrap_mpzl(wasm)
+    assert list_container_sections(z) == secs
+    assert extract_container_section(z, index=by_name["code"].index) == code_body
+
+
+def test_list_container_sections_elf_text() -> None:
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    wasmmod_tools = Path("/home/ladmin/Devel/os-sdk/packages/metalpython/extmod/wasmmod/tools")
+    if not (wasmmod_tools / "wasmmod_elf.py").is_file():
+        pytest.skip("wasmmod_elf.py not found")
+
+    c = Path("/tmp/cdn_elf_text.c")
+    c.write_text("int hello(void){return 42;}\n")
+    o = Path("/tmp/cdn_elf_text.o")
+    subprocess.check_call(
+        ["gcc", "-c", "-ffreestanding", "-fPIC", "-O2", "-o", str(o), str(c)]
+    )
+    sys.path.insert(0, str(wasmmod_tools))
+    from wasmmod_elf import append_section  # type: ignore
+
+    pack = _pack_v3("hello", [], exports=[("", "hello", "hello", 0)])
+    elf = append_section(o.read_bytes(), "wasmmod.pack", pack)
+    secs = list_container_sections(elf)
+    names = [s.name for s in secs]
+    assert ".text" in names
+    text = next(s for s in secs if s.name == ".text")
+    assert text.role == "code"
+    assert text.size > 0
+    payload = extract_container_section(elf, index=text.index)
+    assert len(payload) == text.size
+
+    meta = next(s for s in secs if s.name in (".wasmmod.pack", "wasmmod.pack") or s.name.endswith("wasmmod.pack"))
+    assert meta.role == "meta"
+
+    info = inspect_artifact(elf, filename="hello.elf")
+    assert any(s.name == ".text" and s.role == "code" for s in info.sections)
 

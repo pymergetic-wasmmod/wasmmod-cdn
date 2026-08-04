@@ -199,13 +199,15 @@
       {% set inspect_href = href('artifacts', 'lead', a.path, 'inspect') %}
       {% set files_base = href('artifacts', 'lead', a.path, 'files') %}
       {% set files_raw = href('artifacts', 'lead', a.path, 'files', 'raw') %}
+      {% set sections_raw = href('artifacts', 'lead', a.path, 'sections', 'raw') %}
     {% else %}
       {% set dl_href = href('artifacts', 'pin', channel[1:], a.path) %}
       {% set inspect_href = href('artifacts', 'pin', channel[1:], a.path, 'inspect') %}
       {% set files_base = href('artifacts', 'pin', channel[1:], a.path, 'files') %}
       {% set files_raw = href('artifacts', 'pin', channel[1:], a.path, 'files', 'raw') %}
+      {% set sections_raw = href('artifacts', 'pin', channel[1:], a.path, 'sections', 'raw') %}
     {% endif %}
-    <li class="artifact-row" data-filename="{{ a.path }}" data-inspect="{{ inspect_href }}" data-files="{{ files_base }}" data-files-raw="{{ files_raw }}">
+    <li class="artifact-row" data-filename="{{ a.path }}" data-inspect="{{ inspect_href }}" data-files="{{ files_base }}" data-files-raw="{{ files_raw }}" data-sections-raw="{{ sections_raw }}">
       <div class="artifact-main">
         <button type="button" class="artifact-open" aria-expanded="false">
           <code>{{ a.path }}</code>
@@ -362,18 +364,32 @@
 
   function fileRow(path, filesBase, filesRaw, metaHtml) {
     const rawUrl = filesRaw + "?path=" + encodeURIComponent(path);
+    const base = path.split("/").pop() || path;
     return `<li>
-      <button type="button" class="file-link" data-path="${esc(path)}" data-files="${esc(filesBase)}" data-files-raw="${esc(filesRaw)}"><code>${esc(path)}</code></button>
+      <button type="button" class="file-link" data-path="${esc(path)}" data-files="${esc(filesBase)}" data-files-raw="${esc(filesRaw)}" title="Open ${esc(path)}">${esc(path)}</button>
       <span class="muted">${metaHtml}</span>
-      <a class="icon-btn file-download" href="${esc(rawUrl)}" download="${esc(path.split("/").pop())}" title="Download ${esc(path)}" aria-label="Download ${esc(path)}">${DL_SVG}</a>
+      <a class="icon-btn file-download" href="${esc(rawUrl)}" download="${esc(base)}" title="Download ${esc(path)}" aria-label="Download ${esc(path)}">${DL_SVG}</a>
     </li>`;
   }
 
-  function renderInspect(data, filesBase, filesRaw) {
+  function sectionRow(sec, sectionsRaw) {
+    const rawUrl = sectionsRaw + "?index=" + encodeURIComponent(String(sec.index));
+    const role = sec.role || "other";
+    const roleCls = role === "code" ? " sec-code" : (role === "meta" ? " sec-meta" : "");
+    const dlName = (sec.name || ("section_" + sec.index)).replace(/\//g, "_");
+    return `<li class="section-row${roleCls}">
+      <button type="button" class="section-link" data-index="${esc(sec.index)}" data-name="${esc(sec.name)}" data-sections-raw="${esc(sectionsRaw)}" data-size="${esc(sec.size)}" data-role="${esc(role)}" title="View hex: ${esc(sec.name)}">${esc(sec.name)}</button>
+      <span class="muted">${esc(role)} · type=${esc(sec.type_id)} · ${esc(fmtSize(sec.size))}</span>
+      <a class="icon-btn file-download" href="${esc(rawUrl)}" download="${esc(dlName)}" title="Download section ${esc(sec.name)}" aria-label="Download section ${esc(sec.name)}">${DL_SVG}</a>
+    </li>`;
+  }
+
+  function renderInspect(data, filesBase, filesRaw, sectionsRaw) {
     const packFiles = (data.pack && data.pack.files) || [];
     const sourceFiles = (data.source && data.source.files) || [];
     const exports = (data.pack && data.pack.exports) || [];
     const imports = data.imports || [];
+    const sections = data.sections || [];
     let html = `<div class="guts">
       <p class="muted">
         kind=<code>${esc(data.kind)}</code>
@@ -383,6 +399,14 @@
         ${data.aot_version != null ? " · aot=" + esc(data.aot_version) : ""}
       </p>`;
     if (data.error) html += `<p class="muted">error: ${esc(data.error)}</p>`;
+    if (sections.length) {
+      html += `<h3>Sections <span class="muted">(${sections.length})</span></h3>
+        <ul class="file-tree">`;
+      for (const sec of sections) {
+        html += sectionRow(sec, sectionsRaw);
+      }
+      html += `</ul>`;
+    }
     if (data.pack) {
       html += `<h3>Pack <code>${esc(data.pack.name)}</code> (v${esc(data.pack.version)})</h3>
         <ul class="file-tree">`;
@@ -453,7 +477,7 @@
       html += `<h3>Signature <code>wasmmod.sig</code></h3>
         <p class="muted">error: ${esc(data.sig_error)}</p>`;
     }
-    if (!data.pack && !data.source && !data.sig && !data.error && !data.sig_error) {
+    if (!data.pack && !data.source && !data.sig && !data.error && !data.sig_error && !sections.length) {
       html += `<p class="muted">No wasmmod.pack / wasmmod.source / wasmmod.sig sections in this artifact.</p>`;
     }
     html += `</div>`;
@@ -563,8 +587,48 @@
     dialogBody.innerHTML = hexdumpHtml(buf, HEX_PREVIEW);
   }
 
+  async function openSection(sectionsRaw, index, name, size, role) {
+    const title = name || ("section_" + index);
+    dialogTitle.textContent = title;
+    resetSourceBody("source-body", "Loading…");
+    dialogMeta.hidden = false;
+    dialogMeta.textContent =
+      "container section · " + (role || "other") +
+      " · index " + index +
+      " · " + fmtSize(size || 0);
+    const rawUrl = sectionsRaw + "?index=" + encodeURIComponent(String(index));
+    setDownload(rawUrl, title.replace(/\//g, "_"));
+    dialog.showModal();
+
+    const rawRes = await fetch(rawUrl, { headers: { Accept: "application/octet-stream" } });
+    if (!rawRes.ok) {
+      const err = await rawRes.json().catch(() => ({}));
+      resetSourceBody(
+        "source-body",
+        err.detail || ("failed to load section (" + rawRes.status + ")")
+      );
+      return;
+    }
+    const buf = await rawRes.arrayBuffer();
+    delete dialogBody.dataset.highlighted;
+    dialogBody.className = "source-body hex-body";
+    dialogBody.innerHTML = hexdumpHtml(buf, HEX_PREVIEW);
+  }
+
   list.addEventListener("click", async (ev) => {
     if (ev.target.closest(".file-download") || ev.target.closest(".download-btn") || ev.target.closest(".try-btn")) return;
+    const secBtn = ev.target.closest(".section-link");
+    if (secBtn) {
+      ev.preventDefault();
+      openSection(
+        secBtn.dataset.sectionsRaw,
+        Number(secBtn.dataset.index),
+        secBtn.dataset.name,
+        Number(secBtn.dataset.size),
+        secBtn.dataset.role
+      );
+      return;
+    }
     const fileBtn = ev.target.closest(".file-link");
     if (fileBtn) {
       ev.preventDefault();
@@ -589,7 +653,9 @@
         const res = await fetch(row.dataset.inspect, { headers: { Accept: "application/json" } });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || res.status);
-        panel.innerHTML = renderInspect(data, row.dataset.files, row.dataset.filesRaw);
+        panel.innerHTML = renderInspect(
+          data, row.dataset.files, row.dataset.filesRaw, row.dataset.sectionsRaw
+        );
         panel.dataset.loaded = "1";
       } catch (err) {
         panel.innerHTML = `<p class="muted">Inspect failed: ${esc(err.message || err)}</p>`;
