@@ -43,7 +43,7 @@ Config: `~/.config/metal-cdn/config.json`
 
 Pack → AOT → sign → zlib stays in wasmmod; this library talks HTTP both ways.
 
-On upload, metal-cdn inspects each `.wasm` / `.aot` / `.zlib` (shared
+On upload, metal-cdn inspects each `.wasm` / `.aot` / `.elf` / `.zlib` (shared
 `pymergetic.metal.cdn_client.contents`) and stores a `contents` JSON object on
 the package index entry (`pack_files`, `source_files`, `exports`, `signed`, …).
 Host tools can call `inspect_upload` / `inspect_artifact` directly.

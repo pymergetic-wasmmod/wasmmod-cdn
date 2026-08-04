@@ -140,7 +140,7 @@ class SigSectionInfo(BaseModel):
 
 
 class ArtifactContents(BaseModel):
-    """Per-file inspect result (one uploaded .wasm / .aot / .zlib)."""
+    """Per-file inspect result (one uploaded .wasm / .aot / .elf / .zlib)."""
 
     model_config = ConfigDict(extra="forbid")
 

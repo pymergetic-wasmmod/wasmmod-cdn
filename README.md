@@ -22,7 +22,7 @@ Devices still verify pack signatures with wasmmod — this service does not repl
 | Surface | What it does |
 |---------|----------------|
 | **Browse** | Package tree, lead / `@version` pins, dependents |
-| **Artifacts** | Expand a `.wasm` / `.zlib` / AOT blob → pack file list |
+| **Artifacts** | Expand a `.wasm` / `.elf` / `.zlib` / AOT blob → pack file list |
 | **Source viewer** | Highlighted text (py / c / rs / toml / …) or hex for binaries |
 | **µPy shell** | In-browser MicroPython + wasmmod: ▶ → `import` + `exports()` |
 | **Sessions** | Per-browser loader sessions — autoexec / pack / index hits |

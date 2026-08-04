@@ -2,7 +2,7 @@
 
 Static object tree served over HTTP(S). The wasmmod finder treats each root as
 a pack search path (same candidate order as VFS: `.zlib` preferred, then
-`.aot{N}` / arch tags, then `.wasm`).
+`.elf` / arch tags when enabled, then `.aot{N}` / arch tags, then `.wasm`).
 
 ## Roots
 
@@ -22,13 +22,16 @@ Aligned with wasmmod pack deliverables:
 |------|------|
 | `hello.wasm` | Portable Wasm (interp / JIT hosts) |
 | `hello.wasm.zlib` | MPZL wrap of the naked `.wasm` (preferred) |
+| `hello.elf` | In-tree ELF64 ET_REL (host arch) |
+| `hello.x86_64.elf` / `hello.aarch64.elf` | Arch-tagged ELF twins |
+| `hello.elf.zlib` / `hello.x86_64.elf.zlib` | MPZL wraps of ELF |
 | `hello.aot6` | AOT format-tagged (`N` = WAMR `AOT_CURRENT_VERSION`) |
 | `hello.x86_64.aot6` | Arch-tagged AOT |
 | `hello.aot6.zlib` / `hello.x86_64.aot6.zlib` | MPZL wraps |
 
 Rules:
 
-1. **Sign the naked artifact** (`.wasm` / `.aotN`) first — digest excludes `wasmmod.sig`.
+1. **Sign the naked artifact** (`.wasm` / `.elf` / `.aotN`) first — digest excludes `wasmmod.sig`.
 2. Then wrap with MPZL (`.zlib`).
 3. Do not put a trailing align pad after the AOT sig section (breaks WAMR load).
 

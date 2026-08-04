@@ -515,7 +515,7 @@ class PackageEntry(BaseModel):
     )
     contents: PackageContents | None = Field(
         default=None,
-        description="Inventory extracted from uploaded .wasm/.aot (pack/source/sig)",
+        description="Inventory extracted from uploaded .wasm/.aot/.elf (pack/source/sig)",
     )
     updated_at: datetime | None = Field(
         default=None,

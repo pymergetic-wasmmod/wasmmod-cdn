@@ -32,6 +32,13 @@ Version `1` — exact deps only; no ranges.
           "encoding": "mpzl",
           "sha256": "…",
           "size": 23456
+        },
+        {
+          "path": "hello.elf.zlib",
+          "kind": "elf",
+          "encoding": "mpzl",
+          "sha256": "…",
+          "size": 4096
         }
       ]
     }
@@ -49,7 +56,7 @@ Version `1` — exact deps only; no ranges.
 | `aot_version` | WAMR AOT file-format N (`wasm.AOT_VERSION`) |
 | `deps` | Map of pack name → **exact** version string |
 | `artifacts[].path` | Relative to the directory that holds this index |
-| `artifacts[].kind` | `wasm` \| `aot` |
+| `artifacts[].kind` | `wasm` \| `aot` \| `elf` |
 | `artifacts[].arch` | Optional host arch infix (`x86_64`, …) |
 | `artifacts[].encoding` | omit / `raw` \| `mpzl` (`.zlib`) |
 | `sha256` | Hex digest of the **file bytes as served** (wrapped if MPZL) |
