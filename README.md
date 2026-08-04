@@ -130,6 +130,18 @@ loaded hello · 5 public
   util (module)
 ```
 
+Dotted trees work too (missing middle packs become namespaces):
+
+```python
+import test_a2.test_b2.test_c2
+exports(test_a2.test_b2.test_c2)
+test_a2.test_b2.test_c2.c2_answer()   # → 42
+```
+
+<p align="center">
+  <img src="screenshots/upy-nested.png" alt="µPy shell — nested import test_a2.test_b2.test_c2" width="720" />
+</p>
+
 - `packages()` — live lead catalog (or autoexec snapshot)
 - `exports(mod)` — shipped in autoexec (same place as `help()`)
 - `GET /repl/autoexec.py` mints/reuses a `ShellSession`, sets `wasm.cdn` + import hook + `SESSION_ID`
