@@ -370,12 +370,20 @@
     return "";
   }
 
-  function fileRow(path, filesBase, filesRaw, metaHtml) {
+  function fileRow(path, filesBase, filesRaw, metaHtml, ctx) {
     const rawUrl = filesRaw + "?path=" + encodeURIComponent(path);
     const base = path.split("/").pop() || path;
+    const isMpy = /\.mpy$/i.test(path);
+    const insp = isMpy && ctx
+      ? ` data-filename="${esc(ctx.filename || "")}" data-package="${esc(ctx.package || "")}" data-version="${esc(ctx.version || "")}" data-mpy-path="${esc(path)}"`
+      : "";
+    const mpyBtn = isMpy && ctx
+      ? `<button type="button" class="mpy-inspect-btn" ${insp} title="mpy-dis in Inspect">dis</button>`
+      : "";
     return `<li>
       <button type="button" class="file-link" data-path="${esc(path)}" data-files="${esc(filesBase)}" data-files-raw="${esc(filesRaw)}" title="Open ${esc(path)}">${esc(path)}</button>
       <span class="muted">${metaHtml}</span>
+      ${mpyBtn}
       <a class="icon-btn file-download" href="${esc(rawUrl)}" download="${esc(base)}" title="Download ${esc(path)}" aria-label="Download ${esc(path)}">${DL_SVG}</a>
     </li>`;
   }
@@ -450,14 +458,25 @@
       html += `<h3>Pack <code>${esc(data.pack.name)}</code> (v${esc(data.pack.version)})</h3>
         <ul class="file-tree">`;
       for (const f of packFiles) {
-        html += fileRow(f.path, filesBase, filesRaw, `${esc(f.kind)} · ${esc(fmtSize(f.raw_len))}`);
+        html += fileRow(
+          f.path, filesBase, filesRaw,
+          `${esc(f.kind)} · ${esc(fmtSize(f.raw_len))}`,
+          ctx
+        );
       }
       html += `</ul>`;
       if (exports.length) {
         html += `<h4>Exports</h4><ul class="file-tree">`;
         for (const ex of exports) {
+          const name = ex.export || ex.func;
           const typeLabel = ex.typesig || (ex.sig === 255 ? "auto" : ("tag:" + ex.sig));
-          html += `<li><code>${esc(ex.export || ex.func)}</code>
+          html += `<li>
+            <button type="button" class="symbol-link"
+              data-filename="${esc(filename)}"
+              data-package="${esc(pkg)}"
+              data-version="${esc(version)}"
+              data-symbol="${esc(name)}"
+              title="Inspect export ${esc(name)}"><code>${esc(name)}</code></button>
             <span class="muted">${esc(typeLabel)}</span></li>`;
         }
         html += `</ul>`;
@@ -467,7 +486,7 @@
       html += `<h3>Source tree <code>${esc(data.source.name)}</code> ${esc(data.source.pkg_version || "")}</h3>
         <ul class="file-tree">`;
       for (const f of sourceFiles) {
-        html += fileRow(f.path, filesBase, filesRaw, esc(fmtSize(f.raw_len)));
+        html += fileRow(f.path, filesBase, filesRaw, esc(fmtSize(f.raw_len)), ctx);
       }
       html += `</ul>`;
     }
@@ -562,9 +581,11 @@
       filename: btn.dataset.filename,
       version: version || undefined,
       symbol: btn.dataset.symbol || undefined,
+      mpyPath: btn.dataset.mpyPath || undefined,
       addr: btn.dataset.offset != null && btn.dataset.offset !== ""
         ? Number(btn.dataset.offset) : undefined,
       sectionIndex: sectionRaw !== "" && sectionRaw != null ? Number(sectionRaw) : undefined,
+      tab: btn.dataset.mpyPath ? "asm" : undefined,
     });
   }
 
@@ -672,7 +693,7 @@
 
   list.addEventListener("click", async (ev) => {
     if (ev.target.closest(".file-download") || ev.target.closest(".download-btn") || ev.target.closest(".try-btn")) return;
-    const inspBtn = ev.target.closest(".symbol-link, .inspect-open-btn");
+    const inspBtn = ev.target.closest(".symbol-link, .inspect-open-btn, .mpy-inspect-btn");
     if (inspBtn) {
       ev.preventDefault();
       openInspectFromBtn(inspBtn);

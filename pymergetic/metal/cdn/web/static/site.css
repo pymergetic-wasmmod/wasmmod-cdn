@@ -793,7 +793,8 @@ a.ver:hover { text-decoration: underline; }
 }
 .inspect-src-hit { background: rgba(61, 156, 253, 0.12); }
 .symbol-link,
-.inspect-open-btn {
+.inspect-open-btn,
+.mpy-inspect-btn {
   background: transparent;
   border: 0;
   padding: 0.1rem 0.25rem;
@@ -804,9 +805,15 @@ a.ver:hover { text-decoration: underline; }
   border-radius: 4px;
 }
 .symbol-link:hover,
-.inspect-open-btn:hover {
+.inspect-open-btn:hover,
+.mpy-inspect-btn:hover {
   text-decoration: underline;
   background: rgba(61, 156, 253, 0.08);
+}
+.mpy-inspect-btn {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  margin-left: 0.15rem;
 }
 @media (max-width: 720px) {
   .inspect-commander {

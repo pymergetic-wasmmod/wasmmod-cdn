@@ -1,11 +1,14 @@
 /**
  * metal-cdn Inspect commander — dual-pane symbols / hex|asm|source.
  *
- * Site-wide: window.openInspect({ filename, version?, package?, symbol?, addr?, sectionIndex? })
+ * Site-wide: window.openInspect({
+ *   filename, version?, package?, symbol?, addr?, sectionIndex?, mpyPath?, tab?
+ * })
  */
 (() => {
   const HEX_PREVIEW = 65536;
   const DISASM_LIMIT = 64;
+  const MPY_DISASM_LIMIT = 96;
 
   function esc(s) {
     return String(s).replace(/[&<>"']/g, (c) =>
@@ -283,6 +286,21 @@
     }
   }
 
+  async function loadMpyDisasm(path) {
+    const { state } = ensureUi();
+    const root = artifactRoot(state.opts);
+    const url =
+      `${root}/files/mpy-disasm?path=${encodeURIComponent(path)}` +
+      `&limit=${MPY_DISASM_LIMIT}`;
+    try {
+      const lines = await fetchJson(url);
+      state.asmHtml =
+        `<div class="muted">mpy · ${esc(path)}</div>\n` + formatAsm(lines);
+    } catch (err) {
+      state.asmHtml = esc(err.message || err);
+    }
+  }
+
   async function loadSourceForLoc() {
     const { state } = ensureUi();
     const loc = state.locations[state.locIndex];
@@ -388,6 +406,7 @@
       version: opts.version || null,
       package: opts.package || null,
       sectionIndex: opts.sectionIndex != null ? Number(opts.sectionIndex) : null,
+      mpyPath: opts.mpyPath || null,
     };
     state.symbols = [];
     state.selected = null;
@@ -396,7 +415,9 @@
     state.hexHtml = "";
     state.asmHtml = "";
     state.sourceHtml = "";
-    state.tab = opts.tab || (opts.symbol || opts.addr != null ? "source" : "hex");
+    state.tab =
+      opts.tab ||
+      (opts.mpyPath ? "asm" : opts.symbol || opts.addr != null ? "source" : "hex");
     els.filter.value = "";
     els.title.textContent =
       (opts.package ? opts.package + " · " : "") + opts.filename;
@@ -413,6 +434,37 @@
       state.symbols = [];
     }
     renderSymList();
+
+    if (opts.mpyPath) {
+      els.meta.textContent = "mpy " + opts.mpyPath;
+      state.hexHtml =
+        '<span class="muted">Embedded .mpy — use asm tab for mpy-dis.</span>';
+      state.sourceHtml =
+        `<span class="muted">path</span> <code>${esc(opts.mpyPath)}</code>` +
+        ` <span class="muted">(prefer twin .py via source tree)</span>`;
+      await loadMpyDisasm(opts.mpyPath);
+      // Prefer .py twin in source pane when present.
+      const twin = String(opts.mpyPath)
+        .replace(/\.upy\.mpy\d+\.sib\d+\.mpy$/i, ".py")
+        .replace(/\.mpy$/i, ".py");
+      if (twin !== opts.mpyPath) {
+        try {
+          const meta = await fetchJson(
+            `${root}/files?path=${encodeURIComponent(twin)}`
+          );
+          if (meta && meta.text != null) {
+            state.locations = [{ path: twin, line: null, role: "twin" }];
+            state.locIndex = 0;
+            renderLocBar();
+            await loadSourceForLoc();
+          }
+        } catch (_) {
+          /* twin optional */
+        }
+      }
+      paintActive();
+      return;
+    }
 
     if (opts.symbol) {
       const hit =

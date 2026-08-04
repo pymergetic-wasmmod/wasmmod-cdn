@@ -52,3 +52,22 @@ order; import/`load_pack` probes filenames under each root. No index fetch yet.
 
 **Planned:** resolve `name` or `name@version` via `index.json`, then fetch the
 listed artifact URLs (still multi-root fallback).
+
+## Inspect HTTP (metal-cdn API)
+
+Thin wrap over shared `wasmmod_inspect` (not a private parser). Prefix:
+`/cdn/artifacts/lead/<file>/…` or `/cdn/artifacts/pin/<ver>/<file>/…`.
+
+| GET | Role |
+|-----|------|
+| `…/inspect` | Aggregate (pack/source/sig/sections/**symbols**/`has_dwarf`) |
+| `…/symbols` | Symbol list |
+| `…/addr2line?addr=` | Location[] for address |
+| `…/locations?name=` | Location[] for symbol (multi-loc OK) |
+| `…/disasm?index=&offset=&limit=` | Disasm lines (ELF **shndx** / Wasm code window) |
+| `…/sections` · `…/sections/raw?index=&offset=&limit=` | Section list / ranged bytes |
+| `…/files` · `…/files/raw` · `…/files/mpy-disasm?path=` | Embedded files + basic mpy-dis |
+
+UI: package page **Open Inspect…** / symbol & export clicks →
+`window.openInspect({ filename, symbol?, sectionIndex?, mpyPath?, … })`
+(`static/inspect.js`). ELF section indexes are real `shndx` (match symbols).
