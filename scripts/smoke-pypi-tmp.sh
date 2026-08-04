@@ -59,10 +59,14 @@ echo "==> wasmmod $WASMMOD_DIR"
 python3 -m venv "$WORK/venv"
 # shellcheck disable=SC1091
 source "$WORK/venv/bin/activate"
+# Host ~/.config/pip/pip.conf adds a private extra-index that can shadow PyPI alphas.
+export PIP_CONFIG_FILE="/dev/null"
+export PIP_INDEX_URL="https://pypi.org/simple"
+export PIP_EXTRA_INDEX_URL=""
 python -m pip install -U pip -q
 
 echo "==> pip install from PyPI (no local editable)"
-python -m pip install \
+python -m pip install --index-url https://pypi.org/simple \
   "pymergetic-metal-cdn-client==${EXPECT_VER}" \
   "pymergetic-metal-cdn==${EXPECT_VER}" -q
 
@@ -136,7 +140,7 @@ assert st.get("experimental") is True
 PY
 
 echo "==> wasmmod requirements-publish + require_cdn_client"
-python -m pip install -r "$WASMMOD_DIR/requirements-publish.txt" -q
+python -m pip install --index-url https://pypi.org/simple -r "$WASMMOD_DIR/requirements-publish.txt" -q
 python - <<PY
 import sys
 sys.path.insert(0, "$WASMMOD_DIR/tools")
