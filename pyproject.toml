@@ -61,7 +61,7 @@ namespaces = true
 
 [tool.setuptools_scm]
 version_file = "pymergetic/metal/cdn/_version.py"
-fallback_version = "0.1.0a3"
+fallback_version = "0.1.0a5"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

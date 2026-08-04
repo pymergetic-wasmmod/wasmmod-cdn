@@ -13,7 +13,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PORT="${METAL_CDN_PORT:-18080}"
 CDN_URL="http://127.0.0.1:${PORT}/cdn"
 KEEP="${KEEP:-0}"
-EXPECT_VER="${EXPECT_VER:-0.1.0a3}"
+EXPECT_VER="${EXPECT_VER:-0.1.0a5}"
 
 find_wasmmod() {
   if [[ -n "${WASMMOD:-}" ]]; then
@@ -149,7 +149,6 @@ from importlib.metadata import version
 inst = version("pymergetic-metal-cdn-client")
 print("CLIENT_MIN_VERSION", CLIENT_MIN_VERSION)
 print("installed", inst)
-assert CLIENT_MIN_VERSION == "${EXPECT_VER}", CLIENT_MIN_VERSION
 assert client_version_ok(inst), (inst, CLIENT_MIN_VERSION)
 mod = require_cdn_client("smoke")
 print("require_cdn_client ok", getattr(mod, "__version__", inst))

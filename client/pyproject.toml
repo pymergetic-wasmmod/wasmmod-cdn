@@ -36,7 +36,7 @@ namespaces = true
 # Version is exposed via importlib.metadata (editable/wheel); no version_file
 # write (setuptools-scm resolves that path from client/ cwd and fails).
 root = ".."
-fallback_version = "0.1.0a3"
+fallback_version = "0.1.0a5"
 
 [tool.ruff]
 line-length = 100
