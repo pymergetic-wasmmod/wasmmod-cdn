@@ -207,7 +207,15 @@
       {% set files_raw = href('artifacts', 'pin', channel[1:], a.path, 'files', 'raw') %}
       {% set sections_raw = href('artifacts', 'pin', channel[1:], a.path, 'sections', 'raw') %}
     {% endif %}
-    <li class="artifact-row" data-filename="{{ a.path }}" data-inspect="{{ inspect_href }}" data-files="{{ files_base }}" data-files-raw="{{ files_raw }}" data-sections-raw="{{ sections_raw }}">
+    <li class="artifact-row"
+        data-filename="{{ a.path }}"
+        data-package="{{ name }}"
+        data-channel="{{ channel }}"
+        {% if channel != "lead" %}data-version="{{ channel[1:] }}"{% endif %}
+        data-inspect="{{ inspect_href }}"
+        data-files="{{ files_base }}"
+        data-files-raw="{{ files_raw }}"
+        data-sections-raw="{{ sections_raw }}">
       <div class="artifact-main">
         <button type="button" class="artifact-open" aria-expanded="false">
           <code>{{ a.path }}</code>
@@ -384,12 +392,16 @@
     </li>`;
   }
 
-  function renderInspect(data, filesBase, filesRaw, sectionsRaw) {
+  function renderInspect(data, filesBase, filesRaw, sectionsRaw, ctx) {
     const packFiles = (data.pack && data.pack.files) || [];
     const sourceFiles = (data.source && data.source.files) || [];
     const exports = (data.pack && data.pack.exports) || [];
     const imports = data.imports || [];
     const sections = data.sections || [];
+    const symbols = data.symbols || [];
+    const filename = (ctx && ctx.filename) || "";
+    const version = (ctx && ctx.version) || "";
+    const pkg = (ctx && ctx.package) || "";
     let html = `<div class="guts">
       <p class="muted">
         kind=<code>${esc(data.kind)}</code>
@@ -397,8 +409,35 @@
         · signed=<code>${esc(data.signed)}</code>
         · naked=${esc(fmtSize(data.naked_size))}
         ${data.aot_version != null ? " · aot=" + esc(data.aot_version) : ""}
+        ${data.has_dwarf ? " · dwarf" : ""}
       </p>`;
     if (data.error) html += `<p class="muted">error: ${esc(data.error)}</p>`;
+    if (symbols.length || sections.length) {
+      html += `<p><button type="button" class="inspect-open-btn"
+        data-filename="${esc(filename)}"
+        data-package="${esc(pkg)}"
+        data-version="${esc(version)}"
+        title="Open Inspect commander">Open Inspect…</button></p>`;
+    }
+    if (symbols.length) {
+      html += `<h3>Symbols <span class="muted">(${symbols.length})</span></h3>
+        <ul class="file-tree">`;
+      for (const sym of symbols) {
+        const meta = [sym.kind, sym.binding, fmtSize(sym.size || 0)].filter(Boolean).join(" · ");
+        html += `<li>
+          <button type="button" class="symbol-link"
+            data-filename="${esc(filename)}"
+            data-package="${esc(pkg)}"
+            data-version="${esc(version)}"
+            data-symbol="${esc(sym.name)}"
+            data-section-index="${esc(sym.section_index == null ? "" : sym.section_index)}"
+            data-offset="${esc(sym.offset == null ? 0 : sym.offset)}"
+            title="Inspect ${esc(sym.name)}"><code>${esc(sym.name)}</code></button>
+          <span class="muted">${esc(meta)}</span>
+        </li>`;
+      }
+      html += `</ul>`;
+    }
     if (sections.length) {
       html += `<h3>Sections <span class="muted">(${sections.length})</span></h3>
         <ul class="file-tree">`;
@@ -484,21 +523,22 @@
     return html;
   }
 
-  function paintHexByte(b) {
-    const hx = b.toString(16).padStart(2, "0");
-    if (b === 0) return `<span class="hx-null">${hx}</span>`;
-    if (b >= 32 && b < 127) return `<span class="hx-print">${hx}</span>`;
-    return `<span class="hx-hi">${hx}</span>`;
-  }
-
   function hexdumpHtml(buf, limit) {
+    if (window.MetalInspect && window.MetalInspect.hexdumpHtml) {
+      return window.MetalInspect.hexdumpHtml(buf, limit);
+    }
     const view = buf.byteLength > limit ? buf.slice(0, limit) : buf;
     const u8 = new Uint8Array(view);
     const width = 16;
     const lines = [];
     for (let i = 0; i < u8.length; i += width) {
       const chunk = u8.subarray(i, i + width);
-      const hex = Array.from(chunk, paintHexByte).join(" ");
+      const hex = Array.from(chunk, (b) => {
+        const hx = b.toString(16).padStart(2, "0");
+        if (b === 0) return `<span class="hx-null">${hx}</span>`;
+        if (b >= 32 && b < 127) return `<span class="hx-print">${hx}</span>`;
+        return `<span class="hx-hi">${hx}</span>`;
+      }).join(" ");
       const pad = "   ".repeat(width - chunk.length);
       let ascii = "";
       for (const b of chunk) ascii += (b >= 32 && b < 127) ? String.fromCharCode(b) : ".";
@@ -511,6 +551,21 @@
       html += `\n… showing ${limit} of ${buf.byteLength} bytes`;
     }
     return html;
+  }
+
+  function openInspectFromBtn(btn) {
+    if (!window.openInspect) return;
+    const version = btn.dataset.version || undefined;
+    const sectionRaw = btn.dataset.sectionIndex;
+    window.openInspect({
+      package: btn.dataset.package || undefined,
+      filename: btn.dataset.filename,
+      version: version || undefined,
+      symbol: btn.dataset.symbol || undefined,
+      addr: btn.dataset.offset != null && btn.dataset.offset !== ""
+        ? Number(btn.dataset.offset) : undefined,
+      sectionIndex: sectionRaw !== "" && sectionRaw != null ? Number(sectionRaw) : undefined,
+    });
   }
 
   function setDownload(rawUrl, filename) {
@@ -617,9 +672,26 @@
 
   list.addEventListener("click", async (ev) => {
     if (ev.target.closest(".file-download") || ev.target.closest(".download-btn") || ev.target.closest(".try-btn")) return;
+    const inspBtn = ev.target.closest(".symbol-link, .inspect-open-btn");
+    if (inspBtn) {
+      ev.preventDefault();
+      openInspectFromBtn(inspBtn);
+      return;
+    }
     const secBtn = ev.target.closest(".section-link");
     if (secBtn) {
       ev.preventDefault();
+      const row = secBtn.closest(".artifact-row");
+      if (window.openInspect && row && (ev.metaKey || ev.ctrlKey || ev.altKey)) {
+        window.openInspect({
+          package: row.dataset.package,
+          filename: row.dataset.filename,
+          version: row.dataset.version || undefined,
+          sectionIndex: Number(secBtn.dataset.index),
+          tab: "hex",
+        });
+        return;
+      }
       openSection(
         secBtn.dataset.sectionsRaw,
         Number(secBtn.dataset.index),
@@ -654,7 +726,12 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || res.status);
         panel.innerHTML = renderInspect(
-          data, row.dataset.files, row.dataset.filesRaw, row.dataset.sectionsRaw
+          data, row.dataset.files, row.dataset.filesRaw, row.dataset.sectionsRaw,
+          {
+            filename: row.dataset.filename,
+            package: row.dataset.package,
+            version: row.dataset.version || "",
+          }
         );
         panel.dataset.loaded = "1";
       } catch (err) {

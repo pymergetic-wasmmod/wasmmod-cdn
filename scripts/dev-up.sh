@@ -5,6 +5,7 @@
 #   ./scripts/dev-up.sh --seed-only  # packs into already-running container
 #   ./scripts/dev-up.sh --no-upy     # skip Emscripten rebuild (reuse synced assets)
 #   ./scripts/dev-up.sh --no-seed    # docker only
+#   ./scripts/dev-up.sh --reseed     # wipe named volume metal-cdn-data, then docker+seed
 #
 # Env overrides:
 #   METALPYTHON   path to metalpython tree (default: sibling ../metalpython)
@@ -12,6 +13,7 @@
 #   METAL_CDN_IMAGE metal-cdn
 #   METAL_CDN_NAME  metal-cdn
 #   METAL_CDN_PORT  8000
+#   METAL_CDN_VOLUME metal-cdn-data   # docker volume wiped by --reseed only
 #   METAL_CDN_REQUIRE_SIGNED  off|present|verify (default: present)
 set -euo pipefail
 
@@ -22,14 +24,16 @@ IMAGE="${METAL_CDN_IMAGE:-metal-cdn}"
 NAME="${METAL_CDN_NAME:-metal-cdn}"
 PORT="${METAL_CDN_PORT:-8000}"
 CDN_URL="${METAL_CDN_URL:-http://127.0.0.1:${PORT}/cdn}"
+VOLUME="${METAL_CDN_VOLUME:-metal-cdn-data}"
 
 DO_UPY=1
 DO_DOCKER=1
 DO_SEED=1
+DO_RESEED=0
 SEED_ONLY=0
 
 usage() {
-  sed -n '2,14p' "$0" | sed 's/^# \?//'
+  sed -n '2,16p' "$0" | sed 's/^# \?//'
   exit "${1:-0}"
 }
 
@@ -39,7 +43,8 @@ while [[ $# -gt 0 ]]; do
     --no-upy) DO_UPY=0 ;;
     --no-seed) DO_SEED=0 ;;
     --no-docker) DO_DOCKER=0 ;;
-    --seed-only) SEED_ONLY=1; DO_UPY=0; DO_DOCKER=0; DO_SEED=1 ;;
+    --seed-only) SEED_ONLY=1; DO_UPY=0; DO_DOCKER=0; DO_SEED=1; DO_RESEED=0 ;;
+    --reseed) DO_RESEED=1; DO_DOCKER=1; DO_SEED=1 ;;
     *) echo "unknown arg: $1" >&2; usage 2 ;;
   esac
   shift
@@ -94,6 +99,19 @@ step_upy() {
   "$ROOT/scripts/sync-repl-assets.sh" "$build"
 }
 
+step_reseed_volume() {
+  # Only the named local CDN volume (default metal-cdn-data). Never touches
+  # compose volumes like pgdata / host bind mounts outside Docker.
+  echo "==> reseed: stop $NAME and remove docker volume $VOLUME"
+  docker rm -f "$NAME" >/dev/null 2>&1 || true
+  if docker volume inspect "$VOLUME" >/dev/null 2>&1; then
+    docker volume rm "$VOLUME"
+    echo "    removed volume $VOLUME"
+  else
+    echo "    volume $VOLUME already absent"
+  fi
+}
+
 step_docker() {
   echo "==> docker build -t $IMAGE"
   docker build -t "$IMAGE" "$ROOT"
@@ -110,7 +128,7 @@ step_docker() {
     -e "METAL_CDN_PUBLIC_ORIGIN=${METAL_CDN_PUBLIC_ORIGIN:-https://cdn.pymergetic.com}" \
     -e "METAL_CDN_BEHIND_PROXY=${METAL_CDN_BEHIND_PROXY:-true}" \
     -e "METAL_CDN_REQUIRE_SIGNED=${METAL_CDN_REQUIRE_SIGNED:-present}" \
-    -v metal-cdn-data:/data \
+    -v "${VOLUME}:/data" \
     "$IMAGE"
   echo "==> wait for $CDN_URL/health"
   local i
@@ -224,6 +242,14 @@ step_seed() {
 }
 
 # ── main ──────────────────────────────────────────────────────────────
+if [[ "$DO_RESEED" -eq 1 ]]; then
+  if [[ "$SEED_ONLY" -eq 1 ]]; then
+    echo "FAIL: --reseed cannot combine with --seed-only (needs docker recreate)" >&2
+    exit 2
+  fi
+  step_reseed_volume
+fi
+
 if [[ "$SEED_ONLY" -eq 0 && "$DO_UPY" -eq 1 ]]; then
   step_upy
 elif [[ "$DO_DOCKER" -eq 1 ]]; then

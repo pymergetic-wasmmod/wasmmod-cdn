@@ -10,10 +10,18 @@ import pytest
 from pymergetic.metal.cdn_client.contents import (
     ensure_zlib_artifacts,
     extract_container_section,
+    extract_embedded_bytes,
     inspect_artifact,
     inspect_upload,
     list_container_sections,
+    list_pack_symbols,
+    pack_addr2line,
+    pack_disasm,
+    pack_has_dwarf,
+    pack_locations,
+    pack_mpy_disasm,
     parse_pack_payload,
+    slice_bytes,
     unwrap_mpzl,
     without_sig_section,
     wrap_mpzl,
@@ -456,4 +464,168 @@ def test_list_container_sections_elf_text() -> None:
 
     info = inspect_artifact(elf, filename="hello.elf")
     assert any(s.name == ".text" and s.role == "code" for s in info.sections)
+
+
+def _hello_elf_bytes() -> bytes:
+    from pathlib import Path
+
+    candidates = [
+        Path(__file__).resolve().parents[2]
+        / "metalpython"
+        / "extmod"
+        / "wasmmod"
+        / "examples"
+        / "packs"
+        / "hello.elf",
+        Path("/home/ladmin/Devel/os-sdk/packages/metalpython/extmod/wasmmod/examples/packs/hello.elf"),
+    ]
+    for p in candidates:
+        if p.is_file():
+            return p.read_bytes()
+    pytest.skip("hello.elf fixture not found")
+
+
+def test_slice_bytes_limit_cap() -> None:
+    body = bytes(range(256)) * 8
+    assert slice_bytes(body, offset=10, limit=5) == body[10:15]
+    assert slice_bytes(body, offset=0, limit=None) == body
+    huge = b"x" * ((1 << 20) + 50)
+    assert len(slice_bytes(huge, offset=0, limit=(1 << 20) + 50)) == (1 << 20)
+    with pytest.raises(ValueError):
+        slice_bytes(body, offset=-1)
+
+
+def test_pack_symbols_addr2line_disasm_hello_elf() -> None:
+    data = _hello_elf_bytes()
+    syms = list_pack_symbols(data)
+    assert any(s.name == "hello" for s in syms)
+    assert pack_has_dwarf(data) is True
+
+    hello = next(s for s in syms if s.name == "hello")
+    locs = pack_addr2line(data, hello.offset)
+    assert locs
+    assert any(loc.path for loc in locs)
+
+    named = pack_locations(data, "hello")
+    assert named
+    assert any(loc.role in ("sym", "dwarf", "def", "twin") for loc in named)
+
+    assert hello.section_index is not None
+    lines = pack_disasm(data, hello.section_index, offset=hello.offset, limit=8)
+    assert lines
+    assert all(ln.text for ln in lines)
+
+
+def test_pack_mpy_disasm_hello_elf() -> None:
+    data = _hello_elf_bytes()
+    body, section, _kind = extract_embedded_bytes(
+        data, "__init__.upy.mpy6.sib31.mpy"
+    )
+    assert section in ("pack", "source")
+    lines = pack_mpy_disasm(body, limit=16)
+    assert lines
+    assert lines[0].text.startswith("mpy_hdr") or lines[0].raw_hex
+
+
+@pytest.mark.asyncio
+async def test_symbols_and_addr2line_api(tmp_path) -> None:
+    from httpx import ASGITransport, AsyncClient
+
+    from pymergetic.metal.cdn.main import create_app
+    from pymergetic.metal.cdn.settings import Settings
+
+    data = _hello_elf_bytes()
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        storage_root=tmp_path / "packs",
+        database_url=f"sqlite+aiosqlite:///{tmp_path / 'c.db'}",
+        base_path="/cdn",
+        require_auth=True,
+        allow_open_registration=True,
+        session_secret="test-secret",
+        csrf_enabled=False,
+        rate_limit_enabled=False,
+        debug=False,
+        require_signed="off",
+    )
+    app = create_app(settings)
+    transport = ASGITransport(app=app)
+    async with (
+        AsyncClient(transport=transport, base_url="http://test") as ac,
+        app.router.lifespan_context(app),
+    ):
+        await ac.post(
+            "/cdn/auth/register",
+            json={"email": "elf@example.com", "password": "secret123", "display_name": "E"},
+        )
+        tok = (
+            await ac.post(
+                "/cdn/auth/token",
+                json={"email": "elf@example.com", "password": "secret123", "name": "t"},
+            )
+        ).json()["key"]
+        await ac.post(
+            "/cdn/packages/hello/claim",
+            headers={"Authorization": f"Bearer {tok}"},
+        )
+        import json
+
+        pub = await ac.post(
+            "/cdn/publish",
+            data={
+                "meta": json.dumps(
+                    {
+                        "package": "hello",
+                        "version": "0.1.0",
+                        "lead": True,
+                        "pin": True,
+                        "deps": {},
+                    }
+                )
+            },
+            files=[("files", ("hello.elf", data, "application/octet-stream"))],
+            headers={"Authorization": f"Bearer {tok}"},
+        )
+        assert pub.status_code == 201, pub.text
+
+        syms = await ac.get("/cdn/artifacts/lead/hello.elf/symbols")
+        assert syms.status_code == 200, syms.text
+        names = [s["name"] for s in syms.json()]
+        assert "hello" in names
+
+        hello = next(s for s in syms.json() if s["name"] == "hello")
+        a2l = await ac.get(
+            "/cdn/artifacts/lead/hello.elf/addr2line",
+            params={"addr": hello["offset"]},
+        )
+        assert a2l.status_code == 200, a2l.text
+        assert isinstance(a2l.json(), list)
+
+        locs = await ac.get(
+            "/cdn/artifacts/lead/hello.elf/locations",
+            params={"name": "hello"},
+        )
+        assert locs.status_code == 200, locs.text
+        assert locs.json()
+
+        dasm = await ac.get(
+            "/cdn/artifacts/lead/hello.elf/disasm",
+            params={"index": hello["section_index"], "offset": hello["offset"], "limit": 8},
+        )
+        assert dasm.status_code == 200, dasm.text
+        assert dasm.json()
+
+        raw = await ac.get(
+            "/cdn/artifacts/lead/hello.elf/sections/raw",
+            params={"index": hello["section_index"], "offset": 0, "limit": 16},
+        )
+        assert raw.status_code == 200, raw.text
+        assert len(raw.content) <= 16
+
+        mpy = await ac.get(
+            "/cdn/artifacts/lead/hello.elf/files/mpy-disasm",
+            params={"path": "__init__.upy.mpy6.sib31.mpy", "limit": 12},
+        )
+        assert mpy.status_code == 200, mpy.text
+        assert mpy.json()
 

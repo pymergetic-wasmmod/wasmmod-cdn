@@ -7,11 +7,14 @@ file bodies are not embedded. Models are Pydantic so index JSON stays typed.
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import re
 import struct
+import sys
 import zlib
 from enum import Enum
-from typing import Literal
+from pathlib import Path
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -179,6 +182,19 @@ class ContainerSectionInfo(BaseModel):
     role: Literal["code", "meta", "other"] = "other"
 
 
+class SymbolInfo(BaseModel):
+    """ELF symtab / Wasm export entry (from wasmmod_inspect)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    section_index: int | None = None
+    offset: int = Field(default=0, ge=0)
+    size: int = Field(default=0, ge=0)
+    kind: str = "other"
+    binding: str = ""
+
+
 class ArtifactContents(BaseModel):
     """Per-file inspect result (one uploaded .wasm / .aot / .elf / .zlib)."""
 
@@ -197,12 +213,234 @@ class ArtifactContents(BaseModel):
     imports: list[ImportInfo] = Field(default_factory=list)
     deps: list[DepInfo] = Field(default_factory=list)
     sections: list[ContainerSectionInfo] = Field(default_factory=list)
+    symbols: list[SymbolInfo] = Field(default_factory=list)
+    has_dwarf: bool = False
     error: str | None = None
     pack_error: str | None = None
     source_error: str | None = None
     imports_error: str | None = None
     deps_error: str | None = None
     sig_error: str | None = None
+
+
+def _wasmmod_inspect_mod() -> Any | None:
+    """Load extmod/wasmmod/tools/wasmmod_inspect.py when metalpython is a sibling."""
+    try:
+        import wasmmod_inspect  # type: ignore
+
+        return wasmmod_inspect
+    except ImportError:
+        pass
+    here = Path(__file__).resolve()
+    candidates = [
+        here.parents[4] / "metalpython" / "extmod" / "wasmmod" / "tools",
+        here.parents[5] / "metalpython" / "extmod" / "wasmmod" / "tools",
+        Path("/home/ladmin/Devel/os-sdk/packages/metalpython/extmod/wasmmod/tools"),
+    ]
+    for tools in candidates:
+        path = tools / "wasmmod_inspect.py"
+        if not path.is_file():
+            continue
+        if str(tools) not in sys.path:
+            sys.path.insert(0, str(tools))
+        try:
+            import wasmmod_inspect  # type: ignore
+
+            return wasmmod_inspect
+        except ImportError:
+            pass
+        spec = importlib.util.spec_from_file_location("wasmmod_inspect", path)
+        if spec is None or spec.loader is None:
+            continue
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+    return None
+
+
+def list_pack_symbols(data: bytes) -> list[SymbolInfo]:
+    """Symbols for naked pack bytes (ELF/Wasm). Empty if inspect helper missing."""
+    mod = _wasmmod_inspect_mod()
+    if mod is None:
+        return []
+    try:
+        naked = unwrap_mpzl(data)
+    except ValueError:
+        naked = data
+    out: list[SymbolInfo] = []
+    for s in mod.list_symbols(naked):
+        out.append(
+            SymbolInfo(
+                name=s.name,
+                section_index=s.section_index,
+                offset=int(s.offset),
+                size=int(s.size),
+                kind=str(s.kind),
+                binding=str(s.binding or ""),
+            )
+        )
+    return out
+
+
+def pack_has_dwarf(data: bytes) -> bool:
+    mod = _wasmmod_inspect_mod()
+    if mod is None:
+        return False
+    try:
+        naked = unwrap_mpzl(data)
+    except ValueError:
+        naked = data
+    return bool(mod.has_dwarf(naked))
+
+
+class LocationInfo(BaseModel):
+    """Source / DWARF / symbol location from wasmmod_inspect."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+    line: int | None = None
+    role: str = "dwarf"
+
+
+class DisasmLineInfo(BaseModel):
+    """One disassembly line (ELF/Wasm/mpy)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    addr: int = Field(ge=0)
+    text: str
+    raw_hex: str = ""
+
+
+def _naked_pack_bytes(data: bytes) -> bytes:
+    try:
+        return unwrap_mpzl(data)
+    except ValueError:
+        return data
+
+
+def _embedded_text_sources(data: bytes) -> dict[str, str]:
+    """Best-effort path→text map from pack/source for location search."""
+    out: dict[str, str] = {}
+    try:
+        info = inspect_artifact(data)
+    except Exception:
+        return out
+    paths: list[str] = []
+    if info.source is not None:
+        paths.extend(f.path for f in info.source.files)
+    if info.pack is not None:
+        for f in info.pack.files:
+            if f.path.endswith((".py", ".pyi", ".c", ".h", ".cc", ".cpp", ".hpp")) or f.kind in (
+                "py",
+                "c",
+            ):
+                paths.append(f.path)
+    seen: set[str] = set()
+    for path in paths:
+        if path in seen or path.endswith(".mpy"):
+            continue
+        seen.add(path)
+        try:
+            view = extract_embedded_file(data, path)
+        except (FileNotFoundError, ValueError):
+            continue
+        if view.text is not None:
+            out[path] = view.text
+    return out
+
+
+def pack_addr2line(data: bytes, addr: int) -> list[LocationInfo]:
+    """Map address → locations (DWARF or enclosing symbol)."""
+    mod = _wasmmod_inspect_mod()
+    if mod is None:
+        return []
+    naked = _naked_pack_bytes(data)
+    out: list[LocationInfo] = []
+    for loc in mod.addr2line(naked, int(addr)):
+        out.append(
+            LocationInfo(path=loc.path, line=loc.line, role=str(loc.role or "dwarf"))
+        )
+    return out
+
+
+def pack_locations(data: bytes, name: str) -> list[LocationInfo]:
+    """Locations for a symbol name (DWARF/sym + optional embedded source hits)."""
+    mod = _wasmmod_inspect_mod()
+    if mod is None:
+        return []
+    naked = _naked_pack_bytes(data)
+    sources = _embedded_text_sources(data)
+    out: list[LocationInfo] = []
+    for loc in mod.locations_for_symbol(
+        naked, name, source_files=sources or None
+    ):
+        out.append(
+            LocationInfo(path=loc.path, line=loc.line, role=str(loc.role or "dwarf"))
+        )
+    return out
+
+
+def pack_disasm(
+    data: bytes, section_index: int, offset: int = 0, limit: int = 64
+) -> list[DisasmLineInfo]:
+    """Disassemble a window of a container section."""
+    mod = _wasmmod_inspect_mod()
+    if mod is None:
+        return []
+    naked = _naked_pack_bytes(data)
+    lim = max(0, min(int(limit), 4096))
+    out: list[DisasmLineInfo] = []
+    for line in mod.disasm(naked, int(section_index), int(offset), lim):
+        raw = getattr(line, "raw", b"") or b""
+        out.append(
+            DisasmLineInfo(
+                addr=int(line.addr),
+                text=str(line.text),
+                raw_hex=bytes(raw).hex(),
+            )
+        )
+    return out
+
+
+def pack_mpy_disasm(mpy_bytes: bytes, limit: int = 80) -> list[DisasmLineInfo]:
+    """Disassemble embedded MicroPython .mpy bytecode."""
+    mod = _wasmmod_inspect_mod()
+    if mod is None:
+        return []
+    lim = max(0, min(int(limit), 4096))
+    out: list[DisasmLineInfo] = []
+    for line in mod.mpy_disasm(mpy_bytes, lim):
+        raw = getattr(line, "raw", b"") or b""
+        out.append(
+            DisasmLineInfo(
+                addr=int(line.addr),
+                text=str(line.text),
+                raw_hex=bytes(raw).hex(),
+            )
+        )
+    return out
+
+
+SECTION_RAW_LIMIT_CAP = 1 << 20
+
+
+def slice_bytes(
+    body: bytes, *, offset: int = 0, limit: int | None = None
+) -> bytes:
+    """Slice ``body[offset:offset+limit]`` with a hard cap on ``limit``."""
+    if offset < 0:
+        raise ValueError("offset must be >= 0")
+    if offset > len(body):
+        return b""
+    if limit is None:
+        return body[offset:]
+    if limit < 0:
+        raise ValueError("limit must be >= 0")
+    capped = min(int(limit), SECTION_RAW_LIMIT_CAP)
+    return body[offset : offset + capped]
 
 
 class ArtifactContentsSummary(BaseModel):
@@ -1158,6 +1396,13 @@ def inspect_artifact(data: bytes, *, filename: str = "") -> ArtifactContents:
         info.sections = list_container_sections(naked)
     except (ValueError, struct.error):
         info.sections = []
+
+    try:
+        info.symbols = list_pack_symbols(naked)
+        info.has_dwarf = pack_has_dwarf(naked)
+    except Exception:
+        info.symbols = []
+        info.has_dwarf = False
 
     try:
         info.signed = has_section(naked, SIG_SECTION)

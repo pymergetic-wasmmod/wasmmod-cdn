@@ -74,12 +74,21 @@ from pymergetic.metal.cdn.services.shell_sessions import SESSION_ANON_KEY
 from pymergetic.metal.cdn_client.contents import (
     ArtifactContents,
     ContainerSectionInfo,
+    DisasmLineInfo,
     EmbeddedFileView,
+    LocationInfo,
+    SymbolInfo,
     extract_container_section,
     extract_embedded_bytes,
     extract_embedded_file,
     inspect_artifact,
     list_container_sections,
+    list_pack_symbols,
+    pack_addr2line,
+    pack_disasm,
+    pack_locations,
+    pack_mpy_disasm,
+    slice_bytes,
 )
 
 api_router = APIRouter()
@@ -771,6 +780,115 @@ async def embedded_file_raw_pin(
     return _embedded_raw_response(body, path=path)
 
 
+@artifacts_router.get("/lead/{filename}/symbols", response_model=list[SymbolInfo])
+async def symbols_lead(filename: str, storage: StorageDep) -> list[SymbolInfo]:
+    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+    return list_pack_symbols(data)
+
+
+@artifacts_router.get("/pin/{version}/{filename}/symbols", response_model=list[SymbolInfo])
+async def symbols_pin(
+    version: str, filename: str, storage: StorageDep
+) -> list[SymbolInfo]:
+    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    return list_pack_symbols(data)
+
+
+@artifacts_router.get("/lead/{filename}/addr2line", response_model=list[LocationInfo])
+async def addr2line_lead(
+    filename: str, addr: int, storage: StorageDep
+) -> list[LocationInfo]:
+    """Map ``addr`` (decimal integer query) to source/symbol locations.
+
+    Pass a decimal integer (e.g. ``?addr=16``). Hex ``0x`` prefixes are not
+    required — clients should convert before calling.
+    """
+    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+    return pack_addr2line(data, addr)
+
+
+@artifacts_router.get("/pin/{version}/{filename}/addr2line", response_model=list[LocationInfo])
+async def addr2line_pin(
+    version: str, filename: str, addr: int, storage: StorageDep
+) -> list[LocationInfo]:
+    """Pin variant of addr2line (``addr`` is a decimal integer query param)."""
+    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    return pack_addr2line(data, addr)
+
+
+@artifacts_router.get("/lead/{filename}/locations", response_model=list[LocationInfo])
+async def locations_lead(
+    filename: str, name: str, storage: StorageDep
+) -> list[LocationInfo]:
+    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+    return pack_locations(data, name)
+
+
+@artifacts_router.get("/pin/{version}/{filename}/locations", response_model=list[LocationInfo])
+async def locations_pin(
+    version: str, filename: str, name: str, storage: StorageDep
+) -> list[LocationInfo]:
+    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    return pack_locations(data, name)
+
+
+@artifacts_router.get("/lead/{filename}/disasm", response_model=list[DisasmLineInfo])
+async def disasm_lead(
+    filename: str,
+    index: int,
+    storage: StorageDep,
+    offset: int = 0,
+    limit: int = 64,
+) -> list[DisasmLineInfo]:
+    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+    return pack_disasm(data, index, offset=offset, limit=limit)
+
+
+@artifacts_router.get("/pin/{version}/{filename}/disasm", response_model=list[DisasmLineInfo])
+async def disasm_pin(
+    version: str,
+    filename: str,
+    index: int,
+    storage: StorageDep,
+    offset: int = 0,
+    limit: int = 64,
+) -> list[DisasmLineInfo]:
+    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    return pack_disasm(data, index, offset=offset, limit=limit)
+
+
+@artifacts_router.get(
+    "/lead/{filename}/files/mpy-disasm", response_model=list[DisasmLineInfo]
+)
+async def mpy_disasm_lead(
+    filename: str, path: str, storage: StorageDep, limit: int = 80
+) -> list[DisasmLineInfo]:
+    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+    try:
+        body, _section, _kind = extract_embedded_bytes(data, path)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"embedded path not found: {path}") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return pack_mpy_disasm(body, limit=limit)
+
+
+@artifacts_router.get(
+    "/pin/{version}/{filename}/files/mpy-disasm", response_model=list[DisasmLineInfo]
+)
+async def mpy_disasm_pin(
+    version: str, filename: str, path: str, storage: StorageDep, limit: int = 80
+) -> list[DisasmLineInfo]:
+    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    try:
+        body, _section, _kind = extract_embedded_bytes(data, path)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=f"embedded path not found: {path}") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return pack_mpy_disasm(body, limit=limit)
+
+
 @artifacts_router.get("/lead/{filename}/sections", response_model=list[ContainerSectionInfo])
 async def sections_lead(filename: str, storage: StorageDep) -> list[ContainerSectionInfo]:
     data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
@@ -785,7 +903,9 @@ async def sections_pin(
     return list_container_sections(data)
 
 
-def _section_raw_response(body: bytes, *, index: int, name: str) -> Response:
+def _section_raw_response(
+    body: bytes, *, index: int, name: str, offset: int = 0
+) -> Response:
     from urllib.parse import quote
 
     safe = name.replace("/", "_") or f"section_{index}"
@@ -797,38 +917,53 @@ def _section_raw_response(body: bytes, *, index: int, name: str) -> Response:
             "Cache-Control": "private, max-age=60",
             "X-Section-Index": str(index),
             "X-Section-Name": name,
+            "X-Section-Offset": str(offset),
+            "X-Section-Length": str(len(body)),
         },
     )
 
 
 @artifacts_router.get("/lead/{filename}/sections/raw")
-async def section_raw_lead(filename: str, index: int, storage: StorageDep) -> Response:
+async def section_raw_lead(
+    filename: str,
+    index: int,
+    storage: StorageDep,
+    offset: int = 0,
+    limit: int | None = None,
+) -> Response:
     data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
     try:
         body = extract_container_section(data, index=index)
         sections = list_container_sections(data)
         name = sections[index].name if 0 <= index < len(sections) else f"section_{index}"
+        body = slice_bytes(body, offset=offset, limit=limit)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return _section_raw_response(body, index=index, name=name)
+    return _section_raw_response(body, index=index, name=name, offset=offset)
 
 
 @artifacts_router.get("/pin/{version}/{filename}/sections/raw")
 async def section_raw_pin(
-    version: str, filename: str, index: int, storage: StorageDep
+    version: str,
+    filename: str,
+    index: int,
+    storage: StorageDep,
+    offset: int = 0,
+    limit: int | None = None,
 ) -> Response:
     data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
     try:
         body = extract_container_section(data, index=index)
         sections = list_container_sections(data)
         name = sections[index].name if 0 <= index < len(sections) else f"section_{index}"
+        body = slice_bytes(body, offset=offset, limit=limit)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return _section_raw_response(body, index=index, name=name)
+    return _section_raw_response(body, index=index, name=name, offset=offset)
 
 
 def build_api_router() -> APIRouter:

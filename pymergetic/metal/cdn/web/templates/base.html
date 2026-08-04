@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="{{ href('static', 'site.css') }}{% if site_css_v %}?v={{ site_css_v }}{% endif %}" />
   {% block head %}{% endblock %}
 </head>
-<body class="{% if active_page == 'docs' %}page-docs{% endif %}">
+<body class="{% if active_page == 'docs' %}page-docs{% endif %}" data-base-path="{{ base_path }}">
   <div class="site-top">
     {% if experimental %}
     <div class="exp-banner" role="status">
@@ -326,5 +326,6 @@
   })();
   </script>
   {% endif %}
+  <script src="{{ href('static', 'inspect.js') }}" defer></script>
 </body>
 </html>
