@@ -126,19 +126,43 @@ step_docker() {
   exit 1
 }
 
-pub_one() {
-  local name="$1" file="$2"
-  # Do not use ${3:-{}} — bash parses the closing braces wrong and appends a stray }.
+# Publish one package with one or more artifact files in a single request.
+# (Lead/pin package entries replace artifacts wholesale — do not split twins
+# across multiple publishes.)
+# Usage: pub_pkg NAME [DEPS_JSON] FILE [FILE...]
+pub_pkg() {
+  local name="$1"
+  shift
   local deps="{}"
-  if [[ -n "${3:-}" ]]; then
-    deps="$3"
+  if [[ "${1:-}" == \{* ]]; then
+    deps="$1"
+    shift
   fi
-  local meta code
+  if [[ $# -lt 1 ]]; then
+    echo "FAIL: pub_pkg $name needs at least one file" >&2
+    return 1
+  fi
+  local meta code form=()
+  local f
+  for f in "$@"; do
+    if [[ ! -f "$f" ]]; then
+      echo "FAIL: missing artifact $f" >&2
+      return 1
+    fi
+    form+=(-F "files=@$f;type=application/octet-stream")
+  done
   meta="$(python3 -c 'import json,sys; print(json.dumps({"package":sys.argv[1],"version":"0.1.0","lead":True,"pin":True,"force":True,"deps":json.loads(sys.argv[2])}))' "$name" "$deps")"
-  echo -n "    publish $name ($(basename "$file")) … "
+  echo -n "    publish $name ("
+  local names=()
+  for f in "$@"; do
+    names+=("$(basename "$f")")
+  done
+  local IFS=,
+  echo -n "${names[*]}"
+  echo -n ") … "
   code="$(curl -sS -o /tmp/metal-cdn-dev-pub.json -w '%{http_code}' -X POST "$CDN_URL/publish" \
     -F "meta=$meta;type=application/json" \
-    -F "files=@$file;type=application/octet-stream")"
+    "${form[@]}")"
   echo "HTTP $code"
   if [[ "$code" != "201" && "$code" != "200" ]]; then
     echo "      $(head -c 240 /tmp/metal-cdn-dev-pub.json)" >&2
@@ -159,25 +183,37 @@ step_seed() {
   PATH="/usr/bin:/bin:${PATH}" make -C "$examples" sign-packs
   echo "==> publish samples → $CDN_URL"
   [[ -f "$packs/hello.wasm" ]] || { echo "FAIL: missing $packs/hello.wasm" >&2; exit 1; }
-  pub_one hello                "$packs/hello.wasm"
-  [[ -f "$packs/hello.elf" ]] && pub_one hello "$packs/hello.elf"
-  [[ -f "$packs/hello.x86_64.elf" ]] && pub_one hello "$packs/hello.x86_64.elf"
-  [[ -f "$packs/hello.aarch64.elf" ]] && pub_one hello "$packs/hello.aarch64.elf"
-  pub_one client               "$packs/client.wasm"
-  [[ -f "$packs/client.elf" ]] && pub_one client "$packs/client.elf" '{"hello":"0.1.0"}'
-  [[ -f "$packs/hostcall.elf" ]] && pub_one hostcall "$packs/hostcall.elf"
-  pub_one mixed                "$packs/mixed.wasm"
-  pub_one bridge               "$packs/bridge.wasm"
-  pub_one test_a               "$packs/test_a.wasm"
-  pub_one test_a.test_d        "$packs/test_a.test_d.wasm"
-  pub_one test_a.test_b.test_c "$packs/test_a.test_b.test_c.wasm" '{"test_a.test_d":"0.1.0"}'
-  pub_one test_a2              "$packs/test_a2.wasm"
-  pub_one test_a2.test_d2      "$packs/test_a2.test_d2.wasm"
-  pub_one test_a2.test_b2.test_c2 "$packs/test_a2.test_b2.test_c2.wasm" '{"test_a2.test_d2":"0.1.0"}'
+
+  local hello_files=("$packs/hello.wasm")
+  [[ -f "$packs/hello.elf" ]] && hello_files+=("$packs/hello.elf")
+  [[ -f "$packs/hello.x86_64.elf" ]] && hello_files+=("$packs/hello.x86_64.elf")
+  [[ -f "$packs/hello.aarch64.elf" ]] && hello_files+=("$packs/hello.aarch64.elf")
+  pub_pkg hello "${hello_files[@]}"
+
+  local client_files=("$packs/client.wasm")
+  [[ -f "$packs/client.elf" ]] && client_files+=("$packs/client.elf")
+  [[ -f "$packs/client.x86_64.elf" ]] && client_files+=("$packs/client.x86_64.elf")
+  pub_pkg client '{"hello":"0.1.0"}' "${client_files[@]}"
+
+  local host_files=()
+  [[ -f "$packs/hostcall.elf" ]] && host_files+=("$packs/hostcall.elf")
+  [[ -f "$packs/hostcall.x86_64.elf" ]] && host_files+=("$packs/hostcall.x86_64.elf")
+  if [[ ${#host_files[@]} -gt 0 ]]; then
+    pub_pkg hostcall "${host_files[@]}"
+  fi
+
+  pub_pkg mixed                "$packs/mixed.wasm"
+  pub_pkg bridge               "$packs/bridge.wasm"
+  pub_pkg test_a               "$packs/test_a.wasm"
+  pub_pkg test_a.test_d        "$packs/test_a.test_d.wasm"
+  pub_pkg test_a.test_b.test_c '{"test_a.test_d":"0.1.0"}' "$packs/test_a.test_b.test_c.wasm"
+  pub_pkg test_a2              "$packs/test_a2.wasm"
+  pub_pkg test_a2.test_d2      "$packs/test_a2.test_d2.wasm"
+  pub_pkg test_a2.test_b2.test_c2 '{"test_a2.test_d2":"0.1.0"}' "$packs/test_a2.test_b2.test_c2.wasm"
   echo "==> lead packages:"
   curl -sf "$CDN_URL/index/lead" | python3 -c \
     "import sys,json; print('   ', ', '.join(sorted(json.load(sys.stdin).get('packages',{}))))"
-  echo -n "==> signature check hello … "
+  echo -n "==> signature check hello.wasm … "
   curl -sf "$CDN_URL/artifacts/lead/hello.wasm/inspect" | python3 -c \
     'import sys,json; d=json.load(sys.stdin); ok=bool(d.get("signed") and d.get("sig")); print("signed" if ok else "UNSIGNED"); raise SystemExit(0 if ok else 1)'
   if [[ -f "$packs/hello.elf" ]]; then

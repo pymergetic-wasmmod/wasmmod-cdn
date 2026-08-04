@@ -32,8 +32,12 @@ Aligned with wasmmod pack deliverables:
 Rules:
 
 1. **Sign the naked artifact** (`.wasm` / `.elf` / `.aotN`) first — digest excludes `wasmmod.sig`.
-2. Then wrap with MPZL (`.zlib`).
+2. Then wrap with MPZL (`.zlib`). CDN `publish` also auto-adds missing `.zlib` twins.
 3. Do not put a trailing align pad after the AOT sig section (breaks WAMR load).
+4. **One publish per package version** must include every twin (Wasm + ELF + arch).
+   Package entries replace `artifacts` wholesale — splitting `hello.wasm` and
+   `hello.elf` across two publishes drops the first set. `scripts/dev-up.sh`
+   seeds multi-file for that reason.
 
 ## Index
 
