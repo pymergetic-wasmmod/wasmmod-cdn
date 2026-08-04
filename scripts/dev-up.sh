@@ -135,7 +135,7 @@ pub_one() {
   fi
   local meta code
   meta="$(python3 -c 'import json,sys; print(json.dumps({"package":sys.argv[1],"version":"0.1.0","lead":True,"pin":True,"force":True,"deps":json.loads(sys.argv[2])}))' "$name" "$deps")"
-  echo -n "    publish $name … "
+  echo -n "    publish $name ($(basename "$file")) … "
   code="$(curl -sS -o /tmp/metal-cdn-dev-pub.json -w '%{http_code}' -X POST "$CDN_URL/publish" \
     -F "meta=$meta;type=application/json" \
     -F "files=@$file;type=application/octet-stream")"
@@ -160,16 +160,12 @@ step_seed() {
   echo "==> publish samples → $CDN_URL"
   [[ -f "$packs/hello.wasm" ]] || { echo "FAIL: missing $packs/hello.wasm" >&2; exit 1; }
   pub_one hello                "$packs/hello.wasm"
-  if [[ -f "$packs/hello.elf" ]]; then
-    # Same package name; CDN keeps multiple artifact filenames (hello.wasm + hello.elf).
-    echo -n "    publish hello.elf … "
-    meta="$(python3 -c 'import json,sys; print(json.dumps({"package":"hello","version":"0.1.0","lead":True,"pin":True,"force":True,"deps":{}}))')"
-    code="$(curl -sS -o /tmp/metal-cdn-dev-pub.json -w '%{http_code}' -X POST "$CDN_URL/publish" \
-      -F "meta=$meta;type=application/json" \
-      -F "files=@$packs/hello.elf;type=application/octet-stream")"
-    echo "HTTP $code"
-  fi
+  [[ -f "$packs/hello.elf" ]] && pub_one hello "$packs/hello.elf"
+  [[ -f "$packs/hello.x86_64.elf" ]] && pub_one hello "$packs/hello.x86_64.elf"
+  [[ -f "$packs/hello.aarch64.elf" ]] && pub_one hello "$packs/hello.aarch64.elf"
   pub_one client               "$packs/client.wasm"
+  [[ -f "$packs/client.elf" ]] && pub_one client "$packs/client.elf" '{"hello":"0.1.0"}'
+  [[ -f "$packs/hostcall.elf" ]] && pub_one hostcall "$packs/hostcall.elf"
   pub_one mixed                "$packs/mixed.wasm"
   pub_one bridge               "$packs/bridge.wasm"
   pub_one test_a               "$packs/test_a.wasm"
@@ -184,6 +180,11 @@ step_seed() {
   echo -n "==> signature check hello … "
   curl -sf "$CDN_URL/artifacts/lead/hello.wasm/inspect" | python3 -c \
     'import sys,json; d=json.load(sys.stdin); ok=bool(d.get("signed") and d.get("sig")); print("signed" if ok else "UNSIGNED"); raise SystemExit(0 if ok else 1)'
+  if [[ -f "$packs/hello.elf" ]]; then
+    echo -n "==> signature check hello.elf … "
+    curl -sf "$CDN_URL/artifacts/lead/hello.elf/inspect" | python3 -c \
+      'import sys,json; d=json.load(sys.stdin); ok=bool(d.get("signed") and d.get("sig")); print("signed" if ok else "UNSIGNED"); raise SystemExit(0 if ok else 1)'
+  fi
 }
 
 # ── main ──────────────────────────────────────────────────────────────
