@@ -77,23 +77,27 @@ Publish signature policy (server setting `METAL_CDN_REQUIRE_SIGNED`):
 | `verify` | Verify MPWS against admin trust roots (`POST /admin/trust`) |
 
 **Versioning:** additive client APIs are fine without a wasmmod bump. Removals /
-required-field changes need a new client release and a bump of wasmmod
-`CLIENT_MIN_VERSION` (see `tools/wasmmod_cliutil.py`) plus
+required-field changes need a new client release and a bump of
+`pymergetic.wasmmod.tools.cliutil` ``CLIENT_MIN_VERSION`` plus the
 `requirements-publish.txt` floor (`>=…`).
 
 Host discovery (pip-style):
 
 ```sh
-# wasmmod
-python3 tools/wasmmod.py cdn list
-python3 tools/wasmmod.py cdn search hello
-python3 tools/wasmmod.py cdn show hello
-python3 tools/wasmmod.py cdn inspect hello
-python3 tools/wasmmod.py cdn cat hello util/extra.py
-python3 tools/wasmmod.py cdn hex hello util/extra.py
-python3 tools/wasmmod.py cdn extract hello -o ./extracted
-python3 tools/wasmmod.py cdn get hello -o ./packs --unwrap
-python3 tools/wasmmod.py inspect packs/hello.wasm [--verify --trust root.crt]
+# host CLI (PyPI alpha for now)
+pip install --pre 'pymergetic-wasmmod-tools[cdn]'
+export METAL_CDN_URL=https://cdn.example/cdn
+export METAL_CDN_TOKEN=mcdn_…
+
+wasmmod cdn list
+wasmmod cdn search hello
+wasmmod cdn show hello
+wasmmod cdn inspect hello
+wasmmod cdn cat hello util/extra.py
+wasmmod cdn hex hello util/extra.py
+wasmmod cdn extract hello -o ./extracted
+wasmmod cdn get hello -o ./packs --unwrap
+wasmmod inspect packs/hello.wasm [--verify --trust root.crt]
 
 # or metal-cdn CLI
 metal-cdn list
@@ -105,9 +109,9 @@ metal-cdn download hello -o ./packs
 ## One-shot (wasmmod)
 
 ```sh
-# in the wasmmod repo
-pip install -r requirements-publish.txt
-python3 tools/wasmmod.py publish examples/hello --version 0.1.0 \
+pip install --pre 'pymergetic-wasmmod-tools[cdn]'
+export WASMMOD_ROOT=/path/to/wasmmod   # pack needs the checkout
+wasmmod publish examples/hello --version 0.1.0 \
   --key .keys/sign/leaf.key.pem --chain .keys/sign/chain.der \
   --cdn-url https://cdn.example/cdn --token "$METAL_CDN_TOKEN" --claim
 ```

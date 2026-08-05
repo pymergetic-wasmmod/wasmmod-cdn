@@ -149,12 +149,10 @@ def test_ensure_zlib_adds_twin() -> None:
 def test_inspect_elf_pack_section() -> None:
     """ELF64 ET_REL with .wasmmod.pack is kind=elf and readable."""
     import subprocess
-    import sys
     from pathlib import Path
 
-    wasmmod_tools = Path("/home/ladmin/Devel/os-sdk/packages/metalpython/extmod/wasmmod/tools")
-    if not (wasmmod_tools / "wasmmod_elf.py").is_file():
-        pytest.skip("wasmmod_elf.py not found")
+    pytest.importorskip("pymergetic.wasmmod.tools.elf")
+    from pymergetic.wasmmod.tools.elf import append_section
 
     c = Path("/tmp/cdn_elf_hello.c")
     c.write_text("int hello(void){return 42;}\n")
@@ -162,8 +160,6 @@ def test_inspect_elf_pack_section() -> None:
     subprocess.check_call(
         ["gcc", "-c", "-ffreestanding", "-fno-pic", "-O2", "-o", str(o), str(c)]
     )
-    sys.path.insert(0, str(wasmmod_tools))
-    from wasmmod_elf import append_section  # type: ignore
 
     pack = _pack_v3("hello", [], exports=[("", "hello", "hello", 0)])
     elf = append_section(o.read_bytes(), "wasmmod.pack", pack)
@@ -181,12 +177,10 @@ def test_inspect_elf_pack_section() -> None:
 def test_without_sig_section_elf_wpse() -> None:
     """ELF WPSE strip matches wasmmod (naked cookie drop + signed restore)."""
     import subprocess
-    import sys
     from pathlib import Path
 
-    wasmmod_tools = Path("/home/ladmin/Devel/os-sdk/packages/metalpython/extmod/wasmmod/tools")
-    if not (wasmmod_tools / "wasmmod_elf.py").is_file():
-        pytest.skip("wasmmod_elf.py not found")
+    pytest.importorskip("pymergetic.wasmmod.tools.elf")
+    from pymergetic.wasmmod.tools.elf import append_section
 
     c = Path("/tmp/cdn_elf_wpse.c")
     c.write_text("int hello(void){return 42;}\n")
@@ -194,8 +188,6 @@ def test_without_sig_section_elf_wpse() -> None:
     subprocess.check_call(
         ["gcc", "-c", "-ffreestanding", "-fPIC", "-O2", "-o", str(o), str(c)]
     )
-    sys.path.insert(0, str(wasmmod_tools))
-    from wasmmod_elf import append_section  # type: ignore
 
     base = o.read_bytes()
     with_pack = append_section(base, "wasmmod.pack", b"pack")
@@ -207,7 +199,7 @@ def test_without_sig_section_elf_wpse() -> None:
     with_sig = append_section(with_pack, "wasmmod.sig", b"\x00" * 16)
     stripped = without_sig_section(with_sig)
     assert stripped == naked
-    from wasmmod_elf import find_section  # type: ignore
+    from pymergetic.wasmmod.tools.elf import find_section
 
     assert find_section(stripped, "wasmmod.sig") is None
     assert find_section(stripped, "wasmmod.pack") is not None
@@ -439,12 +431,10 @@ def test_list_container_sections_wasm_code() -> None:
 
 def test_list_container_sections_elf_text() -> None:
     import subprocess
-    import sys
     from pathlib import Path
 
-    wasmmod_tools = Path("/home/ladmin/Devel/os-sdk/packages/metalpython/extmod/wasmmod/tools")
-    if not (wasmmod_tools / "wasmmod_elf.py").is_file():
-        pytest.skip("wasmmod_elf.py not found")
+    pytest.importorskip("pymergetic.wasmmod.tools.elf")
+    from pymergetic.wasmmod.tools.elf import append_section
 
     c = Path("/tmp/cdn_elf_text.c")
     c.write_text("int hello(void){return 42;}\n")
@@ -452,8 +442,6 @@ def test_list_container_sections_elf_text() -> None:
     subprocess.check_call(
         ["gcc", "-c", "-ffreestanding", "-fPIC", "-O2", "-o", str(o), str(c)]
     )
-    sys.path.insert(0, str(wasmmod_tools))
-    from wasmmod_elf import append_section  # type: ignore
 
     pack = _pack_v3("hello", [], exports=[("", "hello", "hello", 0)])
     elf = append_section(o.read_bytes(), "wasmmod.pack", pack)

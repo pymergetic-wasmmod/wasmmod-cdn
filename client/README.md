@@ -11,8 +11,10 @@ Use this from wasmmod / CI. Do **not** install `pymergetic-metal-cdn` just to pu
 ## Install
 
 ```sh
-pip install pymergetic-metal-cdn-client
+# alphas need --pre until a stable release
+pip install --pre pymergetic-metal-cdn-client
 # from this monorepo (sources under ../pymergetic/metal/cdn_client):
+pip install --pre 'pymergetic-wasmmod-tools>=0.1.0a1'
 pip install -e ./client --config-settings editable_mode=compat
 ```
 

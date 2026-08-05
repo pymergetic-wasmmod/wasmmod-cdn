@@ -34,6 +34,7 @@ COPY pymergetic ./pymergetic
 # Keep the micropython.mjs warning outside the &&-chain so a missing asset
 # cannot mask a failed pip/useradd (shell: A && B || echo → success on echo).
 RUN set -eux; \
+    pip install --no-cache-dir --pre 'pymergetic-wasmmod-tools>=0.1.0a1'; \
     pip install --no-cache-dir ./client .; \
     useradd --create-home --uid 10001 app; \
     mkdir -p /data/packs; \

@@ -43,7 +43,14 @@ Add a **Trusted Publisher** (not pending) with:
 | Environment | *(empty)* | *(empty)* |
 
 Then re-run the failed workflow(s) (or `gh workflow run` / re-tag). No new tag
-needed if `v0.1.0a7` artifacts were already built.
+needed if `v0.1.0a8` artifacts were already built.
+
+Also delete the repo secret **`PYPI_API_TOKEN`** if it still exists — a leftover
+API token can confuse debugging; workflows are OIDC-only.
+
+If upload fails with `OIDC scoped token is not valid for project …`, the
+publisher row above is missing or mistyped (workflow filename is the usual
+typo).
 
 ### Pending publishers (new projects only)
 

@@ -241,9 +241,7 @@ def _wasmmod_inspect_mod() -> Any | None:
         pass
 
     here = Path(__file__).resolve()
-    candidates: list[Path] = [
-        here.parent / "wasmmod_tools",  # legacy bundled copy
-    ]
+    candidates: list[Path] = []
     env = (os.environ.get("WASMMOD_TOOLS") or "").strip()
     if env:
         candidates.append(Path(env))
