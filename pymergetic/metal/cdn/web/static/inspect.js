@@ -318,7 +318,9 @@
       return;
     }
     const role = loc.role || "";
-    if (role === "sym" || (loc.line == null && !String(loc.path).includes("/"))) {
+    // Only role=sym is a bare symbol name. Root twins like __init__.py (line null)
+    // must still load via /files.
+    if (role === "sym") {
       state.sourceHtml =
         `<span class="muted">symbol</span> <code>${esc(loc.path)}</code>` +
         (loc.line != null ? ` <span class="muted">line ${esc(loc.line)}</span>` : "");
