@@ -321,6 +321,17 @@ def _naked_pack_bytes(data: bytes) -> bytes:
         return data
 
 
+_CODE_SOURCE_SUFFIXES = (".py", ".pyi", ".c", ".h", ".cc", ".cpp", ".hpp", ".rs")
+
+
+def _is_code_source_path(path: str) -> bool:
+    """True for paths worth scanning for symbol defs (not README.md / .wat / …)."""
+    if not path or path.endswith(".mpy"):
+        return False
+    lower = path.lower()
+    return lower.endswith(_CODE_SOURCE_SUFFIXES)
+
+
 def _embedded_text_sources(data: bytes) -> dict[str, str]:
     """Best-effort path→text map from pack/source for location search."""
     out: dict[str, str] = {}
@@ -330,13 +341,10 @@ def _embedded_text_sources(data: bytes) -> dict[str, str]:
         return out
     paths: list[str] = []
     if info.source is not None:
-        paths.extend(f.path for f in info.source.files)
+        paths.extend(f.path for f in info.source.files if _is_code_source_path(f.path))
     if info.pack is not None:
         for f in info.pack.files:
-            if f.path.endswith((".py", ".pyi", ".c", ".h", ".cc", ".cpp", ".hpp")) or f.kind in (
-                "py",
-                "c",
-            ):
+            if _is_code_source_path(f.path) or f.kind in ("py", "c"):
                 paths.append(f.path)
     seen: set[str] = set()
     for path in paths:

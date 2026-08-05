@@ -495,6 +495,36 @@ def test_slice_bytes_limit_cap() -> None:
         slice_bytes(body, offset=-1)
 
 
+def test_embedded_text_sources_skips_readme() -> None:
+    """README.md mentioning ``hello(`` must not become a locations def hit."""
+    from pymergetic.metal.cdn_client.contents import _embedded_text_sources
+
+    pack = _pack_v3(
+        "hello",
+        [("__init__.py", 1, b"def hello():\n    return 42\n")],
+        exports=[("", "hello", "hello", 0)],
+    )
+    src = _source(
+        "hello",
+        "0.1.0",
+        [
+            ("README.md", b"# Demo\n\nCall hello() from the pack.\n"),
+            ("src/hello.c", b"int hello(void) { return 42; }\n"),
+        ],
+    )
+    wasm = _minimal_wasm(
+        _custom_section("wasmmod.pack", pack),
+        _custom_section("wasmmod.source", src),
+    )
+    keys = set(_embedded_text_sources(wasm))
+    assert "README.md" not in keys
+    assert "src/hello.c" in keys
+    assert "__init__.py" in keys
+    locs = pack_locations(wasm, "hello")
+    assert not any(loc.path == "README.md" for loc in locs)
+    assert any(loc.path == "src/hello.c" and loc.role == "def" for loc in locs)
+
+
 def test_pack_symbols_addr2line_disasm_hello_elf() -> None:
     data = _hello_elf_bytes()
     syms = list_pack_symbols(data)
