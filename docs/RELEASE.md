@@ -49,8 +49,9 @@ rows exist on the **project** publishing pages.
 Then re-run the failed workflow(s) (or tag again). No new tag needed if the
 tag’s workflow already has the fix and publishers match.
 
-Also delete the repo secret **`PYPI_API_TOKEN`** if it still exists — a leftover
-API token can confuse debugging; workflows are OIDC-only.
+Workflows prefer OIDC. Optional escape hatch: repo secret **`PYPI_API_TOKEN`**
+(scope covering both packages) — same path as a6. Remove that secret once
+project Trusted Publishers work.
 
 If upload fails with `OIDC scoped token is not valid for project …`, the
 publisher row above is missing or the workflow filename is mistyped.
@@ -85,29 +86,28 @@ filename is gone / cannot cover both packages).
 ### Ship / re-tag
 
 ```sh
-# Prefer a new tag (setuptools-scm); example next alpha:
-./scripts/tag-release.sh 0.1.0a7
+# Prefer a new tag (setuptools-scm); next after a9:
+./scripts/tag-release.sh 0.1.0a10
 git push origin main
-git push origin v0.1.0a7
+git push origin v0.1.0a10
 ```
 
 Both `publish-pypi-client` and `publish-pypi-server` run on the same `v*` tag.
 First OIDC upload on a **pending** publisher creates the project and graduates
 to a normal publisher. On an **existing** project, use a normal publisher (above).
-Do **not** set `password:` / `PYPI_API_TOKEN` on those jobs.
 
-### Manual upload (escape hatch)
+### Manual / secret escape hatch
+
+Repo secret `PYPI_API_TOKEN` → workflows upload with that token instead of OIDC.
+
+Or build locally / download artifacts and:
 
 ```sh
-gh run download <run-id> -n python-packages -D /tmp/metal-cdn-pypi
-# or local build:
-# python -m build --wheel --sdist --outdir dist-client client
-# python -m build --wheel --sdist --outdir dist-server .
-twine upload /tmp/metal-cdn-pypi/dist-client/* /tmp/metal-cdn-pypi/dist-server/*
+twine upload dist-client/* dist-server/*
 ```
 
-Manual `twine` + API token creates/uploads the project but does **not** convert
-a pending Trusted Publisher; add a normal publisher on the project afterward.
+Manual `twine` does **not** create a Trusted Publisher; add the project
+publisher rows afterward if you want OIDC next time.
 
 ## Verify
 
