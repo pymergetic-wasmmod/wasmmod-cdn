@@ -413,10 +413,12 @@
     state.locIndex = 0;
     renderLocBar();
 
+    // Use only this symbol's section — do not inherit openInspect's sectionIndex
+    // (that stuck value made memory/other reuse a prior .text/code window).
     let sec =
       sym.section_index != null && Number.isFinite(Number(sym.section_index))
         ? Number(sym.section_index)
-        : state.opts.sectionIndex;
+        : null;
     const kind = String(sym.kind || "");
     const wantsCode =
       kind === "export" || kind === "func" || kind === "data";
