@@ -1470,9 +1470,7 @@ def _score(art: ArtifactContents) -> int:
         score += 8
     if art.signed:
         score += 2
-    if art.kind is ArtifactBinaryKind.WASM:
-        score += 1
-    elif art.kind is ArtifactBinaryKind.ELF:
+    if art.kind is ArtifactBinaryKind.WASM or art.kind is ArtifactBinaryKind.ELF:
         score += 1
     return score
 

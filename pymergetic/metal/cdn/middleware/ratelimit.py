@@ -6,10 +6,9 @@ import time
 from collections import defaultdict, deque
 from threading import Lock
 
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
-from starlette.types import ASGIApp
+from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 
 class RateLimiter:
@@ -30,8 +29,8 @@ class RateLimiter:
             return True
 
 
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    """Limit login/token and publish by client IP."""
+class RateLimitMiddleware:
+    """Limit login/token and publish by client IP (pure ASGI)."""
 
     def __init__(
         self,
@@ -42,7 +41,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         window_s: float = 60.0,
         path_prefix: str = "",
     ) -> None:
-        super().__init__(app)
+        self.app = app
         self._limiter = RateLimiter()
         self.login_limit = login_limit
         self.publish_limit = publish_limit
@@ -54,7 +53,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return path[len(self.path_prefix) :] or "/"
         return path
 
-    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[no-untyped-def]
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request = Request(scope, receive)
         path = self._strip(request.url.path)
         method = request.method.upper()
         client = request.client.host if request.client else "unknown"
@@ -68,10 +72,15 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             limit = self.publish_limit
             bucket = f"publish:{client}"
 
-        if limit is not None and not self._limiter.hit(bucket, limit=limit, window_s=self.window_s):
-            return JSONResponse(
+        if limit is not None and not self._limiter.hit(
+            bucket, limit=limit, window_s=self.window_s
+        ):
+            response = JSONResponse(
                 {"detail": "rate limit exceeded"},
                 status_code=429,
                 headers={"Retry-After": str(int(self.window_s))},
             )
-        return await call_next(request)
+            await response(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)

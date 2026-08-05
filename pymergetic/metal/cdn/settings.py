@@ -62,6 +62,14 @@ class Settings(BaseSettings):
         default="dev-change-me-metal-cdn",
         description="Secret for signed session cookies",
     )
+    session_https_only: bool | None = Field(
+        default=None,
+        description=(
+            "Set Secure on the session cookie. None = auto (true when "
+            "public_origin is an https:// URL). Tests should leave this None "
+            "and avoid inheriting a production public_origin over http:// clients."
+        ),
+    )
     require_auth: bool = Field(
         default=False,
         description="When true, mutating routes require a session or API key",
@@ -164,6 +172,12 @@ class Settings(BaseSettings):
     @property
     def registration_open(self) -> bool:
         return bool(self.allow_open_registration)
+
+    @property
+    def session_cookie_secure(self) -> bool:
+        if self.session_https_only is not None:
+            return self.session_https_only
+        return bool(self.public_origin and self.public_origin.startswith("https://"))
 
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)

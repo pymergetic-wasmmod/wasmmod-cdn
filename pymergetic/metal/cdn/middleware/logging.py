@@ -7,12 +7,11 @@ import logging
 import time
 import uuid
 from collections import defaultdict
-from collections.abc import Callable
 from threading import Lock
 
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.datastructures import MutableHeaders
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 logger = logging.getLogger("metal_cdn.access")
 
@@ -36,24 +35,39 @@ def metrics_text() -> str:
         return "\n".join(lines) + "\n"
 
 
-class RequestLogMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, *, json_logs: bool = False) -> None:
-        super().__init__(app)
+class RequestLogMiddleware:
+    """Pure ASGI access log (avoids BaseHTTPMiddleware session breakage)."""
+
+    def __init__(self, app: ASGIApp, *, json_logs: bool = False) -> None:
+        self.app = app
         self.json_logs = json_logs
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request = Request(scope, receive)
         req_id = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
         start = time.perf_counter()
+        status_code = 500
+
+        async def send_wrapper(message: Message) -> None:
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = int(message["status"])
+                headers = MutableHeaders(scope=message)
+                headers["X-Request-Id"] = req_id
+            await send(message)
+
         try:
-            response = await call_next(request)
+            await self.app(scope, receive, send_wrapper)
         except Exception:
             elapsed_ms = (time.perf_counter() - start) * 1000
             self._log(request, req_id, 500, elapsed_ms)
             raise
         elapsed_ms = (time.perf_counter() - start) * 1000
-        self._log(request, req_id, response.status_code, elapsed_ms)
-        response.headers["X-Request-Id"] = req_id
-        return response
+        self._log(request, req_id, status_code, elapsed_ms)
 
     def _log(self, request: Request, req_id: str, status: int, elapsed_ms: float) -> None:
         path = request.url.path
@@ -76,4 +90,6 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
                 )
             )
         else:
-            logger.info("%s %s %s %.1fms id=%s", request.method, path, status, elapsed_ms, req_id)
+            logger.info(
+                "%s %s %s %.1fms id=%s", request.method, path, status, elapsed_ms, req_id
+            )
