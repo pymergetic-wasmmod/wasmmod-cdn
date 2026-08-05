@@ -501,7 +501,10 @@ def test_embedded_text_sources_skips_readme() -> None:
 
     pack = _pack_v3(
         "hello",
-        [("__init__.py", 1, b"def hello():\n    return 42\n")],
+        [
+            ("__init__.py", 1, b"def hello():\n    return 42\n"),
+            ("docs/sample.c", 2, b"void demo() { hello(); }\n"),  # kind=c must still skip docs/
+        ],
         exports=[("", "hello", "hello", 0)],
     )
     src = _source(
@@ -520,6 +523,7 @@ def test_embedded_text_sources_skips_readme() -> None:
     keys = set(_embedded_text_sources(wasm))
     assert "README.md" not in keys
     assert "docs/sample.cpp" not in keys
+    assert "docs/sample.c" not in keys
     assert "src/hello.c" in keys
     assert "__init__.py" in keys
     locs = pack_locations(wasm, "hello")

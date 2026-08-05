@@ -346,7 +346,8 @@ def _embedded_text_sources(data: bytes) -> dict[str, str]:
         paths.extend(f.path for f in info.source.files if _is_code_source_path(f.path))
     if info.pack is not None:
         for f in info.pack.files:
-            if _is_code_source_path(f.path) or f.kind in ("py", "c"):
+            # Same path filter as source (rejects docs/); kind alone is not enough.
+            if _is_code_source_path(f.path):
                 paths.append(f.path)
     seen: set[str] = set()
     for path in paths:
