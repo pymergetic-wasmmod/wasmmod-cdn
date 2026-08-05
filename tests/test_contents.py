@@ -495,6 +495,44 @@ def test_slice_bytes_limit_cap() -> None:
         slice_bytes(body, offset=-1)
 
 
+def test_pack_locations_skips_comment_defs() -> None:
+    """Commented ``hello(`` forms must not outrank the real C def."""
+    pack = _pack_v3(
+        "hello",
+        [("__init__.py", 1, b"def hello():\n    return 42\n")],
+        exports=[("", "hello", "hello", 0)],
+    )
+    src = _source(
+        "hello",
+        "0.1.0",
+        [
+            (
+                "src/hello.c",
+                (
+                    b"/* int hello(void) { return 0; } */\n"
+                    b"// int hello(void) { return 0; }\n"
+                    b"int hello(void) { return 42; }\n"
+                ),
+            ),
+            (
+                "src/hello.h",
+                b"int hello(void);\n/* Mention hello(x) in docs. */\n",
+            ),
+        ],
+    )
+    wasm = _minimal_wasm(
+        _custom_section("wasmmod.pack", pack),
+        _custom_section("wasmmod.source", src),
+    )
+    locs = pack_locations(wasm, "hello")
+    defs = [loc for loc in locs if loc.role == "def"]
+    decls = [loc for loc in locs if loc.role == "decl"]
+    assert any(loc.path == "src/hello.c" and loc.line == 3 for loc in defs)
+    assert not any(loc.path == "src/hello.c" and loc.line in (1, 2) for loc in defs)
+    assert any(loc.path == "src/hello.h" and loc.line == 1 for loc in decls)
+    assert not any(loc.path == "src/hello.h" and loc.line == 2 for loc in decls)
+
+
 def test_embedded_text_sources_skips_readme() -> None:
     """README.md / docs/ mentioning ``hello(`` must not become locations hits."""
     from pymergetic.metal.cdn_client.contents import _embedded_text_sources
