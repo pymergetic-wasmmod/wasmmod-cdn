@@ -5,7 +5,7 @@
  *   filename, version?, package?, symbol?, addr?, sectionIndex?, mpyPath?, tab?
  * })
  *
- * Keys: / filter · Enter select · ↑/↓ symbols · [ ] locations · c copy · 1 hex · 2 asm · 3 source · Esc close
+ * Keys: / filter · Enter select · ↑/↓ symbols · [ ] locations · c copy · ? help · 1 hex · 2 asm · 3 source · Esc close
  */
 (() => {
   const HEX_PREVIEW = 65536;
@@ -226,6 +226,7 @@
       selected: null,
       locations: [],
       locIndex: 0,
+      hasDwarf: false,
       tab: "hex",
       hexHtml: "",
       asmHtml: "",
@@ -284,6 +285,11 @@
         return;
       }
       if (inFilter) return;
+      if (ev.key === "?" ) {
+        ev.preventDefault();
+        flashMeta("keys: / Enter ↑↓ [ ] c 1/2/3 Esc");
+        return;
+      }
       if (ev.key === "c" || ev.key === "C") {
         ev.preventDefault();
         copyActiveLocation();
@@ -303,6 +309,27 @@
 
     ui = { dialog, els, state };
     return ui;
+  }
+
+  function flashMeta(msg) {
+    const { els } = ensureUi();
+    const prev = els.meta.textContent;
+    els.meta.textContent = msg;
+    setTimeout(() => {
+      if (els.meta.textContent === msg) {
+        els.meta.textContent = prev;
+      }
+    }, 1600);
+  }
+
+  function refreshChrome() {
+    const { els, state } = ensureUi();
+    if (!state.opts) return;
+    const base =
+      (state.opts.package ? state.opts.package + " · " : "") + state.opts.filename;
+    els.title.textContent = base + (state.hasDwarf ? " · dwarf" : "");
+    const n = (state.symbols && state.symbols.length) || 0;
+    els.filter.placeholder = n ? "Filter symbols… (" + n + ")" : "Filter symbols…";
   }
 
   function moveSym(delta) {
@@ -341,17 +368,8 @@
       text = state.selected.name;
     }
     if (!text) return;
-    const done = () => {
-      const prev = els.meta.textContent;
-      els.meta.textContent = "copied " + text;
-      setTimeout(() => {
-        if (els.meta.textContent === "copied " + text) {
-          els.meta.textContent = prev;
-        }
-      }, 1200);
-    };
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(done).catch(() => {});
+      navigator.clipboard.writeText(text).then(() => flashMeta("copied " + text)).catch(() => {});
     }
   }
 
@@ -656,6 +674,7 @@
     state.selected = null;
     state.locations = [];
     state.locIndex = 0;
+    state.hasDwarf = false;
     state.codeSectionIndex = null;
     state.hexHtml = "";
     state.asmHtml = "";
@@ -665,8 +684,7 @@
       opts.tab ||
       (opts.mpyPath ? "asm" : opts.symbol || opts.addr != null ? "source" : "hex");
     els.filter.value = "";
-    els.title.textContent =
-      (opts.package ? opts.package + " · " : "") + opts.filename;
+    refreshChrome();
     els.meta.textContent = "Loading…";
     els.body.textContent = "Loading…";
     setTab(state.tab);
@@ -678,12 +696,21 @@
     }
 
     const root = artifactRoot(state.opts);
+    const inspectP = fetchJson(`${root}/inspect`)
+      .then((info) => {
+        state.hasDwarf = !!(info && info.has_dwarf);
+      })
+      .catch(() => {
+        state.hasDwarf = false;
+      });
     try {
       state.symbols = await fetchJson(`${root}/symbols`);
     } catch (err) {
       els.meta.textContent = "symbols: " + (err.message || err);
       state.symbols = [];
     }
+    await inspectP;
+    refreshChrome();
     renderSymList();
 
     if (opts.mpyPath) {
