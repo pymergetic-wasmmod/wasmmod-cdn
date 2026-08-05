@@ -53,12 +53,18 @@ filename is gone / cannot cover both packages).
 After the two pending publishers exist and the split workflows are on `main`:
 
 ```sh
-git tag -d v0.1.0a3 && git push origin :refs/tags/v0.1.0a3
-git tag -a v0.1.0a3 -m "metal-cdn 0.1.0a3"
-git push origin v0.1.0a3
+# Prefer a new tag (setuptools-scm); example next alpha:
+./scripts/tag-release.sh 0.1.0a7
+git push origin main
+git push origin v0.1.0a7
 ```
 
-### Manual upload (always works)
+Both `publish-pypi-client` and `publish-pypi-server` run on the same `v*` tag.
+First **OIDC** upload graduates each pending publisher into a normal one on the
+new PyPI project. Do **not** set `password:` / `PYPI_API_TOKEN` on those jobs —
+token upload skips Trusted Publishing and leaves the pending row stuck.
+
+### Manual upload (escape hatch)
 
 ```sh
 gh run download <run-id> -n python-packages -D /tmp/metal-cdn-pypi
@@ -68,7 +74,9 @@ gh run download <run-id> -n python-packages -D /tmp/metal-cdn-pypi
 twine upload /tmp/metal-cdn-pypi/dist-client/* /tmp/metal-cdn-pypi/dist-server/*
 ```
 
-Optional repo secret `PYPI_API_TOKEN` skips OIDC entirely.
+Manual `twine` + API token creates/uploads the project but does **not** convert
+a pending Trusted Publisher; add a normal publisher on the project afterward if
+you used that path.
 
 ## Verify
 

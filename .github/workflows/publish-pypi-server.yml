@@ -18,8 +18,9 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # No `environment:` — pending publisher is registered with empty / any env.
     permissions:
-      id-token: write
+      id-token: write # OIDC Trusted Publishing (graduates pending → normal)
       contents: read
     steps:
       - uses: actions/checkout@v4
@@ -41,4 +42,5 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist-server/
-          password: ${{ secrets.PYPI_API_TOKEN }}
+          # No password — OIDC only. An API token would skip Trusted Publishing
+          # and leave the pending publisher stuck.
