@@ -417,8 +417,11 @@
       sym.section_index != null && Number.isFinite(Number(sym.section_index))
         ? Number(sym.section_index)
         : state.opts.sectionIndex;
-    // Wasm exports have section_index=null — fall back to the code section.
-    if (sec == null || !Number.isFinite(sec)) {
+    const kind = String(sym.kind || "");
+    const wantsCode =
+      kind === "export" || kind === "func" || kind === "data";
+    // Func/export without section_index → code section. memory/global stay empty.
+    if ((sec == null || !Number.isFinite(sec)) && wantsCode) {
       sec = await resolveCodeSectionIndex();
     }
     const off = Number(sym.offset) || 0;
@@ -426,10 +429,11 @@
     if (sec != null && Number.isFinite(sec) && sec < 65500) {
       jobs.push(loadHex(sec, off), loadAsm(sec, off));
     } else {
-      // Host /disasm for Wasm ignores index and windows the code section.
-      jobs.push(loadAsm(0, off));
-      state.hexHtml =
-        '<span class="muted">No section index (asm may still work for Wasm).</span>';
+      const msg = wantsCode
+        ? '<span class="muted">No section index for hex/asm.</span>'
+        : `<span class="muted">No code section for ${esc(kind || "this")} symbol.</span>`;
+      state.hexHtml = msg;
+      state.asmHtml = msg;
     }
     await Promise.all(jobs);
     paintActive();
