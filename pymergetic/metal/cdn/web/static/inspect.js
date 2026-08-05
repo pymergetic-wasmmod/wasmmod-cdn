@@ -420,18 +420,20 @@
     } catch (_) {
       state.locations = [];
     }
-    // Prefer def/dwarf/decl, then twin, over the leading role=sym stub.
+    // Prefer dwarf, then def/decl, then twin, over the leading role=sym stub.
     {
       const rank = (role) =>
-        role === "def" || role === "dwarf" || role === "decl"
+        role === "dwarf"
           ? 0
-          : role === "twin"
+          : role === "def" || role === "decl"
             ? 1
-            : role && role !== "sym"
+            : role === "twin"
               ? 2
-              : 3;
+              : role && role !== "sym"
+                ? 3
+                : 4;
       let best = 0;
-      let bestRank = 3;
+      let bestRank = 4;
       state.locations.forEach((l, i) => {
         const r = rank(l && l.role);
         if (r < bestRank) {

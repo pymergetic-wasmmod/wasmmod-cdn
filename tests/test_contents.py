@@ -602,7 +602,15 @@ def test_pack_symbols_addr2line_disasm_hello_elf() -> None:
     named = pack_locations(data, "hello")
     assert named
     assert any(loc.role in ("sym", "dwarf", "def", "twin") for loc in named)
-    assert any(loc.role == "def" and "hello.c" in loc.path for loc in named)
+    # dwarf+def on the same line collapse; keep a hello.c chip with file:line.
+    lined = [
+        loc
+        for loc in named
+        if loc.line is not None and "hello.c" in loc.path and loc.role in ("dwarf", "def")
+    ]
+    assert lined
+    keys = [(loc.path.rsplit("/", 1)[-1], loc.line) for loc in lined]
+    assert len(keys) == len(set(keys))
 
     assert hello.section_index is not None
     secs = list_container_sections(data)
