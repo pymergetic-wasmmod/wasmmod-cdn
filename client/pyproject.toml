@@ -9,6 +9,7 @@ authors = [{ name = "Rouven Raudzus", email = "raudzus@pymergetic.com" }]
 dependencies = [
   "pydantic>=2.7",
   "cryptography>=42",
+  "pymergetic-wasmmod-tools>=0.1.0a1",
 ]
 
 [project.urls]

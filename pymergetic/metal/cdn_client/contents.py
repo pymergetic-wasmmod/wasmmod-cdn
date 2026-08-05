@@ -225,7 +225,14 @@ class ArtifactContents(BaseModel):
 
 
 def _wasmmod_inspect_mod() -> Any | None:
-    """Load shared ``wasmmod_inspect`` (sibling metalpython, env, or bundled)."""
+    """Load shared inspect helpers from ``pymergetic-wasmmod-tools`` (or legacy paths)."""
+    try:
+        from pymergetic.wasmmod.tools import inspect as wasmmod_inspect
+
+        return wasmmod_inspect
+    except ImportError:
+        pass
+
     try:
         import wasmmod_inspect  # type: ignore
 
@@ -235,24 +242,34 @@ def _wasmmod_inspect_mod() -> Any | None:
 
     here = Path(__file__).resolve()
     candidates: list[Path] = [
-        here.parent / "wasmmod_tools",  # bundled for Docker / PyPI client
+        here.parent / "wasmmod_tools",  # legacy bundled copy
     ]
     env = (os.environ.get("WASMMOD_TOOLS") or "").strip()
     if env:
         candidates.append(Path(env))
     candidates.append(Path("/opt/wasmmod-tools"))
-    # Sibling checkouts: …/packages/metal-cdn/… → …/packages/metalpython/…
     for idx in (4, 5, 6):
         if len(here.parents) > idx:
+            candidates.append(here.parents[idx] / "wasmmod-tools" / "src")
             candidates.append(
                 here.parents[idx] / "metalpython" / "extmod" / "wasmmod" / "tools"
             )
-    # Dev laptop fallback (harmless if absent).
+    candidates.append(Path.home() / "Devel/os-sdk/packages/wasmmod-tools" / "src")
     candidates.append(
         Path.home() / "Devel/os-sdk/packages/metalpython/extmod/wasmmod/tools"
     )
 
     for tools in candidates:
+        # Package src layout
+        if (tools / "pymergetic" / "wasmmod" / "tools" / "inspect.py").is_file():
+            if str(tools) not in sys.path:
+                sys.path.insert(0, str(tools))
+            try:
+                from pymergetic.wasmmod.tools import inspect as wasmmod_inspect
+
+                return wasmmod_inspect
+            except ImportError:
+                pass
         path = tools / "wasmmod_inspect.py"
         if not path.is_file():
             continue
