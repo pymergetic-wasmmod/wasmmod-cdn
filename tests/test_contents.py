@@ -584,10 +584,18 @@ def test_pack_symbols_addr2line_disasm_hello_elf() -> None:
     locs = pack_addr2line(data, hello.offset)
     assert locs
     assert any(loc.path for loc in locs)
+    # Host binutils (or pyelftools) → real DWARF file:line on -g ELF packs.
+    import shutil
+
+    if shutil.which("addr2line"):
+        dwarf = [loc for loc in locs if loc.role == "dwarf"]
+        assert dwarf and dwarf[0].line and dwarf[0].line > 0
+        assert "hello" in dwarf[0].path
 
     named = pack_locations(data, "hello")
     assert named
     assert any(loc.role in ("sym", "dwarf", "def", "twin") for loc in named)
+    assert any(loc.role == "def" and "hello.c" in loc.path for loc in named)
 
     assert hello.section_index is not None
     secs = list_container_sections(data)
