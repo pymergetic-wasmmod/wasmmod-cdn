@@ -5,7 +5,7 @@
  *   filename, version?, package?, symbol?, addr?, sectionIndex?, mpyPath?, tab?
  * })
  *
- * Keys: / filter · Enter select · ↑/↓ symbols · [ ] locations · 1 hex · 2 asm · 3 source · Esc close
+ * Keys: / filter · Enter select · ↑/↓ symbols · [ ] locations · c copy · 1 hex · 2 asm · 3 source · Esc close
  */
 (() => {
   const HEX_PREVIEW = 65536;
@@ -34,6 +34,14 @@
     const pretty =
       value >= 100 ? value.toFixed(0) : value >= 10 ? value.toFixed(1) : value.toFixed(2);
     return pretty + " " + unit + " (" + exact + ")";
+  }
+
+  function fmtOff(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v)) return "?";
+    const i = Math.trunc(v);
+    if (i < 0) return String(i);
+    return "0x" + i.toString(16);
   }
 
   /** Prefer dwarf, then def/decl, then twin, over role=sym stubs. */
@@ -240,7 +248,7 @@
       if (!btn) return;
       state.locIndex = Number(btn.dataset.loc);
       renderLocBar();
-      loadSourceForLoc().then(paintActive);
+      loadSourceForLoc().then(() => setTab("source"));
     });
     dialog.addEventListener("keydown", (ev) => {
       const inFilter = document.activeElement === els.filter;
@@ -276,6 +284,11 @@
         return;
       }
       if (inFilter) return;
+      if (ev.key === "c" || ev.key === "C") {
+        ev.preventDefault();
+        copyActiveLocation();
+        return;
+      }
       if (ev.key === "1") {
         ev.preventDefault();
         setTab("hex");
@@ -318,6 +331,30 @@
     });
   }
 
+  function copyActiveLocation() {
+    const { els, state } = ensureUi();
+    const loc = state.locations && state.locations[state.locIndex];
+    let text = "";
+    if (loc && loc.path) {
+      text = loc.path + (loc.line != null ? ":" + loc.line : "");
+    } else if (state.selected && state.selected.name) {
+      text = state.selected.name;
+    }
+    if (!text) return;
+    const done = () => {
+      const prev = els.meta.textContent;
+      els.meta.textContent = "copied " + text;
+      setTimeout(() => {
+        if (els.meta.textContent === "copied " + text) {
+          els.meta.textContent = prev;
+        }
+      }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(() => {});
+    }
+  }
+
   function setTab(tab) {
     const { els, state } = ensureUi();
     state.tab = tab;
@@ -358,6 +395,7 @@
       const meta = [
         s.kind || "",
         s.binding || "",
+        s.offset != null ? fmtOff(s.offset) : "",
         s.size != null ? fmtSize(s.size) : "",
       ]
         .filter(Boolean)
@@ -554,7 +592,7 @@
       (sym.kind || "sym") +
       (sym.binding ? " · " + sym.binding : "") +
       " · off=" +
-      (sym.offset != null ? sym.offset : "?") +
+      (sym.offset != null ? fmtOff(sym.offset) : "?") +
       " · " +
       fmtSize(sym.size || 0) +
       (sym.section_index != null ? " · section " + sym.section_index : "");
@@ -694,7 +732,7 @@
 
     if (opts.addr != null) {
       const addr = Number(opts.addr);
-      els.meta.textContent = "addr=" + addr;
+      els.meta.textContent = "addr=" + fmtOff(addr);
       try {
         state.locations = await fetchJson(
           `${root}/addr2line?addr=${encodeURIComponent(String(addr))}`
@@ -750,6 +788,7 @@
     hexdumpHtml,
     esc,
     fmtSize,
+    fmtOff,
     cdnPrefix,
     artifactRoot,
     pickBestLocIndex,
