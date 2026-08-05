@@ -52,8 +52,9 @@ Audit actions: `fed.peer.*`, `fed.mount.*`, `fed.credential.rotate`, `fed.grant.
 METAL_CDN_FEDERATION_SECRETS_KEY=
 METAL_CDN_FEDERATION_MAX_HOPS=8
 METAL_CDN_FEDERATION_ALLOW_PRIVATE_NET=false
-# Bootstrap hint (not auto-applied to DB yet):
+# Bootstrap hint — applied idempotently on startup (existing prefixes win):
 # METAL_CDN_FEDERATION_MOUNTS_JSON=[{"prefix":"a.b","url":"https://leaf/cdn","token":"mcdn_…"}]
+# Lab private peers also need METAL_CDN_FEDERATION_ALLOW_PRIVATE_NET=1
 ```
 
 API keys gain a `scopes` column. Empty scopes = unrestricted (legacy). Federation bot keys use `["federation:read"]`.
@@ -84,6 +85,9 @@ Browse **Federation** (admin nav) at `/federation`:
 - **Child**: accept grant → one-time API key reveal
 - **Parent**: create peer + mount with bearer in one step
 - List / delete peers & mounts; revoke grants
+
+Optional env bootstrap: ``METAL_CDN_FEDERATION_MOUNTS_JSON`` is applied on startup
+(idempotent — existing prefixes are left alone).
 
 ## UI
 

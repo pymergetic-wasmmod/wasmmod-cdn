@@ -51,6 +51,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
             if created is not None:
                 print(f"bootstrapped admin {created.email}")
+    if settings.federation_mounts_json:
+        secret = (settings.federation_secrets_key or settings.session_secret or "").strip()
+        if not secret:
+            print("federation bootstrap mounts skipped: no session/federation secrets key")
+        else:
+            from pymergetic.metal.cdn.services.federation.registry import FederationRegistry
+
+            async with db.session_maker() as session:
+                reg = FederationRegistry(
+                    session,
+                    secrets_key=secret,
+                    max_hops=settings.federation_max_hops,
+                )
+                for line in await reg.apply_bootstrap_mounts(
+                    settings.federation_mounts_json,
+                    allow_private_net=settings.federation_allow_private_net,
+                ):
+                    print(f"federation bootstrap: {line}")
     yield
     await db.dispose()
 

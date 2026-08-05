@@ -193,7 +193,8 @@ class Settings(BaseSettings):
     federation_mounts_json: str | None = Field(
         default=None,
         description=(
-            'Optional bootstrap mounts JSON: '
+            "Optional bootstrap mounts JSON applied idempotently on startup "
+            '(existing prefixes win): '
             '[{"prefix":"a.b","url":"https://leaf/cdn","token":"mcdn_…","label":"leaf"}]'
         ),
     )
