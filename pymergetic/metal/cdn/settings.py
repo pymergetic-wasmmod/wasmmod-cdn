@@ -146,10 +146,65 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Branding (forks / private CDN mirrors).
+    brand_name: str = Field(
+        default="",
+        description=(
+            "Header product label. Empty → use app_name (default metal-cdn). "
+            "Forks set this when they rename the product."
+        ),
+    )
+    brand_logo_url: str | None = Field(
+        default=None,
+        description=(
+            "Logo URL for the header brand mark. Absolute http(s):// or //…, "
+            "or a site path (/cdn/static/…). Empty → bundled pymergetic mark. "
+            "External logos are fine (img src); set cors_origins if browsers "
+            "must fetch CDN APIs cross-site from a different UI origin."
+        ),
+    )
+    cors_origins: list[str] = Field(
+        default_factory=lambda: ["*"],
+        description=(
+            "CORS Allow-Origin list for API + static (device UIs / other CDNs). "
+            "['*'] = any origin, credentials off. Use explicit origins when "
+            "cookie sessions must work cross-site. Empty list disables CORS."
+        ),
+    )
+
     @field_validator("base_path")
     @classmethod
     def _base_path_ok(cls, value: str) -> str:
         return normalize_base_path(value)
+
+    @field_validator("brand_logo_url")
+    @classmethod
+    def _brand_logo_url_ok(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        v = value.strip()
+        if not v:
+            return None
+        # Absolute remote, protocol-relative, site path, or static-relative key.
+        if v.startswith(("http://", "https://", "//", "/")):
+            return v
+        if "://" in v or v.startswith(("javascript:", "data:")):
+            raise ValueError(
+                "brand_logo_url must be http(s)://, //…, /site/path, or static-relative"
+            )
+        return v
+
+    @field_validator("public_origin")
+    @classmethod
+    def _public_origin_ok(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        v = value.strip().rstrip("/")
+        if not v:
+            return None
+        if not (v.startswith("http://") or v.startswith("https://")):
+            raise ValueError("public_origin must be an http(s) URL")
+        return v
 
     @field_validator("require_signed")
     @classmethod
@@ -172,6 +227,10 @@ class Settings(BaseSettings):
     @property
     def registration_open(self) -> bool:
         return bool(self.allow_open_registration)
+
+    @property
+    def display_brand_name(self) -> str:
+        return (self.brand_name or self.app_name or "metal-cdn").strip() or "metal-cdn"
 
     @property
     def session_cookie_secure(self) -> bool:

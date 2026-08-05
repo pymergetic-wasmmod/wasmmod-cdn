@@ -15,6 +15,7 @@ pymergetic_metal_cdn_client.egg-info/
 .DS_Store
 *.swp
 .env
+.secrets/
 .data/
 out/
 .publish/

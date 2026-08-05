@@ -56,6 +56,7 @@ from pymergetic.metal.cdn.models import (
     PackageOwnership,
     PackageRole,
     PackageSummary,
+    PasswordChangeRequest,
     PresignUploadItem,
     PresignUploadRequest,
     PresignUploadResponse,
@@ -224,6 +225,27 @@ async def logout(request: Request) -> None:
     request.session.pop(SESSION_USER_KEY, None)
     request.session[SESSION_ANON_KEY] = str(uuid4())
     ensure_csrf_token(request)
+
+
+@auth_router.post("/password", response_model=UserRead)
+async def change_password(
+    body: PasswordChangeRequest,
+    user: CurrentUserDep,
+    users: UserServiceDep,
+) -> UserRead:
+    """Set a new password (session or Bearer). Requires the current password."""
+    if body.new_password == body.current_password:
+        raise HTTPException(status_code=400, detail="new password must differ")
+    try:
+        return await users.set_password(
+            user.id,
+            current_password=body.current_password,
+            new_password=body.new_password,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
 
 
 @auth_router.get("/me", response_model=UserRead)

@@ -6,6 +6,15 @@ Thin HTTP client for [metal-cdn](https://github.com/pymergetic/metal-cdn)
 PyPI: **`pymergetic-metal-cdn-client`**  
 Import: **`pymergetic.metal.cdn_client`**
 
+| Component | Role | Repo |
+|-----------|------|------|
+| wasmmod | Runtime + pack tree | [pymergetic/wasmmod](https://github.com/pymergetic/wasmmod) · `main` |
+| wasmmod-tools | Host CLI (optional CDN extras) | [pymergetic/wasmmod-tools](https://github.com/pymergetic/wasmmod-tools) · `main` |
+| wasmmod-test | External consumer sample | [pymergetic/wasmmod-test](https://github.com/pymergetic/wasmmod-test) · `main` |
+| **metal-cdn** | **This package lives here** — server + client | [pymergetic/metal-cdn](https://github.com/pymergetic/metal-cdn) · `main` / [`client/`](https://github.com/pymergetic/metal-cdn/tree/main/client) |
+| metalpython `wasmmod` | Clean upy host + submodule (upstream-shaped) | [metalpython/tree/wasmmod](https://github.com/pymergetic/metalpython/tree/wasmmod) |
+| metalpython `master` | Metal product µPy; **base = `wasmmod` tip** | [metalpython/tree/master](https://github.com/pymergetic/metalpython/tree/master) |
+
 Use this from wasmmod / CI. Do **not** install `pymergetic-metal-cdn` just to publish — that pulls the FastAPI server stack.
 
 ## Install

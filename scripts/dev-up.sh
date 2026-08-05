@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# One-shot local CDN: build browser µPy (optional) → sync → docker → seed samples.
+# One-shot local / public-test CDN: µPy (optional) → docker (auth on) → seed.
 #
 #   ./scripts/dev-up.sh              # full path
 #   ./scripts/dev-up.sh --seed-only  # packs into already-running container
 #   ./scripts/dev-up.sh --no-upy     # skip Emscripten rebuild (reuse synced assets)
 #   ./scripts/dev-up.sh --no-seed    # docker only
 #   ./scripts/dev-up.sh --reseed     # wipe named volume metal-cdn-data, then docker+seed
+#
+# Auth (public-test defaults):
+#   ./scripts/ensure-secrets.sh      # once → .secrets/cdn.env (gitignored)
+#   docker gets REQUIRE_AUTH=true + bootstrap admin; seed uses Bearer from .secrets/token
 #
 # Env overrides:
 #   METALPYTHON   path to metalpython tree (default: sibling ../metalpython)
@@ -15,6 +19,7 @@
 #   METAL_CDN_PORT  8000
 #   METAL_CDN_VOLUME metal-cdn-data   # docker volume wiped by --reseed only
 #   METAL_CDN_REQUIRE_SIGNED  off|present|verify (default: present)
+#   METAL_CDN_REQUIRE_AUTH    default true for this script
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -25,6 +30,9 @@ NAME="${METAL_CDN_NAME:-metal-cdn}"
 PORT="${METAL_CDN_PORT:-8000}"
 CDN_URL="${METAL_CDN_URL:-http://127.0.0.1:${PORT}/cdn}"
 VOLUME="${METAL_CDN_VOLUME:-metal-cdn-data}"
+SECRETS_DIR="$ROOT/.secrets"
+SECRETS_ENV="$SECRETS_DIR/cdn.env"
+SECRETS_TOKEN="$SECRETS_DIR/token"
 
 DO_UPY=1
 DO_DOCKER=1
@@ -33,7 +41,7 @@ DO_RESEED=0
 SEED_ONLY=0
 
 usage() {
-  sed -n '2,16p' "$0" | sed 's/^# \?//'
+  sed -n '2,22p' "$0" | sed 's/^# \?//'
   exit "${1:-0}"
 }
 
@@ -49,6 +57,57 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
+
+load_secrets() {
+  "$ROOT/scripts/ensure-secrets.sh"
+  # shellcheck disable=SC1090
+  set -a
+  # shellcheck disable=SC1091
+  source "$SECRETS_ENV"
+  set +a
+  if [[ -z "${METAL_CDN_BOOTSTRAP_ADMIN_EMAIL:-}" || -z "${METAL_CDN_BOOTSTRAP_ADMIN_PASSWORD:-}" ]]; then
+    echo "FAIL: $SECRETS_ENV missing bootstrap email/password" >&2
+    exit 1
+  fi
+}
+
+mint_or_load_token() {
+  mkdir -p "$SECRETS_DIR"
+  chmod 700 "$SECRETS_DIR" 2>/dev/null || true
+  if [[ -f "$SECRETS_TOKEN" ]]; then
+    local existing
+    existing="$(tr -d '[:space:]' <"$SECRETS_TOKEN")"
+    if [[ -n "$existing" ]]; then
+      if curl -sf -H "Authorization: Bearer $existing" "$CDN_URL/auth/me" >/dev/null 2>&1; then
+        echo "    reuse token → $SECRETS_TOKEN"
+        printf '%s' "$existing" >"$SECRETS_TOKEN"
+        chmod 600 "$SECRETS_TOKEN"
+        return 0
+      fi
+      echo "    stale token — re-minting"
+    fi
+  fi
+  local body code
+  body="$(python3 -c 'import json,os; print(json.dumps({"email":os.environ["METAL_CDN_BOOTSTRAP_ADMIN_EMAIL"],"password":os.environ["METAL_CDN_BOOTSTRAP_ADMIN_PASSWORD"],"name":"dev-up-seed"}))')"
+  code="$(curl -sS -o /tmp/metal-cdn-token.json -w '%{http_code}' -X POST "$CDN_URL/auth/token" \
+    -H 'Content-Type: application/json' \
+    -d "$body")"
+  if [[ "$code" != "200" && "$code" != "201" ]]; then
+    echo "FAIL: mint token HTTP $code — $(head -c 240 /tmp/metal-cdn-token.json)" >&2
+    exit 1
+  fi
+  python3 -c 'import json; print(json.load(open("/tmp/metal-cdn-token.json"))["key"])' >"$SECRETS_TOKEN"
+  chmod 600 "$SECRETS_TOKEN"
+  echo "    minted token → $SECRETS_TOKEN"
+}
+
+seed_token() {
+  if [[ ! -f "$SECRETS_TOKEN" ]]; then
+    echo "FAIL: missing $SECRETS_TOKEN (run docker step or mint_or_load_token)" >&2
+    exit 1
+  fi
+  tr -d '[:space:]' <"$SECRETS_TOKEN"
+}
 
 find_metalpython() {
   if [[ -n "${METALPYTHON:-}" ]]; then
@@ -110,14 +169,17 @@ step_reseed_volume() {
   else
     echo "    volume $VOLUME already absent"
   fi
+  # Volume wipe recreates DB users; drop cached API key so we re-mint.
+  rm -f "$SECRETS_TOKEN"
 }
 
 step_docker() {
+  load_secrets
   echo "==> sync wasmmod inspect helpers into client package"
   "$ROOT/scripts/sync-wasmmod-inspect.sh"
   echo "==> docker build -t $IMAGE"
   docker build -t "$IMAGE" "$ROOT"
-  echo "==> docker run $NAME :$PORT"
+  echo "==> docker run $NAME :$PORT (require_auth=true)"
   docker rm -f "$NAME" >/dev/null 2>&1 || true
   local secret="${METAL_CDN_SESSION_SECRET:-}"
   if [[ -z "$secret" ]]; then
@@ -130,6 +192,10 @@ step_docker() {
     -e "METAL_CDN_PUBLIC_ORIGIN=${METAL_CDN_PUBLIC_ORIGIN:-https://cdn.pymergetic.com}" \
     -e "METAL_CDN_BEHIND_PROXY=${METAL_CDN_BEHIND_PROXY:-true}" \
     -e "METAL_CDN_REQUIRE_SIGNED=${METAL_CDN_REQUIRE_SIGNED:-present}" \
+    -e "METAL_CDN_REQUIRE_AUTH=${METAL_CDN_REQUIRE_AUTH:-true}" \
+    -e "METAL_CDN_ALLOW_OPEN_REGISTRATION=${METAL_CDN_ALLOW_OPEN_REGISTRATION:-false}" \
+    -e "METAL_CDN_BOOTSTRAP_ADMIN_EMAIL=${METAL_CDN_BOOTSTRAP_ADMIN_EMAIL}" \
+    -e "METAL_CDN_BOOTSTRAP_ADMIN_PASSWORD=${METAL_CDN_BOOTSTRAP_ADMIN_PASSWORD}" \
     -v "${VOLUME}:/data" \
     "$IMAGE"
   echo "==> wait for $CDN_URL/health"
@@ -137,6 +203,9 @@ step_docker() {
   for i in $(seq 1 60); do
     if curl -sf "$CDN_URL/health" >/dev/null 2>&1; then
       echo "    healthy (${i}s)"
+      echo "==> seed API token"
+      mint_or_load_token
+      echo "    login: ${METAL_CDN_BOOTSTRAP_ADMIN_EMAIL} (password in $SECRETS_ENV)"
       return 0
     fi
     sleep 1
@@ -162,7 +231,8 @@ pub_pkg() {
     echo "FAIL: pub_pkg $name needs at least one file" >&2
     return 1
   fi
-  local meta code form=()
+  local meta code form=() token
+  token="$(seed_token)"
   local f
   for f in "$@"; do
     if [[ ! -f "$f" ]]; then
@@ -181,6 +251,7 @@ pub_pkg() {
   echo -n "${names[*]}"
   echo -n ") … "
   code="$(curl -sS -o /tmp/metal-cdn-dev-pub.json -w '%{http_code}' -X POST "$CDN_URL/publish" \
+    -H "Authorization: Bearer $token" \
     -F "meta=$meta;type=application/json" \
     "${form[@]}")"
   echo "HTTP $code"
@@ -192,6 +263,11 @@ pub_pkg() {
 
 step_seed() {
   local mp packs
+  load_secrets
+  if [[ ! -f "$SECRETS_TOKEN" ]]; then
+    echo "==> seed API token"
+    mint_or_load_token
+  fi
   mp="$(find_metalpython)" || {
     echo "FAIL: metalpython not found (set METALPYTHON=…)" >&2
     exit 1
@@ -199,9 +275,11 @@ step_seed() {
   packs="$mp/extmod/wasmmod/examples/packs"
   examples="$mp/extmod/wasmmod/examples"
   echo "==> build + sign example packs (wasmmod.sig / examples/.keys)"
-  # Prefer system cmake over broken emsdk shims on PATH
-  PATH="/usr/bin:/bin:${PATH}" make -C "$examples" sign-packs
-  echo "==> publish samples → $CDN_URL"
+  # Prefer system cmake over broken emsdk shims, but keep the active
+  # interpreter (venv) so tools/wasmmod.py can import pymergetic-wasmmod-tools.
+  _py_bin="$(cd "$(dirname "$(command -v python3)")" && pwd)"
+  PATH="${_py_bin}:/usr/bin:/bin:${PATH}" make -C "$examples" sign-packs
+  echo "==> publish samples → $CDN_URL (Bearer)"
   [[ -f "$packs/hello.wasm" ]] || { echo "FAIL: missing $packs/hello.wasm" >&2; exit 1; }
 
   local hello_files=("$packs/hello.wasm")
@@ -283,5 +361,7 @@ fi
 
 echo
 echo "OK  UI     $CDN_URL/"
+echo "    auth   REQUIRE_AUTH on — login ${METAL_CDN_BOOTSTRAP_ADMIN_EMAIL:-demo@…}"
+echo "    secrets $SECRETS_ENV  |  token $SECRETS_TOKEN"
 echo "    shell  open µPy panel → packages()  |  import hello"
 echo "    stop   docker rm -f $NAME"

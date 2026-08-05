@@ -191,7 +191,7 @@
 {% endif %}
 <section>
   <h2>Artifacts</h2>
-  <p class="muted">Click a name to inspect pack guts. Use the download / inspect icons on each row.</p>
+  <p class="muted">Click a name to inspect pack guts. The commander navigates package · version · artifact · section · symbol with dual hex/asm/source views.</p>
   <ul class="pkg-list artifact-list" id="artifact-list">
     {% for a in entry.artifacts %}
     {% if channel == "lead" %}
@@ -229,7 +229,8 @@
             title="Inspect {{ a.path }}"
             aria-label="Inspect {{ a.path }}">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <path fill="currentColor" d="M10 3a7 7 0 0 1 5.6 11.2l4.1 4.1a1 1 0 0 1-1.4 1.4l-4.1-4.1A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"/>
+              <circle cx="12" cy="12" r="9.25" fill="none" stroke="currentColor" stroke-width="1.75"/>
+              <path fill="currentColor" d="M12 6.2 13.4 10h4.1l-3.3 2.5 1.2 4L12 14.2l-3.4 2.3 1.2-4-3.3-2.5h4.1L12 6.2Z"/>
             </svg>
           </button>
           <a class="icon-btn download-btn" href="{{ dl_href }}" download="{{ a.path }}" title="Download {{ a.path }}" aria-label="Download {{ a.path }}">
@@ -319,7 +320,7 @@
   const HEX_PREVIEW = 65536;
 
   const DL_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>`;
-  const INSP_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M10 3a7 7 0 0 1 5.6 11.2l4.1 4.1a1 1 0 0 1-1.4 1.4l-4.1-4.1A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"/></svg>`;
+  const INSP_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9.25" fill="none" stroke="currentColor" stroke-width="1.75"/><path fill="currentColor" d="M12 6.2 13.4 10h4.1l-3.3 2.5 1.2 4L12 14.2l-3.4 2.3 1.2-4-3.3-2.5h4.1L12 6.2Z"/></svg>`;
 
   function inspectBtnAttrs(ctx, extra) {
     const filename = (ctx && ctx.filename) || "";
@@ -417,7 +418,7 @@
       ? `<button type="button" class="icon-btn inspect-open-btn"${inspectBtnAttrs(ctx, `data-section-index="${esc(sec.index)}"`)} title="Inspect section ${esc(sec.name)}" aria-label="Inspect section ${esc(sec.name)}">${INSP_SVG}</button>`
       : "";
     return `<li class="section-row${roleCls}">
-      <button type="button" class="section-link" data-index="${esc(sec.index)}" data-name="${esc(sec.name)}" data-sections-raw="${esc(sectionsRaw)}" data-size="${esc(sec.size)}" data-role="${esc(role)}" title="View hex: ${esc(sec.name)}">${esc(sec.name)}</button>
+      <button type="button" class="section-link" data-index="${esc(sec.index)}" data-name="${esc(sec.name)}" data-sections-raw="${esc(sectionsRaw)}" data-size="${esc(sec.size)}" data-role="${esc(role)}" title="Inspect section: ${esc(sec.name)}">${esc(sec.name)}</button>
       <span class="muted">${esc(role)} · type=${esc(sec.type_id)} · ${esc(fmtSize(sec.size))}</span>
       ${insp}
       <a class="icon-btn file-download" href="${esc(rawUrl)}" download="${esc(dlName)}" title="Download section ${esc(sec.name)}" aria-label="Download section ${esc(sec.name)}">${DL_SVG}</a>
@@ -746,7 +747,7 @@
     if (secBtn) {
       ev.preventDefault();
       const row = secBtn.closest(".artifact-row");
-      if (window.openInspect && row && (ev.metaKey || ev.ctrlKey || ev.altKey)) {
+      if (window.openInspect && row) {
         window.openInspect({
           package: row.dataset.package,
           filename: row.dataset.filename,

@@ -21,7 +21,6 @@
   "typeCheckingMode": "basic",
   "reportMissingImports": "error",
   "reportMissingModuleSource": "none",
-  "stubPath": "typings",
   "executionEnvironments": [
     {
       "root": ".",

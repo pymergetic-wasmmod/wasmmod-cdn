@@ -131,6 +131,14 @@ async def test_user_and_publish_flow(client: AsyncClient) -> None:
     names = [p["name"] for p in lr.json()]
     assert "hello" in names
 
+    vr = await client.get("/packages/hello/versions")
+    assert vr.status_code == 200
+    ver_rows = vr.json()
+    channels = {v["channel"] for v in ver_rows}
+    assert "lead" in channels
+    assert "@0.1.0" in channels
+    assert any(v["label"].startswith("lead") for v in ver_rows)
+
     gr = await client.get("/packages/hello")
     assert gr.status_code == 200
     assert gr.json()["version"] == "0.1.0"

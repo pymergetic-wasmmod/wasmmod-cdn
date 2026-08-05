@@ -12,6 +12,7 @@ from pymergetic.metal.cdn.api.deps import (
     AuditServiceDep,
     CurrentUserDep,
     IndexServiceDep,
+    OptionalUserDep,
     OrgServiceDep,
     PublishServiceDep,
     SettingsDep,
@@ -32,6 +33,7 @@ from pymergetic.metal.cdn.models import (
     PackageMetaRead,
     PackageTeamAclCreate,
     PackageTeamAclRead,
+    PackageVersionOption,
     SuccessorRequest,
     TeamCreate,
     TeamMemberAdd,
@@ -214,7 +216,28 @@ async def delete_trust(root_id: UUID, user: AdminUserDep, trust: TrustServiceDep
 
 
 def register_package_extensions(packages_router: APIRouter) -> None:
-    """Attach successor / visibility / closure onto the packages router."""
+    """Attach versions / successor / visibility / closure onto the packages router."""
+
+    @packages_router.get("/{name:path}/versions", response_model=list[PackageVersionOption])
+    async def package_versions(
+        name: str,
+        indexes: IndexServiceDep,
+        acl: AclServiceDep,
+        user: OptionalUserDep,
+    ) -> list[PackageVersionOption]:
+        """Lead + pin channels that publish ``name`` (inspect / catalog pickers)."""
+        try:
+            ChannelLayout.validate_package_name(name)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not await acl.can_read(
+            name, user.id if user else None, is_admin=bool(user and user.is_admin)
+        ):
+            raise HTTPException(status_code=404, detail="package not found")
+        rows = await indexes.package_versions(name)
+        if not rows:
+            raise HTTPException(status_code=404, detail="package not found")
+        return rows
 
     @packages_router.post("/{name:path}/successor", response_model=PackageEntry)
     async def set_successor(

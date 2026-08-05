@@ -7,6 +7,15 @@ Async FastAPI channel for signed wasmmod packs — browse, publish, inspect, and
 
 > **Experimental.** Data on the public demo is wiped often. Short tests only — not for production.
 
+| Component | Role | Repo |
+|-----------|------|------|
+| wasmmod | Runtime + pack tree (`pymergetic-wasmmod`) | [pymergetic/wasmmod](https://github.com/pymergetic/wasmmod) · `main` |
+| wasmmod-tools | Host CLI (`pymergetic-wasmmod-tools`) | [pymergetic/wasmmod-tools](https://github.com/pymergetic/wasmmod-tools) · `main` |
+| wasmmod-test | External pack/CDN consumer sample | [pymergetic/wasmmod-test](https://github.com/pymergetic/wasmmod-test) · `main` |
+| **metal-cdn** | **This repo** — CDN server + client | [pymergetic/metal-cdn](https://github.com/pymergetic/metal-cdn) · `main` |
+| metalpython `wasmmod` | Clean upy host + submodule (upstream-shaped) | [metalpython/tree/wasmmod](https://github.com/pymergetic/metalpython/tree/wasmmod) |
+| metalpython `master` | Metal product µPy; **base = `wasmmod` tip** | [metalpython/tree/master](https://github.com/pymergetic/metalpython/tree/master) |
+
 <p align="center">
   <img src="screenshots/browse-hello.png" alt="Package browse — hello on lead, dependents, µPy ready" width="820" />
 </p>
@@ -14,6 +23,12 @@ Async FastAPI channel for signed wasmmod packs — browse, publish, inspect, and
 Channel **state** (artifacts + `index.json`) lives in object storage.  
 Publisher **identity** (users + ACL) lives in SQL.  
 Devices still verify pack signatures with wasmmod — this service does not replace that.
+
+UI styles: `static/site.css` barrels `static/css/*.css` (tokens, layout, catalog, artifacts, inspect, chrome, sessions, repl). Inspect JS: `static/inspect/*.js`.
+
+**Forks / mirrors:** set `METAL_CDN_PUBLIC_ORIGIN`, `METAL_CDN_BASE_PATH`, optional
+`METAL_CDN_BRAND_NAME` / `METAL_CDN_BRAND_LOGO_URL`, and `METAL_CDN_CORS_ORIGINS`
+so your UI and `wasm.cdn(...)` clients point at *your* host (see [docs/PROXY.md](docs/PROXY.md)).
 
 ---
 
@@ -85,21 +100,26 @@ metal-cdn serve --reload
 
 ### Docker one-shot
 
-Rebuild browser µPy (if needed), sync REPL assets, `docker build`/`run`, seed sample packs:
+Rebuild browser µPy (if needed), sync REPL assets, `docker build`/`run` with
+**auth required**, seed sample packs with a Bearer token:
 
 ```sh
+./scripts/ensure-secrets.sh   # once → .secrets/cdn.env (gitignored)
 ./scripts/dev-up.sh
 # → http://127.0.0.1:8000/cdn/   (µPy: packages() | import hello)
+# login: email from .secrets/cdn.env ; seed token: .secrets/token
 ```
 
-Flags: `--no-upy`, `--no-seed`, `--seed-only`.  
-Env: `METALPYTHON`, `METAL_CDN_URL`, `METAL_CDN_PORT`, `METAL_CDN_SESSION_SECRET`.
+Flags: `--no-upy`, `--no-seed`, `--seed-only`, `--reseed`.  
+Env: `METALPYTHON`, `METAL_CDN_URL`, `METAL_CDN_PORT`, `METAL_CDN_SESSION_SECRET`.  
+Details: [docs/CLIENT.md](docs/CLIENT.md#public-test-first-boot-auth-on).
 
 ### Public TLS edge
 
 **https://cdn.pymergetic.com/cdn/** — see [docs/PROXY.md](docs/PROXY.md).
 
 ```sh
+./scripts/ensure-secrets.sh
 ./scripts/dev-up.sh --no-upy
 docker compose --profile proxy up -d nginx
 curl -sf https://cdn.pymergetic.com/cdn/health

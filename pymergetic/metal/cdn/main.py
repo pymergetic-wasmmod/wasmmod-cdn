@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -80,6 +81,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.storage = storage
 
     # Last added = outermost.
+    if settings.cors_origins:
+        # '*' cannot mix with credentials; cookie UIs need explicit origins.
+        allow_creds = settings.cors_origins != ["*"]
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_origins,
+            allow_credentials=allow_creds,
+            allow_methods=["*"],
+            allow_headers=["*"],
+            expose_headers=["*"],
+        )
     app.add_middleware(ShellHitMiddleware, path_prefix=prefix)
     app.add_middleware(RequestLogMiddleware, json_logs=settings.json_logs)
     app.add_middleware(
@@ -131,6 +143,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             # browser can keep an old binary while the banner looks "new".
             if path.startswith("repl/micropython."):
                 response.headers["Cache-Control"] = "no-cache, must-revalidate"
+            # UI shell — nav/inspect iterate fast; don't sticky-cache across deploys.
+            elif (
+                path in ("inspect.js", "site.css", "repl.js")
+                or path.startswith("inspect/")
+                or path.startswith("css/")
+            ):
+                response.headers["Cache-Control"] = "no-cache, must-revalidate"
+            # Brand / mark assets: allow other origins to embed (fork UIs).
+            if path.startswith("img/"):
+                response.headers.setdefault("Cross-Origin-Resource-Policy", "cross-origin")
+                response.headers.setdefault("Access-Control-Allow-Origin", "*")
             return response
 
     app.mount(

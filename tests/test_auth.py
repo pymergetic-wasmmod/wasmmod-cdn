@@ -109,3 +109,42 @@ async def test_register_login_claim_publish(auth_client: AsyncClient) -> None:
     )
     clash = await auth_client.post("/cdn/packages/hello/claim")
     assert clash.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_change_password(auth_client: AsyncClient) -> None:
+    await auth_client.post(
+        "/cdn/auth/register",
+        json={
+            "email": "pw@example.com",
+            "display_name": "Pw",
+            "password": "secret123",
+        },
+    )
+    await auth_client.post(
+        "/cdn/auth/login",
+        json={"email": "pw@example.com", "password": "secret123"},
+    )
+    bad = await auth_client.post(
+        "/cdn/auth/password",
+        json={"current_password": "wrongwrong", "new_password": "newsecret1"},
+    )
+    assert bad.status_code == 401
+
+    ok = await auth_client.post(
+        "/cdn/auth/password",
+        json={"current_password": "secret123", "new_password": "newsecret1"},
+    )
+    assert ok.status_code == 200, ok.text
+
+    await auth_client.post("/cdn/auth/logout")
+    old = await auth_client.post(
+        "/cdn/auth/login",
+        json={"email": "pw@example.com", "password": "secret123"},
+    )
+    assert old.status_code == 401
+    new = await auth_client.post(
+        "/cdn/auth/login",
+        json={"email": "pw@example.com", "password": "newsecret1"},
+    )
+    assert new.status_code == 200

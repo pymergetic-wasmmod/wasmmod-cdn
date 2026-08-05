@@ -70,6 +70,20 @@ class UserService:
             is_admin=True,
         )
 
+    async def set_password(
+        self, user_id: UUID, *, current_password: str, new_password: str
+    ) -> UserRead:
+        user = await self._session.get(User, user_id)
+        if user is None or not user.is_active or not user.password_hash:
+            raise LookupError("user not found")
+        if not verify_password(current_password, user.password_hash):
+            raise PermissionError("current password incorrect")
+        user.password_hash = hash_password(new_password)
+        self._session.add(user)
+        await self._session.commit()
+        await self._session.refresh(user)
+        return UserRead.model_validate(user)
+
     async def authenticate(self, email: str, password: str) -> UserRead | None:
         result = await self._session.exec(select(User).where(User.email == email))
         user = result.first()

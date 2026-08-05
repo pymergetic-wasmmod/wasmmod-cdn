@@ -71,7 +71,12 @@ Prefix: `/cdn/artifacts/lead/<file>/…` or `/cdn/artifacts/pin/<ver>/<file>/…
 
 UI: package page **Open Inspect…** / symbol & export clicks →
 `window.openInspect({ filename, symbol?, sectionIndex?, mpyPath?, … })`
-(`static/inspect.js`). Keys: `/` filter · Enter select · ↑/↓ symbols · `[`/`]` locations · `c` copy · `?` help · `1`/`2`/`3` tabs · Esc.
+(`static/inspect/*.js` ES modules, entry `inspect/main.js`). Nav: package ·
+version · artifact · section · symbol. Dual panes each pick hex/asm/source
+independently (modes stick while navigating). Keys: `/` symbol · ↑/↓ symbols ·
+`[`/`]` locations · `c` copy · `Tab` focus pane · `1`/`2`/`3` mode · `?` help · Esc.
+
+Styles: `static/site.css` is a barrel over `static/css/{tokens,layout,catalog,artifacts,inspect,chrome,sessions,repl}.css`.
 Location chip clicks open the source tab. Offsets display as hex (`0x…`).
 Title shows `· dwarf` when `has_dwarf`; filter placeholder includes symbol count.
 ELF section indexes are real `shndx` (match symbols).

@@ -5,6 +5,11 @@
   <p class="eyebrow">account</p>
   <h1>Login</h1>
   <p class="lede">Session cookie for the browse UI; use API keys for CI publish.</p>
+  {% if experimental and bootstrap_admin_email %}
+  <p class="muted">Public-test bootstrap account: <code>{{ bootstrap_admin_email }}</code>
+    (password in operator <code>.secrets/cdn.env</code>). Change later via
+    <code>POST /auth/password</code>.</p>
+  {% endif %}
 </section>
 <form id="login-form" class="auth-form">
   <label>Email <input type="email" name="email" required autocomplete="username" /></label>

@@ -31,9 +31,14 @@ this package.
 
 Config: `~/.config/metal-cdn/config.json`
 
+Related constellation: [metal-cdn README](https://github.com/pymergetic/metal-cdn#metal-cdn) ·
+[wasmmod](https://github.com/pymergetic/wasmmod) ·
+[wasmmod-tools](https://github.com/pymergetic/wasmmod-tools) ·
+[wasmmod-test](https://github.com/pymergetic/wasmmod-test).
+
 ## Surface
 
-- Auth: register, password→API key, `me`
+- Auth: register, password→API key, `me`, change password (`POST /auth/password`)
 - Packages: claim, publish, promote, yank, list, search, get
 - Artifacts: `download_artifact` (ETag / 304), `inspect_artifact_remote`,
   `list_symbols_remote`, `addr2line_remote`, `locations_remote`, `disasm_remote`,
@@ -43,6 +48,26 @@ Config: `~/.config/metal-cdn/config.json`
 - Trust (admin): `list_trust`, `add_trust`, `delete_trust`
 - Verify helpers: `verify_artifact`, `enforce_signed_policy` (needs `cryptography`)
 - Index / closure: `get_index`, `closure`
+
+## Public-test first boot (auth on)
+
+`scripts/dev-up.sh` forces **`METAL_CDN_REQUIRE_AUTH=true`** and closed registration.
+Bootstrap identity + seed token live only under **gitignored** `.secrets/`:
+
+```sh
+./scripts/ensure-secrets.sh   # once → .secrets/cdn.env (email + random password)
+./scripts/dev-up.sh           # docker bootstraps admin, mints .secrets/token, seeds with Bearer
+```
+
+| File | Purpose |
+|------|---------|
+| `.secrets/cdn.env` | `METAL_CDN_BOOTSTRAP_ADMIN_EMAIL` / `…_PASSWORD` (create-once admin) |
+| `.secrets/token` | API key for seed/CI (`Authorization: Bearer …`) |
+
+UI login: email from `cdn.env`. Later set a customer password via
+`POST /cdn/auth/password` `{"current_password","new_password"}` (session or Bearer).
+After `--reseed` (volume wipe), the same password recreates the admin; token is
+re-minted.
 
 Pack → AOT → sign → zlib stays in wasmmod; this library talks HTTP both ways.
 

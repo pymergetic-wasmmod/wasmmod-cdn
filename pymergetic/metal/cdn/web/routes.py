@@ -69,6 +69,25 @@ def _url(*parts: str) -> str:
     return join_base(_base_path, *parts)
 
 
+def resolve_brand_logo_url(settings: Any, *, default_href: str) -> str:
+    """Resolve ``brand_logo_url`` to an absolute or site-relative img src."""
+    raw = getattr(settings, "brand_logo_url", None) if settings is not None else None
+    if not raw:
+        return default_href
+    v = str(raw).strip()
+    if v.startswith(("http://", "https://", "//")):
+        return v
+    if v.startswith("/"):
+        return v
+    # Treat as path under static/, e.g. img/my.png
+    parts = [p for p in v.split("/") if p and p != "."]
+    if not parts:
+        return default_href
+    if parts[0] != "static":
+        parts = ["static", *parts]
+    return _url(*parts)
+
+
 def _cdn_base_url(request: Request) -> str:
     """Absolute CDN root for wasm.cdn (scheme://host[/base_path]).
 
@@ -177,13 +196,46 @@ async def _shell_context(
     repl_ready = False
     repl_asset_v = ""
     site_css_v = ""
+    inspect_js_v = ""
+    bootstrap_admin_email: str | None = None
+    brand_name = "metal-cdn"
+    brand_logo_url = _url("static", "img", "pymergetic.png")
+    public_origin: str | None = None
     settings = None
     try:
-        css = Path(__file__).resolve().parent / "static" / "site.css"
+        static_dir = Path(__file__).resolve().parent / "static"
+        css = static_dir / "site.css"
+        mtimes_css: list[int] = []
         if css.is_file():
-            site_css_v = format(int(css.stat().st_mtime), "x")
+            mtimes_css.append(int(css.stat().st_mtime))
+        css_dir = static_dir / "css"
+        if css_dir.is_dir():
+            for child in css_dir.glob("*.css"):
+                try:
+                    mtimes_css.append(int(child.stat().st_mtime))
+                except OSError:
+                    pass
+        if mtimes_css:
+            site_css_v = format(max(mtimes_css), "x")
+        inspect_js = static_dir / "inspect.js"
+        inspect_main = static_dir / "inspect" / "main.js"
+        mtimes: list[int] = []
+        if inspect_js.is_file():
+            mtimes.append(int(inspect_js.stat().st_mtime))
+        if inspect_main.is_file():
+            mtimes.append(int(inspect_main.stat().st_mtime))
+        inspect_dir = static_dir / "inspect"
+        if inspect_dir.is_dir():
+            for child in inspect_dir.glob("*.js"):
+                try:
+                    mtimes.append(int(child.stat().st_mtime))
+                except OSError:
+                    pass
+        if mtimes:
+            inspect_js_v = format(max(mtimes), "x")
     except OSError:
         site_css_v = ""
+        inspect_js_v = ""
     if request is not None:
         settings = getattr(request.app.state, "settings", None)
         if settings is not None and getattr(settings, "experimental", False):
@@ -206,6 +258,14 @@ async def _shell_context(
                     repl_asset_v = format(max(mtimes), "x")
             except OSError:
                 repl_asset_v = ""
+        if settings is not None and getattr(settings, "bootstrap_admin_email", None):
+            bootstrap_admin_email = str(settings.bootstrap_admin_email)
+        if settings is not None:
+            brand_name = getattr(settings, "display_brand_name", None) or brand_name
+            brand_logo_url = resolve_brand_logo_url(
+                settings, default_href=_url("static", "img", "pymergetic.png")
+            )
+            public_origin = getattr(settings, "public_origin", None)
         if current_user is None:
             current_user = await _session_user(request)
     return {
@@ -221,7 +281,12 @@ async def _shell_context(
         "repl_ready": repl_ready,
         "repl_asset_v": repl_asset_v,
         "site_css_v": site_css_v,
+        "inspect_js_v": inspect_js_v,
+        "bootstrap_admin_email": bootstrap_admin_email,
         "current_user": current_user,
+        "brand_name": brand_name,
+        "brand_logo_url": brand_logo_url,
+        "public_origin": public_origin,
     }
 
 

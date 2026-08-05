@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{% block title %}metal-cdn{% endblock %}</title>
+  <title>{% block title %}{{ brand_name }}{% endblock %}</title>
   <link rel="stylesheet" href="{{ href('static', 'site.css') }}{% if site_css_v %}?v={{ site_css_v }}{% endif %}" />
   {% block head %}{% endblock %}
 </head>
@@ -16,7 +16,19 @@
     </div>
     {% endif %}
     <header class="banner">
-      <a class="brand" href="{{ href('channels', 'lead') }}">metal-cdn</a>
+      <a class="brand" href="{{ href('channels', 'lead') }}">
+        <img
+          class="brand-mark"
+          src="{{ brand_logo_url }}"
+          width="22"
+          height="22"
+          alt=""
+          decoding="async"
+          referrerpolicy="no-referrer"
+          crossorigin="anonymous"
+        />
+        {{ brand_name }}
+      </a>
       <nav class="top-nav">
         <a href="{{ href('channels', 'lead') }}" class="{% if active_page == 'browse' or not active_page %}is-active{% endif %}">Browse</a>
         <a href="{{ href('authors') }}" class="{% if active_page == 'users' %}is-active{% endif %}">Users</a>
@@ -140,7 +152,7 @@
 
   <footer>
     <div class="footer-product">
-      <span class="product">metal-cdn</span>
+      <span class="product">{{ brand_name }}</span>
       <span class="footer-ver" title="package version">{{ app_version }}</span>
     </div>
     <nav class="footer-links" aria-label="Project links">
@@ -326,6 +338,6 @@
   })();
   </script>
   {% endif %}
-  <script src="{{ href('static', 'inspect.js') }}" defer></script>
+  <script type="module" src="{{ href('static', 'inspect', 'main.js') }}{% if inspect_js_v %}?v={{ inspect_js_v }}{% endif %}"></script>
 </body>
 </html>

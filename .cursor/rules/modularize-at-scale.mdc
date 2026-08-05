@@ -1,0 +1,29 @@
+---
+description: Modularize before files approach 4-digit LOC; rethink structure past ~500
+alwaysApply: true
+---
+
+# Modularize at scale
+
+Humans lose the thread around a few hundred lines; agents still “digest” fat files but produce worse diffs and harder reviews. Prefer modules early enough that nothing grows into a blob by accident.
+
+## Thresholds
+
+| Size | Expectation |
+|------|-------------|
+| **~500+ LOC** | Actively ask: can this split by responsibility (UI / fetch / format / domain)? Prefer yes when a second concern appears. |
+| **Approaching ~1000 LOC (4 digits)** | **Split before or as you touch it.** Do not add a large feature to a near-4-digit file. |
+| **Already 4 digits** | Treat modularization as part of the change (or a focused prep commit), not a follow-up wish. |
+
+## How to split
+
+- **JS/TS:** ES modules by concern (`util`, `format`, `http`, `view`, `session`); thin entry that wires exports / `window.*`.
+- **CSS:** partials under `static/css/` + barrel `site.css` (`@import`); keep tokens/layout/feature sheets separate.
+- **Python:** packages/modules by layer; avoid god-modules that mix HTTP, storage, and formatting.
+- Preserve behavior; update cache-bust / static mounts / imports in the same change.
+
+## Exceptions
+
+- Generated code, vendored trees, lockfiles, data tables.
+- A single algorithm that is inherently long *and* cohesive — still extract helpers at the edges.
+- Do not create empty ceremony folders; every module should own a clear slice.

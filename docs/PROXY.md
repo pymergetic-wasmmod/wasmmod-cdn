@@ -121,6 +121,26 @@ METAL_CDN_BASE_PATH=/cdn       # /cdn → metal-cdn; domain root free for ACME /
 Default nginx assumes **`/cdn`** so ACME stays at `/.well-known/…`. Do **not**
 strip the prefix in `proxy_pass` unless you also set `METAL_CDN_ROOT_PATH=/cdn`.
 
+Devices and browser shells bind with `wasm.cdn("<origin><base_path>")` (and may
+list several CDN bases). `PUBLIC_ORIGIN` + `BASE_PATH` must match what clients
+actually call, or imports resolve against the wrong host.
+
+## Branding and CORS (forks)
+
+Upstream [pymergetic/metal-cdn](https://github.com/pymergetic/metal-cdn) is the
+reference; forks / private mirrors keep their own name and mark:
+
+```sh
+METAL_CDN_BRAND_NAME=acme-cdn
+METAL_CDN_BRAND_LOGO_URL=https://assets.example.com/logo.png
+# or path on this CDN: /cdn/static/img/logo.png
+METAL_CDN_CORS_ORIGINS=["*"]   # default; empty [] = off; list for cookie cross-site
+```
+
+Static `img/*` also sends `Cross-Origin-Resource-Policy: cross-origin` so other
+origins can embed your logo. CORS covers API + static for device UIs talking to
+this CDN from a different page origin.
+
 ## First-time cert issue
 
 Needs public **80→8080**. Nginx can be up on the self-signed cert first.
