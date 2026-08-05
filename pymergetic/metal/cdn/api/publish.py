@@ -103,6 +103,12 @@ async def publish_pack(
         bool,
         Form(description="When true, publish to a PUSH federation mount instead of local"),
     ] = False,
+    also_local: Annotated[
+        bool,
+        Form(
+            description="With upstream=true, also write locally (dual-write). Ignored if upstream=false."
+        ),
+    ] = False,
 ) -> PublishResult:
     try:
         request = PublishRequest.model_validate_json(meta)
@@ -119,7 +125,7 @@ async def publish_pack(
     if publisher_id is not None:
         if await acl.is_unclaimed(request.package):
             if settings.auto_claim_on_publish or actor is not None:
-                if not upstream:
+                if not upstream or also_local:
                     try:
                         await acl.claim(request.package, publisher_id)
                     except PermissionError as exc:
@@ -149,6 +155,28 @@ async def publish_pack(
     if request.maintainer_email is None and actor is not None:
         request = request.model_copy(update={"maintainer_email": actor.email})
 
+    local_result: PublishResult | None = None
+    if (not upstream) or also_local:
+        try:
+            roots = await trust.all_der() if settings.require_signed != "off" else []
+            local_result = await publish.publish(request, blob_map, trust_roots=roots)
+        except ValueError as exc:
+            msg = str(exc)
+            code = (
+                http_status.HTTP_400_BAD_REQUEST
+                if "signature" in msg.lower() or "wasmmod.sig" in msg.lower()
+                else http_status.HTTP_409_CONFLICT
+            )
+            raise HTTPException(status_code=code, detail=msg) from exc
+        await orgs.set_visibility(request.package, request.visibility)
+        if actor is not None:
+            await audit.record(
+                "publish",
+                actor_id=actor.id,
+                package_name=request.package,
+                detail=request.version,
+            )
+
     if upstream:
         mount = await resolve_push_mount(reg, request.package)
         if mount is None:
@@ -166,32 +194,17 @@ async def publish_pack(
         )
         for k, v in push_origin_headers(mount).items():
             response.headers[k] = v
+        if also_local:
+            response.headers["X-Metal-Fed-Dual-Write"] = "1"
         if actor is not None:
             await audit.record(
                 "fed.publish.upstream",
                 actor_id=actor.id,
                 package_name=request.package,
-                detail=f"{request.version} → {mount.prefix}",
+                detail=f"{request.version} → {mount.prefix}"
+                + (" +local" if also_local else ""),
             )
         return result
 
-    try:
-        roots = await trust.all_der() if settings.require_signed != "off" else []
-        result = await publish.publish(request, blob_map, trust_roots=roots)
-    except ValueError as exc:
-        msg = str(exc)
-        code = (
-            http_status.HTTP_400_BAD_REQUEST
-            if "signature" in msg.lower() or "wasmmod.sig" in msg.lower()
-            else http_status.HTTP_409_CONFLICT
-        )
-        raise HTTPException(status_code=code, detail=msg) from exc
-    await orgs.set_visibility(request.package, request.visibility)
-    if actor is not None:
-        await audit.record(
-            "publish",
-            actor_id=actor.id,
-            package_name=request.package,
-            detail=request.version,
-        )
-    return result
+    assert local_result is not None
+    return local_result

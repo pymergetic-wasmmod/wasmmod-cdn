@@ -75,6 +75,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Publish via a PUSH federation mount on the CDN (form upstream=true)",
     )
 
+    publish.add_argument(
+        "--also-local",
+        action="store_true",
+        help="With --upstream, also write locally (dual-write)",
+    )
+
     publish.add_argument("--force", action="store_true", help="Overwrite immutable pin")
 
     lst = sub.add_parser("list", help="List packages on a channel")

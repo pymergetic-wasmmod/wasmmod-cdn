@@ -8,6 +8,10 @@ import httpx
 from fastapi import HTTPException, Request
 
 from pymergetic.metal.cdn.services.federation.artifact_name import mount_for_artifact
+from pymergetic.metal.cdn.services.federation.neg_cache import (
+    NegativePeerCache,
+    neg_cache_from_request,
+)
 from pymergetic.metal.cdn.services.federation.proxy import (
     FED_HOP_HEADER,
     FED_MOUNT_HEADER,
@@ -78,6 +82,22 @@ async def authorization_for_mount(
     return None
 
 
+def _check_neg(
+    cache: NegativePeerCache,
+    *,
+    mount: FederationMountRead,
+    method: str,
+    path: str,
+    params: dict[str, Any] | None,
+) -> str:
+    key = NegativePeerCache.key(
+        mount_id=str(mount.id), method=method, path=path, params=params
+    )
+    if cache.is_miss(key):
+        raise HTTPException(status_code=404, detail="package not found")
+    return key
+
+
 async def forward_json(
     *,
     proxy: FederationProxy,
@@ -89,6 +109,8 @@ async def forward_json(
 ) -> Any:
     hop = parse_incoming_hop(request)
     authorization = await authorization_for_mount(reg, mount, hop=hop)
+    cache = neg_cache_from_request(request)
+    neg_key = _check_neg(cache, mount=mount, method="GET", path=path, params=params)
     try:
         resp = await proxy.forward(
             mount=mount,
@@ -102,6 +124,7 @@ async def forward_json(
     except FederationProxyError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     if resp.status_code == 404:
+        cache.remember_miss(neg_key)
         raise HTTPException(status_code=404, detail="package not found")
     if resp.status_code >= 400:
         raise HTTPException(
@@ -125,8 +148,10 @@ async def forward_bytes(
 ) -> httpx.Response:
     hop = parse_incoming_hop(request)
     authorization = await authorization_for_mount(reg, mount, hop=hop)
+    cache = neg_cache_from_request(request)
+    neg_key = _check_neg(cache, mount=mount, method=method, path=path, params=None)
     try:
-        return await proxy.forward(
+        resp = await proxy.forward(
             mount=mount,
             path=path,
             method=method,
@@ -136,6 +161,9 @@ async def forward_bytes(
         )
     except FederationProxyError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    if resp.status_code == 404:
+        cache.remember_miss(neg_key)
+    return resp
 
 
 async def mount_for_filename(

@@ -238,7 +238,39 @@ async def test_cli_parser_upstream_flag() -> None:
     from pymergetic.metal.cdn.cli_parser import build_parser
 
     ns = build_parser().parse_args(
-        ["publish", "leaf.x", "0.1.0", "x.wasm", "--upstream", "--no-pin"]
+        ["publish", "leaf.x", "0.1.0", "x.wasm", "--upstream", "--also-local", "--no-pin"]
     )
     assert ns.upstream is True
+    assert ns.also_local is True
     assert ns.no_pin is True
+
+
+@pytest.mark.asyncio
+async def test_dual_write_upstream_and_local(
+    push_pair: tuple[AsyncClient, AsyncClient],
+) -> None:
+    parent, child = push_pair
+    meta = {
+        "package": "leaf.dual",
+        "version": "0.4.0",
+        "lead": True,
+        "pin": False,
+        "aot_version": 6,
+        "deps": {},
+        "maintainer_email": "uparent@cdn.pymergetic.com",
+    }
+    files = [
+        (
+            "files",
+            ("leaf.dual.wasm", b"\x00asm\x01\x00\x00\x00dual", "application/octet-stream"),
+        ),
+    ]
+    pr = await parent.post(
+        "/cdn/publish",
+        data={"meta": json.dumps(meta), "upstream": "true", "also_local": "true"},
+        files=files,
+    )
+    assert pr.status_code == 201, pr.text
+    assert pr.headers.get("x-metal-fed-dual-write") == "1"
+    assert (await child.get("/cdn/packages/leaf.dual")).status_code == 200
+    assert (await parent.get("/cdn/packages/leaf.dual")).status_code == 200

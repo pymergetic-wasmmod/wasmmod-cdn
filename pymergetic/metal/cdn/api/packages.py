@@ -30,8 +30,22 @@ from pymergetic.metal.cdn.models import (
     YankRequest,
 )
 from pymergetic.metal.cdn.services.federation.forward import forward_json, resolve_mount
+from pymergetic.metal.cdn.services.federation.prefix import name_under_prefix
 
 packages_router = APIRouter(prefix="/packages", tags=["packages"])
+
+
+def _filter_prefix(rows: list[PackageSummary], prefix: str | None) -> list[PackageSummary]:
+    if not prefix:
+        return rows
+    try:
+        p = prefix.strip().strip(".")
+        if not p:
+            return rows
+        ChannelLayout.validate_package_name(p)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return [r for r in rows if name_under_prefix(r.name, p)]
 
 
 @packages_router.get("", response_model=list[PackageSummary])
@@ -44,6 +58,7 @@ async def list_packages(
     proxy: FederationProxyDep,
     channel: str = "lead",
     include_yanked: bool = True,
+    prefix: str | None = None,
 ) -> list[PackageSummary]:
     try:
         ref = ChannelLayout.lead() if channel == "lead" else ChannelLayout.pin(channel)
@@ -59,12 +74,20 @@ async def list_packages(
         )
         if ok:
             out.append(row)
+    out = _filter_prefix(out, prefix)
     if channel == "lead":
         try:
             from pymergetic.metal.cdn.services.federation.catalog import merge_catalog
 
             cache = getattr(request.app.state, "federation_catalog_cache", None)
-            out = await merge_catalog(out, reg=reg, proxy=proxy, request=request, cache=cache)
+            out = await merge_catalog(
+                out,
+                reg=reg,
+                proxy=proxy,
+                request=request,
+                cache=cache,
+                prefix=prefix,
+            )
         except Exception:
             pass
     return out
@@ -78,6 +101,7 @@ async def search_packages(
     q: str = "",
     channel: str | None = None,
     include_yanked: bool = False,
+    prefix: str | None = None,
 ) -> list[PackageSummary]:
     ref = None
     if channel is not None:
@@ -95,7 +119,7 @@ async def search_packages(
         )
         if ok:
             out.append(row)
-    return out
+    return _filter_prefix(out, prefix)
 
 
 @packages_router.get("/mine", response_model=list[PackageOwnership])

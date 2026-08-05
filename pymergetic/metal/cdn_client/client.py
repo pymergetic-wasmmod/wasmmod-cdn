@@ -211,6 +211,7 @@ class CdnClient(ArtifactInspectMixin):
         license: str | None = None,
         force: bool = False,
         upstream: bool = False,
+        also_local: bool = False,
     ) -> dict[str, Any]:
         meta: dict[str, Any] = {
             "package": package,
@@ -233,6 +234,8 @@ class CdnClient(ArtifactInspectMixin):
         parts: list[tuple[str, Any]] = [("meta", json.dumps(meta))]
         if upstream:
             parts.append(("upstream", "true"))
+        if also_local:
+            parts.append(("also_local", "true"))
         for path in files:
             parts.append(("files", (path.name, path.read_bytes(), "application/octet-stream")))
         return self.request("POST", "publish", multipart=parts)

@@ -49,12 +49,17 @@ async def fetch_mount_packages(
     mount: FederationMountRead,
     request: Request,
     cache: PeerCatalogCache | None,
+    prefix: str | None = None,
 ) -> list[PackageSummary]:
-    key = str(mount.id)
+    # Cache key includes prefix so filtered and full catalogs don't collide.
+    key = f"{mount.id}:{prefix or ''}"
     if cache is not None:
         cached = cache.get(key)
         if cached is not None:
             return list(cached)
+    params: dict[str, str] = {"channel": "lead", "include_yanked": "true"}
+    if prefix:
+        params["prefix"] = prefix
     try:
         data = await forward_json(
             proxy=proxy,
@@ -62,7 +67,7 @@ async def fetch_mount_packages(
             mount=mount,
             path="/packages",
             request=request,
-            params={"channel": "lead", "include_yanked": "true"},
+            params=params,
         )
     except Exception as exc:
         log.warning("federation catalog fetch failed mount=%s: %s", mount.prefix, exc)
@@ -77,6 +82,8 @@ async def fetch_mount_packages(
         except ValidationError:
             continue
         if not name_under_prefix(row.name, mount.prefix):
+            continue
+        if prefix and not name_under_prefix(row.name, prefix):
             continue
         browse = f"{browse_base}/channels/lead/packs/{row.name}" if browse_base else None
         out.append(
@@ -101,6 +108,7 @@ async def merge_catalog(
     proxy: FederationProxy,
     request: Request,
     cache: PeerCatalogCache | None = None,
+    prefix: str | None = None,
 ) -> list[PackageSummary]:
     """Append remote packages under enabled pull mounts; local names win."""
     local_names = {p.name for p in local}
@@ -109,10 +117,23 @@ async def merge_catalog(
         for m in await reg.list_mounts()
         if m.enabled and m.direction == FederationDirection.PULL
     ]
+    if prefix:
+        mounts = [
+            m
+            for m in mounts
+            if name_under_prefix(prefix, m.prefix)
+            or name_under_prefix(m.prefix, prefix)
+            or prefix == m.prefix
+        ]
     remote_rows: list[PackageSummary] = []
     for mount in mounts:
         for row in await fetch_mount_packages(
-            proxy=proxy, reg=reg, mount=mount, request=request, cache=cache
+            proxy=proxy,
+            reg=reg,
+            mount=mount,
+            request=request,
+            cache=cache,
+            prefix=prefix,
         ):
             if row.name in local_names:
                 continue

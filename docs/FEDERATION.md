@@ -95,13 +95,22 @@ POST /publish
 Content-Type: multipart/form-data
 
 meta=…&upstream=true&files=…
+# optional dual-write:
+meta=…&upstream=true&also_local=true&files=…
 ```
 
-Parent ACL still applies; bytes land only on the peer. Peer must allow the federation bot:
+Parent ACL still applies. Default `upstream=true` writes **only** on the peer; `also_local=true`
+mirrors locally too (`X-Metal-Fed-Dual-Write: 1`). Peer must allow the federation bot:
 unclaimed + `auto_claim_on_publish`, **or** an active grant prefix covering the package
 (bot may publish claimed packs under its grant). May set `X-Metal-Origin: remote`.
 
-CLI: `metal-cdn publish pkg 1.0.0 ./pkg.wasm --upstream`
+CLI: `metal-cdn publish pkg 1.0.0 ./pkg.wasm --upstream`  
+Dual-write: `… --upstream --also-local`
+
+### Catalog polish
+
+- `GET /packages?prefix=a.b` filters local + federated rows (and is forwarded to peers).
+- Short TTL **negative cache** on peer 404s (avoids hot miss fan-out).
 
 ### Catalog + UI (P2)
 
