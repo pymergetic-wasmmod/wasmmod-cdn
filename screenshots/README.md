@@ -10,6 +10,7 @@ Stills from the live / local metal-cdn UI (used in the root README).
 | `upy-nested.png` | Nested `test_a2.test_b2.test_c2` import + `c2_answer()` → 42 |
 | `sessions.png` | Sessions page — anon loader, sparkline, pack/index/autoexec |
 | `sessions-upy.png` | Sessions + expanded µPy (shell SESSION_ID in banner) |
+| `inspect-commander.png` | Inspect dual-pane — hex + `src/shim.c` for `d_value` |
 | `artifacts-pack.png` | `hello.wasm` expanded — pack v3 file list |
 | `source-python.png` | Syntax-highlighted pack `.py` |
 | `source-pack-toml.png` | Syntax-highlighted embedded `pack.toml` |

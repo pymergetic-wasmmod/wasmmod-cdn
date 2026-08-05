@@ -143,6 +143,9 @@ export async function openInspect(opts) {
   } else if (opts.mpyPath) {
     state.paneA = "asm";
     state.paneB = "source";
+  } else if (opts.sourcePath) {
+    state.paneA = "source";
+    state.paneB = "hex";
   } else if (opts.symbol || opts.addr != null) {
     if (!state._seededForSymbol) {
       state.paneA = "asm";
@@ -157,6 +160,7 @@ export async function openInspect(opts) {
     channel: inferChannel(opts),
     sectionIndex: opts.sectionIndex != null ? Number(opts.sectionIndex) : null,
     mpyPath: opts.mpyPath || null,
+    sourcePath: opts.sourcePath || null,
   };
   state.symbols = [];
   state.sections = [];
@@ -245,6 +249,22 @@ export async function openInspect(opts) {
         /* twin optional */
       }
     }
+    paintActive();
+    return;
+  }
+
+  if (opts.sourcePath) {
+    setMetaStatus("source " + opts.sourcePath);
+    state.selected = { type: "symbol", name: opts.sourcePath };
+    syncNavSelection();
+    state.locations = [{ path: opts.sourcePath, line: null, role: "embed" }];
+    state.locIndex = 0;
+    renderLocBar();
+    state.hexHtml =
+      '<span class="muted">Embedded pack/source file — use the source pane.</span>';
+    state.asmHtml =
+      '<span class="muted">No asm for embedded source files.</span>';
+    await loadSourceForLoc();
     paintActive();
     return;
   }

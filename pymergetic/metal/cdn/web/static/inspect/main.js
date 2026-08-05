@@ -4,7 +4,7 @@
  * Nav: package · version · artifact · section · symbol
  * Dual panes: hex | asm | source (modes stick while navigating)
  *
- * window.openInspect({ filename, version?, package?, symbol?, addr?, sectionIndex?, mpyPath?, tab? })
+ * window.openInspect({ filename, version?, package?, symbol?, addr?, sectionIndex?, mpyPath?, sourcePath?, tab? })
  */
 import { hooks } from "./ctx.js";
 import { navigateCatalog } from "./catalog.js";

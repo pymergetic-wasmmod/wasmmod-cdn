@@ -238,8 +238,9 @@
             title="Inspect {{ a.path }}"
             aria-label="Inspect {{ a.path }}">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-              <circle cx="12" cy="12" r="9.25" fill="none" stroke="currentColor" stroke-width="1.75"/>
-              <path fill="currentColor" d="M12 6.2 13.4 10h4.1l-3.3 2.5 1.2 4L12 14.2l-3.4 2.3 1.2-4-3.3-2.5h4.1L12 6.2Z"/>
+              <path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"
+                d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"/>
+              <circle cx="12" cy="12" r="3.25" fill="none" stroke="currentColor" stroke-width="1.75"/>
             </svg>
           </button>
           <a class="icon-btn download-btn" href="{{ dl_href }}" download="{{ a.path }}" title="Download {{ a.path }}" aria-label="Download {{ a.path }}">
@@ -329,7 +330,8 @@
   const HEX_PREVIEW = 65536;
 
   const DL_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>`;
-  const INSP_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="9.25" fill="none" stroke="currentColor" stroke-width="1.75"/><path fill="currentColor" d="M12 6.2 13.4 10h4.1l-3.3 2.5 1.2 4L12 14.2l-3.4 2.3 1.2-4-3.3-2.5h4.1L12 6.2Z"/></svg>`;
+  /* Generic eye — Inspect opener (avoid star-in-circle branding lookalikes). */
+  const INSP_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3.25" fill="none" stroke="currentColor" stroke-width="1.75"/></svg>`;
 
   function inspectBtnAttrs(ctx, extra) {
     const filename = (ctx && ctx.filename) || "";
@@ -404,16 +406,22 @@
     const rawUrl = filesRaw + "?path=" + encodeURIComponent(path);
     const base = path.split("/").pop() || path;
     const isMpy = /\.mpy$/i.test(path);
-    const insp = isMpy && ctx
-      ? ` data-filename="${esc(ctx.filename || "")}" data-package="${esc(ctx.package || "")}" data-version="${esc(ctx.version || "")}" data-mpy-path="${esc(path)}"`
-      : "";
-    const mpyBtn = isMpy && ctx
-      ? `<button type="button" class="icon-btn mpy-inspect-btn" ${insp} title="mpy-dis in Inspect" aria-label="Inspect ${esc(path)}">${INSP_SVG}</button>`
-      : "";
+    let inspBtn = "";
+    if (ctx) {
+      const common =
+        ` data-filename="${esc(ctx.filename || "")}" data-package="${esc(ctx.package || "")}" data-version="${esc(ctx.version || "")}"`;
+      if (isMpy) {
+        inspBtn =
+          `<button type="button" class="icon-btn mpy-inspect-btn"${common} data-mpy-path="${esc(path)}" title="mpy-dis in Inspect" aria-label="Inspect ${esc(path)}">${INSP_SVG}</button>`;
+      } else {
+        inspBtn =
+          `<button type="button" class="icon-btn inspect-open-btn"${common} data-source-path="${esc(path)}" title="Inspect ${esc(path)}" aria-label="Inspect ${esc(path)}">${INSP_SVG}</button>`;
+      }
+    }
     return `<li>
       <button type="button" class="file-link" data-path="${esc(path)}" data-files="${esc(filesBase)}" data-files-raw="${esc(filesRaw)}" title="Open ${esc(path)}">${esc(path)}</button>
       <span class="muted">${metaHtml}</span>
-      ${mpyBtn}
+      ${inspBtn}
       <a class="icon-btn file-download" href="${esc(rawUrl)}" download="${esc(base)}" title="Download ${esc(path)}" aria-label="Download ${esc(path)}">${DL_SVG}</a>
     </li>`;
   }
@@ -629,16 +637,19 @@
     if (!window.openInspect) return;
     const version = btn.dataset.version || undefined;
     const sectionRaw = btn.dataset.sectionIndex;
+    const sourcePath = btn.dataset.sourcePath || undefined;
+    const mpyPath = btn.dataset.mpyPath || undefined;
     window.openInspect({
       package: btn.dataset.package || undefined,
       filename: btn.dataset.filename,
       version: version || undefined,
       symbol: btn.dataset.symbol || undefined,
-      mpyPath: btn.dataset.mpyPath || undefined,
+      mpyPath,
+      sourcePath,
       addr: btn.dataset.offset != null && btn.dataset.offset !== ""
         ? Number(btn.dataset.offset) : undefined,
       sectionIndex: sectionRaw !== "" && sectionRaw != null ? Number(sectionRaw) : undefined,
-      tab: btn.dataset.mpyPath ? "asm" : undefined,
+      tab: mpyPath ? "asm" : (sourcePath ? "source" : undefined),
     });
   }
 

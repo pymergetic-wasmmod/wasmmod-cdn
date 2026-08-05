@@ -3,7 +3,8 @@
 PyPI: **`pymergetic-metal-cdn`** · Client: **`pymergetic-metal-cdn-client`**  
 Live demo: **[cdn.pymergetic.com/cdn](https://cdn.pymergetic.com/cdn/)** · Pack format: [wasmmod](https://github.com/pymergetic/wasmmod)
 
-Async FastAPI channel for signed wasmmod packs — browse, publish, inspect, and try them in a browser MicroPython shell.
+Async FastAPI channel for signed wasmmod packs — browse, publish, inspect
+(hex / asm / source), and try them in a browser MicroPython shell.
 
 > **Experimental.** Data on the public demo is wiped often. Short tests only — not for production.
 
@@ -37,10 +38,12 @@ so your UI and `wasm.cdn(...)` clients point at *your* host (see [docs/PROXY.md]
 | Surface | What it does |
 |---------|----------------|
 | **Browse** | Package tree, lead / `@version` pins, dependents |
-| **Artifacts** | Expand a `.wasm` / `.elf` / `.zlib` / AOT blob → pack file list |
-| **Source viewer** | Highlighted text (py / c / rs / toml / …) or hex for binaries |
+| **Artifacts** | Expand a `.wasm` / `.elf` / `.zlib` / AOT blob → pack + source file list |
+| **Inspect** | Dual-pane commander — hex / asm / source, location chips (def / decl / dwarf) |
+| **Source viewer** | Quick highlight (py / c / rs / toml / …) or hex for binaries |
 | **µPy shell** | In-browser MicroPython + wasmmod: ▶ → `import` + `exports()` |
 | **Sessions** | Per-browser loader sessions — autoexec / pack / index hits |
+| **Federation** | Peer mounts, grants, upstream publish (MetalFed tickets) |
 | **Publish** | Multipart UI + CLI / thin client for CI |
 
 <p align="center">
@@ -51,13 +54,23 @@ so your UI and `wasm.cdn(...)` clients point at *your* host (see [docs/PROXY.md]
 
 ## Inspect a pack
 
-Click an artifact to open its guts — embedded Python (`.py` / `.mpy` / `.pyc`), natives, and optional `wasmmod.source`.
+Click an artifact (or the eye on a section / export / embedded file) to open
+**Inspect** — package · version · artifact · section · symbol navigation with
+dual panes (hex / asm / source). Location chips jump between DWARF hits,
+C/Rust `def` / `decl` lines, and Python twins when `wasmmod.source` is embedded.
+
+<p align="center">
+  <img src="screenshots/inspect-commander.png" alt="Inspect commander — test_a.test_d.wasm d_value: hex code bytes beside src/shim.c" width="820" />
+</p>
+
+Expand the artifact row for the pack/source file tree without opening the commander:
 
 <p align="center">
   <img src="screenshots/artifacts-pack.png" alt="hello.wasm expanded — pack v3 file tree" width="820" />
 </p>
 
-Text files open with syntax highlighting; bytecode and other binaries get a hex dump.
+Quick open (name click) still uses the light source dialog — syntax highlight for
+text, hex for binaries:
 
 <p align="center">
   <img src="screenshots/source-python.png" alt="Highlighted __init__.py from pack section" width="720" />
