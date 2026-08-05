@@ -35,8 +35,11 @@ Config: `~/.config/metal-cdn/config.json`
 
 - Auth: register, password→API key, `me`
 - Packages: claim, publish, promote, yank, list, search, get
-- Artifacts: `download_artifact` (ETag / 304), `inspect_artifact_remote`
-- Embedded files: `get_embedded_file`, `download_embedded_file` (`…/files`, `…/files/raw`)
+- Artifacts: `download_artifact` (ETag / 304), `inspect_artifact_remote`,
+  `list_symbols_remote`, `addr2line_remote`, `locations_remote`, `disasm_remote`,
+  `list_sections`, `download_section` (`…/sections/raw`)
+- Embedded files: `get_embedded_file`, `download_embedded_file` (`…/files`, `…/files/raw`),
+  `mpy_disasm_remote` (`…/files/mpy-disasm`)
 - Trust (admin): `list_trust`, `add_trust`, `delete_trust`
 - Verify helpers: `verify_artifact`, `enforce_signed_policy` (needs `cryptography`)
 - Index / closure: `get_index`, `closure`

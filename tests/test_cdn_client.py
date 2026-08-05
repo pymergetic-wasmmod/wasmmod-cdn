@@ -146,3 +146,49 @@ def test_from_config_requires_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
     with pytest.raises(ClientError, match="not logged in"):
         CdnClient.from_config(require_token=True)
+
+
+def _hello_elf_bytes() -> bytes:
+    candidates = [
+        Path(__file__).resolve().parents[2]
+        / "metalpython"
+        / "extmod"
+        / "wasmmod"
+        / "examples"
+        / "packs"
+        / "hello.elf",
+        Path(
+            "/home/ladmin/Devel/os-sdk/packages/metalpython/extmod/wasmmod/"
+            "examples/packs/hello.elf"
+        ),
+    ]
+    for p in candidates:
+        if p.is_file():
+            return p.read_bytes()
+    pytest.skip("hello.elf fixture not found")
+
+
+def test_client_inspect_remotes(app_url: str, tmp_path: Path) -> None:
+    data = _hello_elf_bytes()
+    client = CdnClient(app_url)
+    client.register("insp@example.com", "secret123", display_name="Insp")
+    tok = client.create_api_key_with_password("insp@example.com", "secret123", name="t")["key"]
+    authed = CdnClient(app_url, token=tok)
+    authed.claim("hello")
+    elf = tmp_path / "hello.elf"
+    elf.write_bytes(data)
+    authed.publish(package="hello", version="0.1.0", files=[elf])
+
+    syms = authed.list_symbols_remote("hello.elf")
+    names = {s["name"] for s in syms}
+    assert "hello" in names
+    hello = next(s for s in syms if s["name"] == "hello")
+    assert authed.addr2line_remote("hello.elf", int(hello["offset"]))
+    assert authed.locations_remote("hello.elf", "hello")
+    assert authed.disasm_remote(
+        "hello.elf", int(hello["section_index"]), offset=int(hello["offset"]), limit=8
+    )
+    mpy = authed.mpy_disasm_remote("hello.elf", "__init__.upy.mpy6.sib31.mpy", limit=12)
+    assert mpy and ("mpy" in mpy[0].get("text", "") or mpy[0].get("raw_hex"))
+    secs = authed.list_sections("hello.elf")
+    assert any(s.get("name") == ".text" or s.get("role") == "code" for s in secs)

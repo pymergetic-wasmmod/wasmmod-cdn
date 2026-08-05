@@ -355,6 +355,31 @@
     }
   }
 
+  async function resolveCodeSectionIndex() {
+    const { state } = ensureUi();
+    if (state.codeSectionIndex != null && Number.isFinite(state.codeSectionIndex)) {
+      return state.codeSectionIndex;
+    }
+    const root = artifactRoot(state.opts);
+    try {
+      const secs = await fetchJson(`${root}/sections`);
+      const code = (secs || []).find(
+        (s) =>
+          s.role === "code" ||
+          s.name === "code" ||
+          s.name === ".text" ||
+          Number(s.type_id) === 10
+      );
+      if (code && code.index != null && Number.isFinite(Number(code.index))) {
+        state.codeSectionIndex = Number(code.index);
+        return state.codeSectionIndex;
+      }
+    } catch (_) {
+      /* fall through */
+    }
+    return null;
+  }
+
   async function selectSymbol(sym) {
     const { els, state } = ensureUi();
     state.selected = sym;
@@ -379,17 +404,23 @@
     state.locIndex = 0;
     renderLocBar();
 
-    const sec =
+    let sec =
       sym.section_index != null && Number.isFinite(Number(sym.section_index))
         ? Number(sym.section_index)
         : state.opts.sectionIndex;
+    // Wasm exports have section_index=null — fall back to the code section.
+    if (sec == null || !Number.isFinite(sec)) {
+      sec = await resolveCodeSectionIndex();
+    }
     const off = Number(sym.offset) || 0;
     const jobs = [loadSourceForLoc()];
     if (sec != null && Number.isFinite(sec) && sec < 65500) {
       jobs.push(loadHex(sec, off), loadAsm(sec, off));
     } else {
-      state.hexHtml = '<span class="muted">No section for this symbol.</span>';
-      state.asmHtml = state.hexHtml;
+      // Host /disasm for Wasm ignores index and windows the code section.
+      jobs.push(loadAsm(0, off));
+      state.hexHtml =
+        '<span class="muted">No section index (asm may still work for Wasm).</span>';
     }
     await Promise.all(jobs);
     paintActive();
@@ -412,6 +443,7 @@
     state.selected = null;
     state.locations = [];
     state.locIndex = 0;
+    state.codeSectionIndex = null;
     state.hexHtml = "";
     state.asmHtml = "";
     state.sourceHtml = "";
