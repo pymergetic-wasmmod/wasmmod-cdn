@@ -41,8 +41,9 @@
     return `<span class="hx-hi">${hx}</span>`;
   }
 
-  function hexdumpHtml(buf, limit) {
+  function hexdumpHtml(buf, limit, baseOffset) {
     const cap = limit == null ? HEX_PREVIEW : limit;
+    const base = Number(baseOffset) || 0;
     const view = buf.byteLength > cap ? buf.slice(0, cap) : buf;
     const u8 = new Uint8Array(view);
     const width = 16;
@@ -53,8 +54,9 @@
       const pad = "   ".repeat(width - chunk.length);
       let ascii = "";
       for (const b of chunk) ascii += b >= 32 && b < 127 ? String.fromCharCode(b) : ".";
+      const addr = (base + i).toString(16).padStart(8, "0");
       lines.push(
-        `<span class="hx-off">${i.toString(16).padStart(8, "0")}</span>  ${hex}${pad}  |${esc(ascii)}|`
+        `<span class="hx-off">${addr}</span>  ${hex}${pad}  |${esc(ascii)}|`
       );
     }
     let html = lines.join("\n");
@@ -62,6 +64,12 @@
       html += `\n… showing ${cap} of ${buf.byteLength} bytes`;
     }
     return html;
+  }
+
+  function pickDefaultSymbol(syms) {
+    if (!syms || !syms.length) return null;
+    const prefer = (s) => s.kind === "export" || s.kind === "func";
+    return syms.find(prefer) || syms[0];
   }
 
   function cdnPrefix() {
@@ -257,9 +265,10 @@
   async function loadHex(sectionIndex, offset) {
     const { state } = ensureUi();
     const root = artifactRoot(state.opts);
+    const off = Number(offset) || 0;
     const url =
       `${root}/sections/raw?index=${encodeURIComponent(String(sectionIndex))}` +
-      `&offset=${encodeURIComponent(String(offset || 0))}` +
+      `&offset=${encodeURIComponent(String(off))}` +
       `&limit=${HEX_PREVIEW}`;
     const res = await fetch(url, { headers: { Accept: "application/octet-stream" } });
     if (!res.ok) {
@@ -268,7 +277,7 @@
       return;
     }
     const buf = await res.arrayBuffer();
-    state.hexHtml = hexdumpHtml(buf, HEX_PREVIEW);
+    state.hexHtml = hexdumpHtml(buf, HEX_PREVIEW, off);
   }
 
   async function loadAsm(sectionIndex, offset) {
@@ -524,16 +533,19 @@
       }
       state.locIndex = 0;
       renderLocBar();
-      const sec = state.opts.sectionIndex;
-      await Promise.all([
-        loadSourceForLoc(),
-        sec != null ? loadHex(sec, addr) : Promise.resolve(),
-        sec != null ? loadAsm(sec, addr) : Promise.resolve(),
-      ]);
-      if (sec == null) {
-        state.hexHtml = '<span class="muted">Pass sectionIndex for hex/asm.</span>';
-        state.asmHtml = state.hexHtml;
+      let sec = state.opts.sectionIndex;
+      if (sec == null || !Number.isFinite(Number(sec))) {
+        sec = await resolveCodeSectionIndex();
       }
+      const jobs = [loadSourceForLoc()];
+      if (sec != null && Number.isFinite(sec)) {
+        jobs.push(loadHex(sec, addr), loadAsm(sec, addr));
+      } else {
+        jobs.push(loadAsm(0, addr));
+        state.hexHtml =
+          '<span class="muted">No section index (asm may still work for Wasm).</span>';
+      }
+      await Promise.all(jobs);
       paintActive();
       return;
     }
@@ -550,8 +562,9 @@
       return;
     }
 
-    if (state.symbols.length) {
-      await selectSymbol(state.symbols[0]);
+    const def = pickDefaultSymbol(state.symbols);
+    if (def) {
+      await selectSymbol(def);
     } else {
       els.meta.textContent = "No symbols in this artifact.";
       state.sourceHtml = '<span class="muted">Empty.</span>';
