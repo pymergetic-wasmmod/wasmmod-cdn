@@ -8,6 +8,7 @@ from fastapi import HTTPException, Request
 
 from pymergetic.metal.cdn.models import PublishRequest, PublishResult
 from pymergetic.metal.cdn.services.federation.forward import (
+    authorization_for_mount,
     parse_incoming_hop,
     parse_trace,
     remote_headers,
@@ -41,8 +42,11 @@ async def forward_publish(
     blob_map: dict[str, bytes],
 ) -> PublishResult:
     """POST multipart ``/publish`` to the peer; return its PublishResult."""
-    bearer = await reg.get_bearer_for_mount(mount.id)
-    if not bearer:
+    hop = parse_incoming_hop(request)
+    authorization = await authorization_for_mount(
+        reg, mount, hop=hop, for_publish=True
+    )
+    if not authorization:
         raise HTTPException(
             status_code=502,
             detail=f"push mount {mount.prefix!r} has no credential",
@@ -56,8 +60,8 @@ async def forward_publish(
             mount=mount,
             path="/publish",
             method="POST",
-            bearer=bearer,
-            incoming_hop=parse_incoming_hop(request),
+            authorization=authorization,
+            incoming_hop=hop,
             trace=parse_trace(request),
             data={"meta": meta.model_dump_json()},
             files=files,

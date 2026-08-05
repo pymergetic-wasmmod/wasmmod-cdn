@@ -21,20 +21,28 @@ async def federation_bot_may_publish(
     *,
     user_id: UUID,
     package_name: str,
+    api_key_id: UUID | None = None,
+    ticket_prefix: str | None = None,
 ) -> bool:
-    """True if ``user_id`` is the federation bot and ``package_name`` is under an active grant.
+    """True if federation bot may publish ``package_name``.
 
-    Scoped ``federation:publish`` is enforced separately in auth deps; this binds
-    the bot to grant prefixes so it cannot publish arbitrary packages.
+    - Ticket path: package must sit under the ticket's grant prefix.
+    - Bearer path: package under an active grant; if ``api_key_id`` is set, the
+      grant's key must match (tighter binding).
     """
     users = UserService(session)
     user = await users.get(user_id)
     if user is None or str(user.email).lower() != FEDERATION_BOT_EMAIL.lower():
         return False
+    if ticket_prefix is not None:
+        return name_under_prefix(package_name, ticket_prefix)
     result = await session.exec(
         select(FederationGrant).where(FederationGrant.status == FederationGrantStatus.ACTIVE)
     )
     for grant in result.all():
-        if name_under_prefix(package_name, grant.prefix):
-            return True
+        if not name_under_prefix(package_name, grant.prefix):
+            continue
+        if api_key_id is not None and grant.api_key_id is not None and grant.api_key_id != api_key_id:
+            continue
+        return True
     return False

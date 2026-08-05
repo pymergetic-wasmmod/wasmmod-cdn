@@ -14,16 +14,16 @@ from pymergetic.metal.cdn.web.routes import configure_web, resolve_brand_logo_ur
 
 
 def _settings(tmp_path: Path, **kwargs: object) -> Settings:
-    base: dict = dict(
-        data_dir=tmp_path / "data",
-        storage_root=tmp_path / "packs",
-        database_url=f"sqlite+aiosqlite:///{tmp_path / 'brand.db'}",
-        base_path="/cdn",
-        csrf_enabled=False,
-        rate_limit_enabled=False,
-        debug=False,
-        experimental=False,
-    )
+    base: dict = {
+        "data_dir": tmp_path / "data",
+        "storage_root": tmp_path / "packs",
+        "database_url": f"sqlite+aiosqlite:///{tmp_path / 'brand.db'}",
+        "base_path": "/cdn",
+        "csrf_enabled": False,
+        "rate_limit_enabled": False,
+        "debug": False,
+        "experimental": False,
+    }
     base.update(kwargs)
     return Settings(**base)
 

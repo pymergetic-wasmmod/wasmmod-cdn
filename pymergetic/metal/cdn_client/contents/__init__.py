@@ -30,7 +30,6 @@ from pymergetic.metal.cdn_client.contents.extract import (
     extract_embedded_file,
 )
 from pymergetic.metal.cdn_client.contents.host_ops import (
-    _embedded_text_sources,
     list_pack_symbols,
     pack_addr2line,
     pack_disasm,

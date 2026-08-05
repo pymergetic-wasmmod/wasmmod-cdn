@@ -17,7 +17,12 @@ from pymergetic.metal.cdn.services.federation.proxy import (
     FederationProxyError,
 )
 from pymergetic.metal.cdn.services.federation.registry import FederationRegistry
+from pymergetic.metal.cdn.services.federation.scopes import (
+    SCOPE_FEDERATION_PUBLISH,
+    SCOPE_FEDERATION_READ,
+)
 from pymergetic.metal.cdn.services.federation.tables import FederationMountRead
+from pymergetic.metal.cdn.services.federation.tickets import sign_ticket
 
 
 def parse_incoming_hop(request: Request) -> int:
@@ -45,6 +50,34 @@ async def resolve_mount(
     return await reg.resolve_mount_for_package(package_name)
 
 
+async def authorization_for_mount(
+    reg: FederationRegistry,
+    mount: FederationMountRead,
+    *,
+    hop: int,
+    for_publish: bool = False,
+) -> str | None:
+    """Prefer MetalFed ticket when an Ed25519 key is installed; else Bearer."""
+    scopes = [SCOPE_FEDERATION_READ]
+    if for_publish:
+        scopes = [SCOPE_FEDERATION_READ, SCOPE_FEDERATION_PUBLISH]
+    fed = await reg.get_fed_private_for_mount(mount.id)
+    if fed is not None:
+        private_b64, kid = fed
+        return sign_ticket(
+            private_b64,
+            prefix=mount.prefix,
+            scopes=scopes,
+            hop=hop + 1,
+            aud=mount.peer_base_url,
+            key_id=kid or None,
+        )
+    bearer = await reg.get_bearer_for_mount(mount.id)
+    if bearer:
+        return f"Bearer {bearer}"
+    return None
+
+
 async def forward_json(
     *,
     proxy: FederationProxy,
@@ -54,14 +87,15 @@ async def forward_json(
     request: Request,
     params: dict[str, Any] | None = None,
 ) -> Any:
-    bearer = await reg.get_bearer_for_mount(mount.id)
+    hop = parse_incoming_hop(request)
+    authorization = await authorization_for_mount(reg, mount, hop=hop)
     try:
         resp = await proxy.forward(
             mount=mount,
             path=path,
             method="GET",
-            bearer=bearer,
-            incoming_hop=parse_incoming_hop(request),
+            authorization=authorization,
+            incoming_hop=hop,
             trace=parse_trace(request),
             params=params,
         )
@@ -89,14 +123,15 @@ async def forward_bytes(
     request: Request,
     method: str = "GET",
 ) -> httpx.Response:
-    bearer = await reg.get_bearer_for_mount(mount.id)
+    hop = parse_incoming_hop(request)
+    authorization = await authorization_for_mount(reg, mount, hop=hop)
     try:
         return await proxy.forward(
             mount=mount,
             path=path,
             method=method,
-            bearer=bearer,
-            incoming_hop=parse_incoming_hop(request),
+            authorization=authorization,
+            incoming_hop=hop,
             trace=parse_trace(request),
         )
     except FederationProxyError as exc:

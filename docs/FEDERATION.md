@@ -78,7 +78,13 @@ On local miss (package / versions / artifact GET|HEAD):
 3. Response may include `X-Metal-Origin: remote` and `X-Metal-Fed-Mount: <prefix>`.
 4. Local package/artifact of the same name **shadows** the peer (no remote headers).
 
-Still later: ticket auth (Ed25519).
+### Ticket auth (Ed25519)
+
+Parent can install an Ed25519 key on a mount (`POST /admin/federation/mounts/{id}/fed-key`) and paste the
+**public** key into the child’s grant (`parent_public_key` on accept). Proxy then sends
+`Authorization: MetalFed <payload>.<sig>` instead of a long-lived Bearer when a fed key is present.
+Child verifies against active grants; scopes come from the ticket (`federation:read` / `federation:publish`).
+Bearer grants remain supported.
 
 ### Publish upstream (foothold)
 

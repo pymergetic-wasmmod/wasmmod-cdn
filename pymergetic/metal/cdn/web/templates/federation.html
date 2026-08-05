@@ -28,6 +28,9 @@
         <label>Parent base URL <input name="parent_base_url" type="url" placeholder="https://parent.example/cdn" /></label>
         <label>Key name <input name="key_name" value="federation-parent" /></label>
         <label class="fed-check"><input type="checkbox" name="allow_publish" /> Allow publish (federation:publish)</label>
+        <label>Parent public key (optional MetalFed)
+          <input name="parent_public_key" placeholder="base64url Ed25519 public" autocomplete="off" spellcheck="false" />
+        </label>
         <button type="submit">Accept grant</button>
       </form>
       <pre id="fed-accept-out" class="fed-secret" hidden></pre>

@@ -20,6 +20,7 @@ from pymergetic.metal.cdn.services.federation.tables import (
     FederationCredentialSet,
     FederationCredKind,
     FederationDirection,
+    FederationFedKeyCreated,
     FederationMount,
     FederationMountCreate,
     FederationMountRead,
@@ -55,6 +56,12 @@ class MountOpsMixin:
                 peer_id=row.peer_id,
                 mount_id=row.id,
                 body=FederationCredentialSet(bearer_token=data.bearer_token),
+            )
+        elif data.fed_private_key:
+            await self.set_credential(
+                peer_id=row.peer_id,
+                mount_id=row.id,
+                body=FederationCredentialSet(fed_private_key=data.fed_private_key),
             )
         return await self._mount_read(row)
 
@@ -146,14 +153,27 @@ class MountOpsMixin:
         existing = (await self._session.exec(stmt)).all()
         for c in existing:
             await self._session.delete(c)
-        fp = secret_fingerprint(body.bearer_token)
+        try:
+            material, kind = body.material_and_kind()
+        except ValueError as exc:
+            raise ValueError(str(exc)) from exc
+        kid = body.key_id or ""
+        if kind == FederationCredKind.FED_KEY:
+            from pymergetic.metal.cdn.services.federation.tickets import public_from_private
+
+            try:
+                _pub, derived_kid = public_from_private(material)
+            except Exception as exc:
+                raise ValueError(f"invalid fed_private_key: {exc}") from exc
+            kid = kid or derived_kid
+        fp = secret_fingerprint(material)
         row = FederationCredential(
             peer_id=peer_id,
             mount_id=mount_id,
-            kind=FederationCredKind.BEARER,
-            ciphertext=encrypt_secret(body.bearer_token, secret_key=self._secrets_key),
+            kind=kind,
+            ciphertext=encrypt_secret(material, secret_key=self._secrets_key),
             fingerprint=fp,
-            key_id=body.key_id or "",
+            key_id=kid,
         )
         self._session.add(row)
         await self._session.commit()
@@ -163,8 +183,7 @@ class MountOpsMixin:
             return await self._mount_read(mount)
         return FederationPeerRead.model_validate(peer.model_dump())
 
-    async def get_bearer_for_mount(self, mount_id: UUID) -> str | None:
-        """Decrypt bearer for proxy use (mount-specific, else peer-level)."""
+    async def _cred_for_mount(self, mount_id: UUID) -> FederationCredential | None:
         mount = await self._session.get(FederationMount, mount_id)
         if mount is None:
             return None
@@ -177,8 +196,8 @@ class MountOpsMixin:
             )
         ).first()
         if mount_cred is not None:
-            return decrypt_secret(mount_cred.ciphertext, secret_key=self._secrets_key)
-        peer_cred = (
+            return mount_cred
+        return (
             await self._session.exec(
                 select(FederationCredential).where(
                     FederationCredential.peer_id == mount.peer_id,
@@ -186,9 +205,43 @@ class MountOpsMixin:
                 )
             )
         ).first()
-        if peer_cred is not None:
-            return decrypt_secret(peer_cred.ciphertext, secret_key=self._secrets_key)
-        return None
+
+    async def get_bearer_for_mount(self, mount_id: UUID) -> str | None:
+        """Decrypt bearer for proxy use (mount-specific, else peer-level)."""
+        cred = await self._cred_for_mount(mount_id)
+        if cred is None or cred.kind != FederationCredKind.BEARER:
+            return None
+        return decrypt_secret(cred.ciphertext, secret_key=self._secrets_key)
+
+    async def get_fed_private_for_mount(self, mount_id: UUID) -> tuple[str, str] | None:
+        """Return ``(private_b64, key_id)`` when mount has an Ed25519 credential."""
+        cred = await self._cred_for_mount(mount_id)
+        if cred is None or cred.kind != FederationCredKind.FED_KEY:
+            return None
+        material = decrypt_secret(cred.ciphertext, secret_key=self._secrets_key)
+        return material, cred.key_id or ""
+
+    async def install_fed_key(self, mount_id: UUID) -> FederationFedKeyCreated:
+        """Generate Ed25519 keypair, store private on mount, return public (+ kid)."""
+        from pymergetic.metal.cdn.services.federation.tickets import generate_keypair
+
+        mount = await self._session.get(FederationMount, mount_id)
+        if mount is None:
+            raise LookupError("mount not found")
+        pair = generate_keypair()
+        await self.set_credential(
+            peer_id=mount.peer_id,
+            mount_id=mount_id,
+            body=FederationCredentialSet(
+                fed_private_key=pair.private_b64,
+                key_id=pair.key_id,
+            ),
+        )
+        return FederationFedKeyCreated(
+            mount_id=mount_id,
+            public_key=pair.public_b64,
+            key_id=pair.key_id,
+        )
 
     # --- grants (child accept) ----------------------------------------------
     async def _mount_read(self, row: FederationMount) -> FederationMountRead:

@@ -50,6 +50,7 @@ class GrantOpsMixin:
             prefix=data.prefix,
             parent_label=data.parent_label.strip(),
             parent_base_url=data.parent_base_url,
+            parent_public_key=(data.parent_public_key.strip() if data.parent_public_key else None),
             api_key_id=created.id,
             status=FederationGrantStatus.ACTIVE,
             created_by=actor_id,

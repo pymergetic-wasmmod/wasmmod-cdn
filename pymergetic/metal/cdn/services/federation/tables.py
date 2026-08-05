@@ -204,6 +204,7 @@ class FederationMountCreate(_OrmBase):
     notes: str = Field(default="", max_length=500)
     # Optional bearer set at create time (encrypted at rest).
     bearer_token: str | None = Field(default=None, min_length=8, max_length=512)
+    fed_private_key: str | None = Field(default=None, min_length=40, max_length=128)
 
     @field_validator("prefix")
     @classmethod
@@ -239,8 +240,25 @@ class FederationMountRead(_OrmBase):
 
 
 class FederationCredentialSet(_OrmBase):
-    bearer_token: str = Field(min_length=8, max_length=512)
+    """Set mount/peer secret: Bearer API key **or** Ed25519 private seed (b64url)."""
+
+    bearer_token: str | None = Field(default=None, min_length=8, max_length=512)
+    fed_private_key: str | None = Field(
+        default=None,
+        min_length=40,
+        max_length=128,
+        description="base64url Ed25519 private seed (32 bytes)",
+    )
     key_id: str = Field(default="", max_length=64)
+
+    def material_and_kind(self) -> tuple[str, FederationCredKind]:
+        if self.fed_private_key and self.bearer_token:
+            raise ValueError("provide only one of bearer_token or fed_private_key")
+        if self.fed_private_key:
+            return self.fed_private_key.strip(), FederationCredKind.FED_KEY
+        if self.bearer_token:
+            return self.bearer_token, FederationCredKind.BEARER
+        raise ValueError("bearer_token or fed_private_key required")
 
 
 class FederationGrantAccept(_OrmBase):
@@ -253,6 +271,8 @@ class FederationGrantAccept(_OrmBase):
     # Default read-only. Include federation:publish for upstream publish foothold.
     scopes: list[str] | None = Field(default=None)
     allow_publish: bool = False
+    # Parent Ed25519 public key (base64url) — enables MetalFed tickets from parent.
+    parent_public_key: str | None = Field(default=None, max_length=128)
 
     @field_validator("prefix")
     @classmethod
@@ -277,6 +297,7 @@ class FederationGrantRead(_OrmBase):
     prefix: str
     parent_label: str
     parent_base_url: str | None
+    parent_public_key: str | None = None
     api_key_id: UUID | None
     status: FederationGrantStatus
     created_by: UUID | None
@@ -307,3 +328,12 @@ class FederationStatus(_OrmBase):
     max_hops: int
     proxy_ready: bool = False
     detail: str = "registry only — read proxy lands in a later phase"
+
+
+class FederationFedKeyCreated(_OrmBase):
+    """Generated Ed25519 key material for a mount (public always; private if not stored)."""
+
+    mount_id: UUID
+    public_key: str
+    key_id: str
+    private_key: str | None = None

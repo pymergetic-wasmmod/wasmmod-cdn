@@ -159,10 +159,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             response = await super().get_response(path, scope)
             # micropython.mjs/.wasm — autoexec is already no-store; without this the
             # browser can keep an old binary while the banner looks "new".
-            if path.startswith("repl/micropython.") or (
-                path in ("inspect.js", "site.css", "repl.js")
-                or path.startswith("inspect/")
-                or path.startswith("css/")
+            if path.startswith(("repl/micropython.", "inspect/", "css/")) or path in (
+                "inspect.js",
+                "site.css",
+                "repl.js",
             ):
                 response.headers["Cache-Control"] = "no-cache, must-revalidate"
             # Brand / mark assets: allow other origins to embed (fork UIs).

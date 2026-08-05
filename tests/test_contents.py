@@ -530,7 +530,7 @@ def test_pack_locations_skips_comment_defs() -> None:
 
 def test_embedded_text_sources_skips_readme() -> None:
     """README.md / docs/ mentioning ``hello(`` must not become locations hits."""
-    from pymergetic.metal.cdn_client.contents import _embedded_text_sources
+    from pymergetic.metal.cdn_client.contents.host_ops import _embedded_text_sources
 
     pack = _pack_v3(
         "hello",

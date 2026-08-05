@@ -64,7 +64,8 @@ class FederationProxy:
         mount: FederationMountRead,
         path: str,
         method: str = "GET",
-        bearer: str | None,
+        bearer: str | None = None,
+        authorization: str | None = None,
         incoming_hop: int = 0,
         trace: str | None = None,
         params: dict[str, Any] | None = None,
@@ -87,7 +88,9 @@ class FederationProxy:
             FED_VERSION_HEADER: FED_VERSION,
             "Accept": "*/*",
         }
-        if bearer:
+        if authorization:
+            headers["Authorization"] = authorization
+        elif bearer:
             headers["Authorization"] = f"Bearer {bearer}"
         try:
             resp = await self._client.request(

@@ -117,15 +117,19 @@
       return;
     }
     el.innerHTML =
-      "<table class=\"fed-table\"><thead><tr><th>Prefix</th><th>Peer</th><th>Cred</th><th>Enabled</th><th></th></tr></thead><tbody>" +
+      "<table class=\"fed-table\"><thead><tr><th>Prefix</th><th>Peer</th><th>Dir</th><th>Cred</th><th>Enabled</th><th></th></tr></thead><tbody>" +
       rows
         .map(
           (r) =>
             `<tr><td><code>${esc(r.prefix)}</code></td><td>${esc(
               r.peer_label || r.peer_id
-            )}</td><td>${r.has_credential ? esc(r.credential_fingerprint || "yes") : "—"}</td>` +
+            )}</td><td>${esc(r.direction || "pull")}</td>` +
+            `<td>${r.has_credential ? esc(r.credential_fingerprint || "yes") : "—"}</td>` +
             `<td>${r.enabled ? "yes" : "no"}</td>` +
-            `<td><button type="button" class="fed-del" data-kind="mount" data-id="${esc(
+            `<td><button type="button" class="fed-key" data-id="${esc(
+              r.id
+            )}">Ed25519</button> ` +
+            `<button type="button" class="fed-del" data-kind="mount" data-id="${esc(
               r.id
             )}">Delete</button></td></tr>`
         )
@@ -184,6 +188,7 @@
         parent_base_url: form.parent_base_url.value.trim() || null,
         key_name: form.key_name.value.trim() || "federation-parent",
         allow_publish: !!form.allow_publish?.checked,
+        parent_public_key: form.parent_public_key?.value.trim() || null,
       });
       const out = document.getElementById("fed-accept-out");
       if (out) {
@@ -230,6 +235,31 @@
   });
 
   root.addEventListener("click", async (ev) => {
+    const keyBtn = ev.target.closest(".fed-key");
+    if (keyBtn) {
+      const id = keyBtn.dataset.id;
+      if (!id) return;
+      if (!window.confirm("Generate Ed25519 key for this mount? Replaces existing credential."))
+        return;
+      setMsg("Generating fed key…");
+      try {
+        const row = await api("POST", `/admin/federation/mounts/${id}/fed-key`);
+        const out = document.getElementById("fed-accept-out");
+        if (out) {
+          out.hidden = false;
+          out.textContent =
+            "Copy public key to child grant (parent_public_key):\n" +
+            row.public_key +
+            "\n\nkid=" +
+            row.key_id;
+        }
+        setMsg("Ed25519 installed on mount — paste public key into child grant.");
+        await refresh();
+      } catch (err) {
+        setMsg(String(err.message || err), true);
+      }
+      return;
+    }
     const btn = ev.target.closest(".fed-del");
     if (!btn) return;
     const kind = btn.dataset.kind;

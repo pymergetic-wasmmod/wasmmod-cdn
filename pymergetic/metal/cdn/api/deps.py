@@ -15,6 +15,7 @@ from pymergetic.metal.cdn.models import UserRead
 from pymergetic.metal.cdn.services.audit import AuditService
 from pymergetic.metal.cdn.services.channel import IndexService, PublishService
 from pymergetic.metal.cdn.services.federation.scopes import scopes_permit_request
+from pymergetic.metal.cdn.services.federation.ticket_auth import resolve_metalfed
 from pymergetic.metal.cdn.services.identity import AclService, ApiKeyService, UserService
 from pymergetic.metal.cdn.services.orgs import OrgService
 from pymergetic.metal.cdn.services.shell_sessions import ShellSessionService
@@ -27,6 +28,8 @@ _bearer = HTTPBearer(auto_error=False)
 SESSION_USER_KEY = "user_id"
 # Request.state key: scopes for the Bearer API key used on this request (None = session/none).
 API_KEY_SCOPES_STATE = "api_key_scopes"
+API_KEY_ID_STATE = "api_key_id"
+FED_TICKET_PREFIX_STATE = "fed_ticket_prefix"
 
 
 def get_settings(request: Request) -> Settings:
@@ -101,15 +104,28 @@ async def get_optional_user(
     request: Request,
     users: Annotated[UserService, Depends(get_user_service)],
     keys: Annotated[ApiKeyService, Depends(get_api_key_service)],
+    session: Annotated[AsyncSession, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings)],
     creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> UserRead | None:
     request.state.api_key_scopes = None
-    if creds is not None and creds.scheme.lower() == "bearer":
-        resolved = await keys.resolve(creds.credentials)
+    setattr(request.state, API_KEY_ID_STATE, None)
+    setattr(request.state, FED_TICKET_PREFIX_STATE, None)
+
+    # MetalFed tickets (server→server) — not handled by HTTPBearer.
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.lower().startswith("metalfed "):
+        try:
+            resolved = await resolve_metalfed(session, authorization=auth_header)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
+            ) from exc
         if resolved is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid API key")
-        user_id, scopes = resolved
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid federation ticket"
+            )
+        user, scopes, claims = resolved
         if not scopes_permit_request(
             scopes,
             method=request.method,
@@ -121,6 +137,26 @@ async def get_optional_user(
                 detail="API key scope insufficient for this operation",
             )
         setattr(request.state, API_KEY_SCOPES_STATE, scopes)
+        setattr(request.state, FED_TICKET_PREFIX_STATE, claims.prefix)
+        return user
+
+    if creds is not None and creds.scheme.lower() == "bearer":
+        resolved = await keys.resolve(creds.credentials)
+        if resolved is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid API key")
+        user_id, scopes, key_id = resolved
+        if not scopes_permit_request(
+            scopes,
+            method=request.method,
+            path=request.url.path,
+            base_path=settings.base_path,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key scope insufficient for this operation",
+            )
+        setattr(request.state, API_KEY_SCOPES_STATE, scopes)
+        setattr(request.state, API_KEY_ID_STATE, key_id)
         user = await users.get(user_id)
         if user is None or not user.is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="inactive user")

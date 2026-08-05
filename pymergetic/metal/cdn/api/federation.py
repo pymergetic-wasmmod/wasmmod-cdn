@@ -10,6 +10,7 @@ from pymergetic.metal.cdn.api.deps import AdminUserDep, AuditServiceDep
 from pymergetic.metal.cdn.api.fed_deps import FederationRegistryDep
 from pymergetic.metal.cdn.services.federation.tables import (
     FederationCredentialSet,
+    FederationFedKeyCreated,
     FederationGrantAccept,
     FederationGrantAccepted,
     FederationGrantRead,
@@ -183,6 +184,32 @@ async def set_mount_credential(
         actor_id=admin.id,
         package_name=row.prefix,
         detail=row.credential_fingerprint or "",
+    )
+    return row
+
+
+@federation_admin_router.post(
+    "/mounts/{mount_id}/fed-key",
+    response_model=FederationFedKeyCreated,
+    status_code=status.HTTP_201_CREATED,
+)
+async def install_mount_fed_key(
+    mount_id: UUID,
+    reg: FederationRegistryDep,
+    admin: AdminUserDep,
+    audit: AuditServiceDep,
+) -> FederationFedKeyCreated:
+    """Generate Ed25519 keypair, store private on mount, return public key for the child."""
+    try:
+        row = await reg.install_fed_key(mount_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    await audit.record(
+        "fed.credential.fed_key",
+        actor_id=admin.id,
+        detail=f"{mount_id} kid={row.key_id}",
     )
     return row
 

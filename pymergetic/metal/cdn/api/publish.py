@@ -8,6 +8,8 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, Response, Upl
 from fastapi import status as http_status
 
 from pymergetic.metal.cdn.api.deps import (
+    API_KEY_ID_STATE,
+    FED_TICKET_PREFIX_STATE,
     AclServiceDep,
     AuditServiceDep,
     AuthUserDep,
@@ -130,6 +132,8 @@ async def publish_pack(
             session,
             user_id=publisher_id,
             package_name=request.package,
+            api_key_id=getattr(http_request.state, API_KEY_ID_STATE, None),
+            ticket_prefix=getattr(http_request.state, FED_TICKET_PREFIX_STATE, None),
         ):
             raise HTTPException(
                 status_code=http_status.HTTP_403_FORBIDDEN,
