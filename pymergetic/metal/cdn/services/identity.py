@@ -166,12 +166,17 @@ class ApiKeyService:
         return True
 
     async def resolve_user_id(self, full_key: str) -> UUID | None:
+        resolved = await self.resolve(full_key)
+        return resolved[0] if resolved else None
+
+    async def resolve(self, full_key: str) -> tuple[UUID, list[str]] | None:
+        """Return ``(user_id, scopes)`` for a live API key, or ``None``."""
         digest = hash_api_key(full_key)
         result = await self._session.exec(select(ApiKey).where(ApiKey.key_hash == digest))
         row = result.first()
         if row is None or row.revoked_at is not None:
             return None
-        return row.user_id
+        return row.user_id, scopes_from_storage(row.scopes)
 
 
 class AclService:

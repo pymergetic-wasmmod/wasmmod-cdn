@@ -14,6 +14,7 @@ from pymergetic.metal.cdn.services.federation.scopes import (
     key_allows,
     normalize_scopes,
     scopes_from_storage,
+    scopes_permit_request,
     scopes_to_storage,
 )
 
@@ -29,6 +30,7 @@ __all__ = [
     "normalize_mount_prefix",
     "normalize_scopes",
     "scopes_from_storage",
+    "scopes_permit_request",
     "scopes_to_storage",
 ]
 

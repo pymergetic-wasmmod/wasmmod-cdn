@@ -57,7 +57,17 @@ METAL_CDN_FEDERATION_ALLOW_PRIVATE_NET=false
 # Lab private peers also need METAL_CDN_FEDERATION_ALLOW_PRIVATE_NET=1
 ```
 
-API keys gain a `scopes` column. Empty scopes = unrestricted (legacy). Federation bot keys use `["federation:read"]`.
+API keys gain a `scopes` column. Empty scopes = unrestricted (legacy human/CLI keys). Federation bot keys use `["federation:read"]`.
+
+Scoped Bearer keys are enforced in `get_optional_user`:
+
+| Scope | Allowed |
+|-------|---------|
+| `federation:read` | GET/HEAD health, `/auth/me`, `/federation/mounts`, `/packages*`, `/artifacts/*`, `/index/*` |
+| `federation:publish` | Same reads, plus `POST /publish` |
+| anything else (admin, claim, …) | **403** for scoped keys |
+
+Unscoped keys and session cookies are unchanged. Artifact routes that skip auth deps remain public as before.
 
 ## Data plane (read proxy — implemented)
 

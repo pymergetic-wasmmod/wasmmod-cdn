@@ -14,6 +14,7 @@ from pymergetic.metal.cdn.db import Database
 from pymergetic.metal.cdn.models import UserRead
 from pymergetic.metal.cdn.services.audit import AuditService
 from pymergetic.metal.cdn.services.channel import IndexService, PublishService
+from pymergetic.metal.cdn.services.federation.scopes import scopes_permit_request
 from pymergetic.metal.cdn.services.identity import AclService, ApiKeyService, UserService
 from pymergetic.metal.cdn.services.orgs import OrgService
 from pymergetic.metal.cdn.services.shell_sessions import ShellSessionService
@@ -24,6 +25,8 @@ from pymergetic.metal.cdn_client.verify import RequireSignedMode
 
 _bearer = HTTPBearer(auto_error=False)
 SESSION_USER_KEY = "user_id"
+# Request.state key: scopes for the Bearer API key used on this request (None = session/none).
+API_KEY_SCOPES_STATE = "api_key_scopes"
 
 
 def get_settings(request: Request) -> Settings:
@@ -98,12 +101,26 @@ async def get_optional_user(
     request: Request,
     users: Annotated[UserService, Depends(get_user_service)],
     keys: Annotated[ApiKeyService, Depends(get_api_key_service)],
+    settings: Annotated[Settings, Depends(get_settings)],
     creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
 ) -> UserRead | None:
+    request.state.api_key_scopes = None
     if creds is not None and creds.scheme.lower() == "bearer":
-        user_id = await keys.resolve_user_id(creds.credentials)
-        if user_id is None:
+        resolved = await keys.resolve(creds.credentials)
+        if resolved is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid API key")
+        user_id, scopes = resolved
+        if not scopes_permit_request(
+            scopes,
+            method=request.method,
+            path=request.url.path,
+            base_path=settings.base_path,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="API key scope insufficient for this operation",
+            )
+        setattr(request.state, API_KEY_SCOPES_STATE, scopes)
         user = await users.get(user_id)
         if user is None or not user.is_active:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="inactive user")

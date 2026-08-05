@@ -53,3 +53,55 @@ def key_allows(scopes: Iterable[str] | None, needed: str) -> bool:
     if not have:
         return True
     return needed in have
+
+
+def _strip_base(path: str, base_path: str | None) -> str:
+    p = path or "/"
+    if not p.startswith("/"):
+        p = f"/{p}"
+    prefix = (base_path or "").rstrip("/")
+    if prefix and prefix != "/" and p.startswith(prefix):
+        p = p[len(prefix) :] or "/"
+    return p
+
+
+def _is_federation_read_path(path: str) -> bool:
+    """Paths a ``federation:read`` key may GET/HEAD."""
+    if path in ("/health", "/status", "/ready", "/auth/me"):
+        return True
+    if path == "/federation/mounts" or path.startswith("/federation/mounts?"):
+        return True
+    for prefix in ("/packages", "/artifacts/", "/index/"):
+        if path == prefix.rstrip("/") or path.startswith(prefix):
+            return True
+    return False
+
+
+def scopes_permit_request(
+    scopes: Iterable[str] | None,
+    *,
+    method: str,
+    path: str,
+    base_path: str | None = None,
+) -> bool:
+    """Whether a scoped API key may call ``method`` ``path``.
+
+    Empty scopes remain unrestricted. Session auth never calls this.
+    """
+    have = list(scopes or [])
+    if not have:
+        return True
+    method_u = method.upper()
+    app_path = _strip_base(path, base_path)
+    can_read = SCOPE_FEDERATION_READ in have or SCOPE_FEDERATION_PUBLISH in have
+    can_publish = SCOPE_FEDERATION_PUBLISH in have
+
+    if method_u in ("GET", "HEAD"):
+        return can_read and _is_federation_read_path(app_path)
+
+    if method_u == "POST" and (
+        app_path == "/publish" or app_path.startswith("/publish?")
+    ):
+        return can_publish
+
+    return False
