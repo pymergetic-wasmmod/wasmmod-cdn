@@ -21,9 +21,33 @@ This repo therefore has **two** workflows:
 | `publish-pypi-client.yml` | `pymergetic-metal-cdn-client` |
 | `publish-pypi-server.yml` | `pymergetic-metal-cdn` |
 
-### Pending publishers (new projects)
+### Existing projects (normal publisher)
 
-Account → Publishing → pending publisher — **twice**:
+If the PyPI project **already exists** (e.g. earlier `twine` / API-token upload),
+do **not** use a pending publisher. Pending + existing name fails with:
+
+`invalid-pending-publisher: valid token, but project already exists`
+
+That failed exchange often **deletes** the pending row. Fix on each project:
+
+1. https://pypi.org/manage/project/pymergetic-metal-cdn/settings/publishing/
+2. https://pypi.org/manage/project/pymergetic-metal-cdn-client/settings/publishing/
+
+Add a **Trusted Publisher** (not pending) with:
+
+| Field | Client | Server |
+|-------|--------|--------|
+| Owner | `pymergetic` | `pymergetic` |
+| Repository | `metal-cdn` | `metal-cdn` |
+| Workflow name | `publish-pypi-client.yml` | `publish-pypi-server.yml` |
+| Environment | *(empty)* | *(empty)* |
+
+Then re-run the failed workflow(s) (or `gh workflow run` / re-tag). No new tag
+needed if `v0.1.0a7` artifacts were already built.
+
+### Pending publishers (new projects only)
+
+Account → Publishing → pending publisher — only when the name is **not** on PyPI yet:
 
 **Client**
 
@@ -50,8 +74,6 @@ filename is gone / cannot cover both packages).
 
 ### Ship / re-tag
 
-After the two pending publishers exist and the split workflows are on `main`:
-
 ```sh
 # Prefer a new tag (setuptools-scm); example next alpha:
 ./scripts/tag-release.sh 0.1.0a7
@@ -60,9 +82,9 @@ git push origin v0.1.0a7
 ```
 
 Both `publish-pypi-client` and `publish-pypi-server` run on the same `v*` tag.
-First **OIDC** upload graduates each pending publisher into a normal one on the
-new PyPI project. Do **not** set `password:` / `PYPI_API_TOKEN` on those jobs —
-token upload skips Trusted Publishing and leaves the pending row stuck.
+First OIDC upload on a **pending** publisher creates the project and graduates
+to a normal publisher. On an **existing** project, use a normal publisher (above).
+Do **not** set `password:` / `PYPI_API_TOKEN` on those jobs.
 
 ### Manual upload (escape hatch)
 
@@ -75,8 +97,7 @@ twine upload /tmp/metal-cdn-pypi/dist-client/* /tmp/metal-cdn-pypi/dist-server/*
 ```
 
 Manual `twine` + API token creates/uploads the project but does **not** convert
-a pending Trusted Publisher; add a normal publisher on the project afterward if
-you used that path.
+a pending Trusted Publisher; add a normal publisher on the project afterward.
 
 ## Verify
 
