@@ -34,6 +34,31 @@
     return pretty + " " + unit + " (" + exact + ")";
   }
 
+  /** Prefer dwarf, then def/decl, then twin, over role=sym stubs. */
+  function pickBestLocIndex(locations) {
+    if (!locations || !locations.length) return 0;
+    const rank = (role) =>
+      role === "dwarf"
+        ? 0
+        : role === "def" || role === "decl"
+          ? 1
+          : role === "twin"
+            ? 2
+            : role && role !== "sym"
+              ? 3
+              : 4;
+    let best = 0;
+    let bestRank = 4;
+    locations.forEach((l, i) => {
+      const r = rank(l && l.role);
+      if (r < bestRank) {
+        bestRank = r;
+        best = i;
+      }
+    });
+    return best;
+  }
+
   function paintHexByte(b) {
     const hx = b.toString(16).padStart(2, "0");
     if (b === 0) return `<span class="hx-null">${hx}</span>`;
@@ -200,6 +225,10 @@
     } else {
       els.body.className = "source-body";
       els.body.innerHTML = state.sourceHtml || '<span class="muted">No source location.</span>';
+      const hit = els.body.querySelector(".inspect-src-hit");
+      if (hit && typeof hit.scrollIntoView === "function") {
+        hit.scrollIntoView({ block: "nearest" });
+      }
     }
   }
 
@@ -230,7 +259,7 @@
 
   function renderLocBar() {
     const { els, state } = ensureUi();
-    if (!state.locations || state.locations.length <= 1) {
+    if (!state.locations || state.locations.length < 1) {
       els.locBar.hidden = true;
       els.locBar.innerHTML = "";
       return;
@@ -421,28 +450,7 @@
       state.locations = [];
     }
     // Prefer dwarf, then def/decl, then twin, over the leading role=sym stub.
-    {
-      const rank = (role) =>
-        role === "dwarf"
-          ? 0
-          : role === "def" || role === "decl"
-            ? 1
-            : role === "twin"
-              ? 2
-              : role && role !== "sym"
-                ? 3
-                : 4;
-      let best = 0;
-      let bestRank = 4;
-      state.locations.forEach((l, i) => {
-        const r = rank(l && l.role);
-        if (r < bestRank) {
-          bestRank = r;
-          best = i;
-        }
-      });
-      state.locIndex = best;
-    }
+    state.locIndex = pickBestLocIndex(state.locations);
     renderLocBar();
 
     // Use only this symbol's section — do not inherit openInspect's sectionIndex
@@ -572,7 +580,7 @@
         state.locations = [];
         state.sourceHtml = esc(err.message || err);
       }
-      state.locIndex = 0;
+      state.locIndex = pickBestLocIndex(state.locations);
       renderLocBar();
       let sec = state.opts.sectionIndex;
       if (sec == null || !Number.isFinite(Number(sec))) {

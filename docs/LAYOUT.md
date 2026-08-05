@@ -63,7 +63,7 @@ Thin wrap over shared `wasmmod_inspect` (not a private parser). Prefix:
 | `…/inspect` | Aggregate (pack/source/sig/sections/**symbols**/`has_dwarf`) |
 | `…/symbols` | Symbol list |
 | `…/addr2line?addr=` | Location[] for address (ELF: pyelftools or host ``addr2line`` → `role=dwarf`; else enclosing FUNC `role=sym`) |
-| `…/locations?name=` | Location[] for symbol (multi-loc OK; code sources only — skip `docs/` / README; C/Rust defs need body-like forms, not comments/call sites) |
+| `…/locations?name=` | Location[] for symbol (multi-loc OK; same basename:line chips collapse with `dwarf` > `def` > `decl` > …; code sources only — skip `docs/` / README; C/Rust defs need body-like forms, not comments/call sites) |
 | `…/disasm?index=&offset=&limit=` | Disasm lines (ELF **shndx** / Wasm code window) |
 | `…/sections` · `…/sections/raw?index=&offset=&limit=` | Section list / ranged bytes |
 | `…/files` · `…/files/raw` · `…/files/mpy-disasm?path=` | Embedded files + basic mpy-dis |
@@ -76,5 +76,6 @@ index) so hex/asm differ per export; memory/global exports stay offset 0.
 ELF example packs enable `[source] embed` so `locations` can resolve C defs from
 `wasmmod.source` without pyelftools (same as Wasm packs). Host `addr2line`
 similarly unlocks DWARF file:line for `…/addr2line` without pyelftools.
-`…/files?path=` accepts exact pack/source paths and unique basename matches
-(so DWARF ``hello.c`` opens ``src/hello.c``).
+`locations` collapses duplicate chips for the same basename:line (prefer
+`dwarf`, keep the longest path). `…/files?path=` accepts exact pack/source
+paths and unique basename matches (so DWARF ``hello.c`` opens ``src/hello.c``).
