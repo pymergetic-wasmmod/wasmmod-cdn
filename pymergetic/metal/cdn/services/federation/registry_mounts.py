@@ -19,6 +19,7 @@ from pymergetic.metal.cdn.services.federation.tables import (
     FederationCredential,
     FederationCredentialSet,
     FederationCredKind,
+    FederationDirection,
     FederationMount,
     FederationMountCreate,
     FederationMountRead,
@@ -106,10 +107,17 @@ class MountOpsMixin:
         await self._session.commit()
 
     async def resolve_mount_for_package(
-        self, package_name: str
+        self,
+        package_name: str,
+        *,
+        direction: FederationDirection = FederationDirection.PULL,
     ) -> FederationMountRead | None:
         mounts = await self.list_mounts()
-        enabled = [(m.prefix, m) for m in mounts if m.enabled]
+        enabled = [
+            (m.prefix, m)
+            for m in mounts
+            if m.enabled and m.direction == direction
+        ]
         hit = longest_prefix_mount(package_name, enabled)
         return hit[1] if hit else None
 

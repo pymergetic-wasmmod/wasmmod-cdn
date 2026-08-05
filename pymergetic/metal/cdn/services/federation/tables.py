@@ -250,6 +250,9 @@ class FederationGrantAccept(_OrmBase):
     parent_label: str = Field(min_length=1, max_length=128)
     parent_base_url: str | None = Field(default=None, max_length=512)
     key_name: str = Field(default="federation-parent", min_length=1, max_length=64)
+    # Default read-only. Include federation:publish for upstream publish foothold.
+    scopes: list[str] | None = Field(default=None)
+    allow_publish: bool = False
 
     @field_validator("prefix")
     @classmethod

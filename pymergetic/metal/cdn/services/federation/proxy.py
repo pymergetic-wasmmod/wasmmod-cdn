@@ -28,7 +28,7 @@ class FederationProxyError(Exception):
 
 
 class FederationProxy:
-    """Forward GET/HEAD to a peer mount (server→server)."""
+    """Forward requests to a peer mount (server→server)."""
 
     def __init__(
         self,
@@ -68,6 +68,9 @@ class FederationProxy:
         incoming_hop: int = 0,
         trace: str | None = None,
         params: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
+        files: Any | None = None,
+        content: bytes | None = None,
     ) -> httpx.Response:
         if not mount.peer_base_url:
             raise FederationProxyError("mount peer has no base_url", status_code=502)
@@ -87,7 +90,15 @@ class FederationProxy:
         if bearer:
             headers["Authorization"] = f"Bearer {bearer}"
         try:
-            resp = await self._client.request(method.upper(), url, headers=headers, params=params)
+            resp = await self._client.request(
+                method.upper(),
+                url,
+                headers=headers,
+                params=params,
+                data=data,
+                files=files,
+                content=content,
+            )
         except httpx.HTTPError as exc:
             log.warning("federation forward failed mount=%s url=%s err=%s", mount.prefix, url, exc)
             raise FederationProxyError(f"peer unreachable: {exc}", status_code=502) from exc

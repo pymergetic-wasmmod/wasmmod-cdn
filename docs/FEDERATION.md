@@ -78,7 +78,20 @@ On local miss (package / versions / artifact GET|HEAD):
 3. Response may include `X-Metal-Origin: remote` and `X-Metal-Fed-Mount: <prefix>`.
 4. Local package/artifact of the same name **shadows** the peer (no remote headers).
 
-Still later: ticket auth (Ed25519), publish upstream.
+Still later: ticket auth (Ed25519).
+
+### Publish upstream (foothold)
+
+Parent mount with `direction=push`; child grant with `allow_publish` (adds `federation:publish`). Then:
+
+```http
+POST /publish
+Content-Type: multipart/form-data
+
+meta=…&upstream=true&files=…
+```
+
+Parent ACL still applies; bytes land only on the peer. Peer must allow the federation bot (unclaimed + `auto_claim_on_publish`, or ACL). May set `X-Metal-Origin: remote`.
 
 ### Catalog + UI (P2)
 

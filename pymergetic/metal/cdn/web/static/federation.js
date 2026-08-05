@@ -183,6 +183,7 @@
         parent_label: form.parent_label.value.trim(),
         parent_base_url: form.parent_base_url.value.trim() || null,
         key_name: form.key_name.value.trim() || "federation-parent",
+        allow_publish: !!form.allow_publish?.checked,
       });
       const out = document.getElementById("fed-accept-out");
       if (out) {
@@ -217,6 +218,7 @@
         prefix: form.prefix.value.trim(),
         peer_id: peer.id,
         bearer_token: form.bearer_token.value.trim(),
+        direction: form.direction?.value || "pull",
         enabled: true,
       });
       form.reset();

@@ -6,7 +6,11 @@ from uuid import UUID
 from sqlmodel import col, select
 
 from pymergetic.metal.cdn.models import ApiKey, ApiKeyCreate, UserCreate, utcnow
-from pymergetic.metal.cdn.services.federation.scopes import SCOPE_FEDERATION_READ
+from pymergetic.metal.cdn.services.federation.scopes import (
+    SCOPE_FEDERATION_PUBLISH,
+    SCOPE_FEDERATION_READ,
+    normalize_scopes,
+)
 from pymergetic.metal.cdn.services.federation.tables import (
     FederationGrant,
     FederationGrantAccept,
@@ -19,6 +23,18 @@ from pymergetic.metal.cdn.services.identity import ApiKeyService, UserService
 FEDERATION_BOT_EMAIL = "federation-bot@cdn.pymergetic.com"
 
 
+def _grant_key_scopes(data: FederationGrantAccept) -> list[str]:
+    if data.scopes is not None:
+        scopes = normalize_scopes(data.scopes)
+    else:
+        scopes = [SCOPE_FEDERATION_READ]
+    if data.allow_publish and SCOPE_FEDERATION_PUBLISH not in scopes:
+        scopes = [*scopes, SCOPE_FEDERATION_PUBLISH]
+    if not scopes:
+        scopes = [SCOPE_FEDERATION_READ]
+    return scopes
+
+
 class GrantOpsMixin:
     async def accept_grant(
         self, data: FederationGrantAccept, *, actor_id: UUID
@@ -28,7 +44,7 @@ class GrantOpsMixin:
         bot = await self._ensure_federation_bot(users)
         created = await keys.create(
             bot.id,
-            ApiKeyCreate(name=data.key_name, scopes=[SCOPE_FEDERATION_READ]),
+            ApiKeyCreate(name=data.key_name, scopes=_grant_key_scopes(data)),
         )
         grant = FederationGrant(
             prefix=data.prefix,

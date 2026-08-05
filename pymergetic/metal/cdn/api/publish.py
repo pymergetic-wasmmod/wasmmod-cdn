@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi import status as http_status
 
 from pymergetic.metal.cdn.api.deps import (
@@ -17,6 +17,7 @@ from pymergetic.metal.cdn.api.deps import (
     StorageDep,
     TrustServiceDep,
 )
+from pymergetic.metal.cdn.api.fed_deps import FederationProxyDep, FederationRegistryDep
 from pymergetic.metal.cdn.layout import ChannelLayout
 from pymergetic.metal.cdn.models import (
     PresignUploadItem,
@@ -24,6 +25,11 @@ from pymergetic.metal.cdn.models import (
     PresignUploadResponse,
     PublishRequest,
     PublishResult,
+)
+from pymergetic.metal.cdn.services.federation.publish_upstream import (
+    forward_publish,
+    push_origin_headers,
+    resolve_push_mount,
 )
 
 publish_router = APIRouter(prefix="/publish", tags=["publish"])
@@ -75,6 +81,8 @@ async def publish_presign(
 
 @publish_router.post("", response_model=PublishResult, status_code=http_status.HTTP_201_CREATED)
 async def publish_pack(
+    http_request: Request,
+    response: Response,
     publish: PublishServiceDep,
     acl: AclServiceDep,
     orgs: OrgServiceDep,
@@ -82,8 +90,14 @@ async def publish_pack(
     trust: TrustServiceDep,
     settings: SettingsDep,
     actor: AuthUserDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep,
     meta: Annotated[str, Form(description="JSON PublishRequest")],
     files: Annotated[list[UploadFile], File()],
+    upstream: Annotated[
+        bool,
+        Form(description="When true, publish to a PUSH federation mount instead of local"),
+    ] = False,
 ) -> PublishResult:
     try:
         request = PublishRequest.model_validate_json(meta)
@@ -100,10 +114,11 @@ async def publish_pack(
     if publisher_id is not None:
         if await acl.is_unclaimed(request.package):
             if settings.auto_claim_on_publish or actor is not None:
-                try:
-                    await acl.claim(request.package, publisher_id)
-                except PermissionError as exc:
-                    raise HTTPException(status_code=409, detail=str(exc)) from exc
+                if not upstream:
+                    try:
+                        await acl.claim(request.package, publisher_id)
+                    except PermissionError as exc:
+                        raise HTTPException(status_code=409, detail=str(exc)) from exc
             else:
                 raise HTTPException(status_code=403, detail="claim package first")
         elif not await acl.can_publish(request.package, publisher_id):
@@ -120,6 +135,32 @@ async def publish_pack(
 
     if request.maintainer_email is None and actor is not None:
         request = request.model_copy(update={"maintainer_email": actor.email})
+
+    if upstream:
+        mount = await resolve_push_mount(reg, request.package)
+        if mount is None:
+            raise HTTPException(
+                status_code=404,
+                detail="no PUSH federation mount for this package prefix",
+            )
+        result = await forward_publish(
+            proxy=proxy,
+            reg=reg,
+            mount=mount,
+            request=http_request,
+            meta=request,
+            blob_map=blob_map,
+        )
+        for k, v in push_origin_headers(mount).items():
+            response.headers[k] = v
+        if actor is not None:
+            await audit.record(
+                "fed.publish.upstream",
+                actor_id=actor.id,
+                package_name=request.package,
+                detail=f"{request.version} → {mount.prefix}",
+            )
+        return result
 
     try:
         roots = await trust.all_der() if settings.require_signed != "off" else []

@@ -61,7 +61,7 @@ class FederationRegistry(PeerOpsMixin, MountOpsMixin, GrantOpsMixin):
             grants_active=sum(1 for g in grants if g.status == FederationGrantStatus.ACTIVE),
             max_hops=self._max_hops,
             proxy_ready=True,
-            detail="read proxy: packages + artifacts on local miss",
+            detail="read proxy + optional PUSH upstream publish",
         )
 
     def parse_bootstrap_mounts(self, raw: str | None) -> list[dict]:

@@ -27,6 +27,7 @@
         <label>Parent label <input name="parent_label" required placeholder="parent-cdn" autocomplete="off" /></label>
         <label>Parent base URL <input name="parent_base_url" type="url" placeholder="https://parent.example/cdn" /></label>
         <label>Key name <input name="key_name" value="federation-parent" /></label>
+        <label class="fed-check"><input type="checkbox" name="allow_publish" /> Allow publish (federation:publish)</label>
         <button type="submit">Accept grant</button>
       </form>
       <pre id="fed-accept-out" class="fed-secret" hidden></pre>
@@ -40,6 +41,12 @@
         <label>Child CDN URL <input name="base_url" type="url" required placeholder="https://leaf.example/cdn" /></label>
         <label>Browse URL (optional) <input name="public_browse_url" type="url" placeholder="same as base if empty" /></label>
         <label>Mount prefix <input name="prefix" required placeholder="a.b" autocomplete="off" /></label>
+        <label>Direction
+          <select name="direction">
+            <option value="pull" selected>pull (read proxy)</option>
+            <option value="push">push (upstream publish)</option>
+          </select>
+        </label>
         <label>Bearer token <input name="bearer_token" required autocomplete="off" spellcheck="false" /></label>
         <button type="submit">Create peer + mount</button>
       </form>
