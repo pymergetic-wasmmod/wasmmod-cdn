@@ -5,7 +5,7 @@
  *   filename, version?, package?, symbol?, addr?, sectionIndex?, mpyPath?, tab?
  * })
  *
- * Keys: / filter · ↑/↓ symbols · 1 hex · 2 asm · 3 source · Esc close
+ * Keys: / filter · Enter select · ↑/↓ symbols · [ ] locations · 1 hex · 2 asm · 3 source · Esc close
  */
 (() => {
   const HEX_PREVIEW = 65536;
@@ -253,9 +253,26 @@
         }
         return;
       }
+      if (ev.key === "Enter" && inFilter) {
+        const first = els.list.querySelector(".inspect-sym-btn");
+        if (first) {
+          ev.preventDefault();
+          const name = first.dataset.sym;
+          const sym = state.symbols.find((s) => s.name === name);
+          if (sym) selectSymbol(sym);
+        }
+        return;
+      }
       if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
         ev.preventDefault();
         moveSym(ev.key === "ArrowDown" ? 1 : -1);
+        return;
+      }
+      if (ev.key === "[" || ev.key === "]") {
+        if (!inFilter) {
+          ev.preventDefault();
+          moveLoc(ev.key === "]" ? 1 : -1);
+        }
         return;
       }
       if (inFilter) return;
@@ -288,6 +305,17 @@
     if (!sym) return;
     selectSymbol(sym);
     btns[idx].scrollIntoView({ block: "nearest" });
+  }
+
+  function moveLoc(delta) {
+    const { state } = ensureUi();
+    if (!state.locations || state.locations.length < 2) return;
+    const n = state.locations.length;
+    state.locIndex = (state.locIndex + delta + n) % n;
+    renderLocBar();
+    loadSourceForLoc().then(() => {
+      setTab("source");
+    });
   }
 
   function setTab(tab) {

@@ -70,7 +70,7 @@ Thin wrap over shared `wasmmod_inspect` (not a private parser). Prefix:
 
 UI: package page **Open Inspect…** / symbol & export clicks →
 `window.openInspect({ filename, symbol?, sectionIndex?, mpyPath?, … })`
-(`static/inspect.js`). Keys: `/` filter · ↑/↓ symbols · `1`/`2`/`3` tabs · Esc.
+(`static/inspect.js`). Keys: `/` filter · Enter select · ↑/↓ symbols · `[`/`]` locations · `1`/`2`/`3` tabs · Esc.
 ELF section indexes are real `shndx` (match symbols).
 Wasm **func** exports include code-payload `offset`/`size` (and the code section
 index) so hex/asm differ per export; memory/global exports stay offset 0.
