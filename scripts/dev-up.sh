@@ -113,6 +113,8 @@ step_reseed_volume() {
 }
 
 step_docker() {
+  echo "==> sync wasmmod inspect helpers into client package"
+  "$ROOT/scripts/sync-wasmmod-inspect.sh"
   echo "==> docker build -t $IMAGE"
   docker build -t "$IMAGE" "$ROOT"
   echo "==> docker run $NAME :$PORT"

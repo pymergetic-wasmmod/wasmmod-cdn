@@ -810,10 +810,26 @@ a.ver:hover { text-decoration: underline; }
   text-decoration: underline;
   background: rgba(61, 156, 253, 0.08);
 }
-.mpy-inspect-btn {
-  font-family: var(--mono);
-  font-size: 0.85em;
-  margin-left: 0.15rem;
+.icon-btn.inspect-open-btn,
+.icon-btn.mpy-inspect-btn {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-btn.inspect-open-btn:hover,
+.icon-btn.mpy-inspect-btn:hover {
+  color: var(--accent);
+  text-decoration: none;
+  background: rgba(61, 156, 253, 0.08);
+}
+.inspect-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.35rem 0 0.6rem;
 }
 @media (max-width: 720px) {
   .inspect-commander {

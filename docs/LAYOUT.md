@@ -55,7 +55,9 @@ listed artifact URLs (still multi-root fallback).
 
 ## Inspect HTTP (metal-cdn API)
 
-Thin wrap over shared `wasmmod_inspect` (not a private parser). Prefix:
+Thin wrap over shared `wasmmod_inspect` (not a private parser). The Docker image
+bundles `pymergetic/metal/cdn_client/wasmmod_tools/` (synced from wasmmod via
+`scripts/sync-wasmmod-inspect.sh` / `dev-up.sh`). Prefix:
 `/cdn/artifacts/lead/<file>/…` or `/cdn/artifacts/pin/<ver>/<file>/…`.
 
 | GET | Role |

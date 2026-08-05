@@ -191,7 +191,7 @@
 {% endif %}
 <section>
   <h2>Artifacts</h2>
-  <p class="muted">Click a name to inspect pack guts. Use the download icon to fetch the binary.</p>
+  <p class="muted">Click a name to inspect pack guts. Use the download / inspect icons on each row.</p>
   <ul class="pkg-list artifact-list" id="artifact-list">
     {% for a in entry.artifacts %}
     {% if channel == "lead" %}
@@ -222,6 +222,16 @@
         </button>
         <span class="muted artifact-meta">{{ a.kind.value }} · {{ a.encoding.value }} · {{ a.size|human_size }}</span>
         <div class="artifact-actions">
+          <button type="button" class="icon-btn inspect-open-btn"
+            data-filename="{{ a.path }}"
+            data-package="{{ name }}"
+            {% if channel != "lead" %}data-version="{{ channel[1:] }}"{% endif %}
+            title="Inspect {{ a.path }}"
+            aria-label="Inspect {{ a.path }}">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path fill="currentColor" d="M10 3a7 7 0 0 1 5.6 11.2l4.1 4.1a1 1 0 0 1-1.4 1.4l-4.1-4.1A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"/>
+            </svg>
+          </button>
           <a class="icon-btn download-btn" href="{{ dl_href }}" download="{{ a.path }}" title="Download {{ a.path }}" aria-label="Download {{ a.path }}">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/>
@@ -309,7 +319,17 @@
   const HEX_PREVIEW = 65536;
 
   const DL_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>`;
+  const INSP_SVG = `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M10 3a7 7 0 0 1 5.6 11.2l4.1 4.1a1 1 0 0 1-1.4 1.4l-4.1-4.1A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Z"/></svg>`;
 
+  function inspectBtnAttrs(ctx, extra) {
+    const filename = (ctx && ctx.filename) || "";
+    const pkg = (ctx && ctx.package) || "";
+    const version = (ctx && ctx.version) || "";
+    let attrs =
+      ` data-filename="${esc(filename)}" data-package="${esc(pkg)}" data-version="${esc(version)}"`;
+    if (extra) attrs += " " + extra;
+    return attrs;
+  }
   function esc(s) {
     return String(s).replace(/[&<>"']/g, (c) => ({
       "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
@@ -378,7 +398,7 @@
       ? ` data-filename="${esc(ctx.filename || "")}" data-package="${esc(ctx.package || "")}" data-version="${esc(ctx.version || "")}" data-mpy-path="${esc(path)}"`
       : "";
     const mpyBtn = isMpy && ctx
-      ? `<button type="button" class="mpy-inspect-btn" ${insp} title="mpy-dis in Inspect">dis</button>`
+      ? `<button type="button" class="icon-btn mpy-inspect-btn" ${insp} title="mpy-dis in Inspect" aria-label="Inspect ${esc(path)}">${INSP_SVG}</button>`
       : "";
     return `<li>
       <button type="button" class="file-link" data-path="${esc(path)}" data-files="${esc(filesBase)}" data-files-raw="${esc(filesRaw)}" title="Open ${esc(path)}">${esc(path)}</button>
@@ -388,14 +408,18 @@
     </li>`;
   }
 
-  function sectionRow(sec, sectionsRaw) {
+  function sectionRow(sec, sectionsRaw, ctx) {
     const rawUrl = sectionsRaw + "?index=" + encodeURIComponent(String(sec.index));
     const role = sec.role || "other";
     const roleCls = role === "code" ? " sec-code" : (role === "meta" ? " sec-meta" : "");
     const dlName = (sec.name || ("section_" + sec.index)).replace(/\//g, "_");
+    const insp = ctx
+      ? `<button type="button" class="icon-btn inspect-open-btn"${inspectBtnAttrs(ctx, `data-section-index="${esc(sec.index)}"`)} title="Inspect section ${esc(sec.name)}" aria-label="Inspect section ${esc(sec.name)}">${INSP_SVG}</button>`
+      : "";
     return `<li class="section-row${roleCls}">
       <button type="button" class="section-link" data-index="${esc(sec.index)}" data-name="${esc(sec.name)}" data-sections-raw="${esc(sectionsRaw)}" data-size="${esc(sec.size)}" data-role="${esc(role)}" title="View hex: ${esc(sec.name)}">${esc(sec.name)}</button>
       <span class="muted">${esc(role)} · type=${esc(sec.type_id)} · ${esc(fmtSize(sec.size))}</span>
+      ${insp}
       <a class="icon-btn file-download" href="${esc(rawUrl)}" download="${esc(dlName)}" title="Download section ${esc(sec.name)}" aria-label="Download section ${esc(sec.name)}">${DL_SVG}</a>
     </li>`;
   }
@@ -421,11 +445,13 @@
       </p>`;
     if (data.error) html += `<p class="muted">error: ${esc(data.error)}</p>`;
     if (symbols.length || sections.length) {
-      html += `<p><button type="button" class="inspect-open-btn"
+      html += `<p class="inspect-toolbar"><button type="button" class="icon-btn inspect-open-btn"
         data-filename="${esc(filename)}"
         data-package="${esc(pkg)}"
         data-version="${esc(version)}"
-        title="Open Inspect commander">Open Inspect…</button></p>`;
+        title="Open Inspect commander"
+        aria-label="Open Inspect commander">${INSP_SVG}</button>
+        <span class="muted">Open Inspect…</span></p>`;
     }
     if (symbols.length) {
       html += `<h3>Symbols <span class="muted">(${symbols.length})</span></h3>
@@ -442,6 +468,15 @@
             data-offset="${esc(sym.offset == null ? 0 : sym.offset)}"
             title="Inspect ${esc(sym.name)}"><code>${esc(sym.name)}</code></button>
           <span class="muted">${esc(meta)}</span>
+          <button type="button" class="icon-btn inspect-open-btn"
+            data-filename="${esc(filename)}"
+            data-package="${esc(pkg)}"
+            data-version="${esc(version)}"
+            data-symbol="${esc(sym.name)}"
+            data-section-index="${esc(sym.section_index == null ? "" : sym.section_index)}"
+            data-offset="${esc(sym.offset == null ? 0 : sym.offset)}"
+            title="Inspect ${esc(sym.name)}"
+            aria-label="Inspect ${esc(sym.name)}">${INSP_SVG}</button>
         </li>`;
       }
       html += `</ul>`;
@@ -450,7 +485,7 @@
       html += `<h3>Sections <span class="muted">(${sections.length})</span></h3>
         <ul class="file-tree">`;
       for (const sec of sections) {
-        html += sectionRow(sec, sectionsRaw);
+        html += sectionRow(sec, sectionsRaw, ctx);
       }
       html += `</ul>`;
     }
@@ -477,7 +512,15 @@
               data-version="${esc(version)}"
               data-symbol="${esc(name)}"
               title="Inspect export ${esc(name)}"><code>${esc(name)}</code></button>
-            <span class="muted">${esc(typeLabel)}</span></li>`;
+            <span class="muted">${esc(typeLabel)}</span>
+            <button type="button" class="icon-btn inspect-open-btn"
+              data-filename="${esc(filename)}"
+              data-package="${esc(pkg)}"
+              data-version="${esc(version)}"
+              data-symbol="${esc(name)}"
+              title="Inspect export ${esc(name)}"
+              aria-label="Inspect export ${esc(name)}">${INSP_SVG}</button>
+          </li>`;
         }
         html += `</ul>`;
       }

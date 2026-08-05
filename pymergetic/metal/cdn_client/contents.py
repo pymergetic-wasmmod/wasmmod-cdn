@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import os
 import re
 import struct
 import sys
@@ -224,19 +225,33 @@ class ArtifactContents(BaseModel):
 
 
 def _wasmmod_inspect_mod() -> Any | None:
-    """Load extmod/wasmmod/tools/wasmmod_inspect.py when metalpython is a sibling."""
+    """Load shared ``wasmmod_inspect`` (sibling metalpython, env, or bundled)."""
     try:
         import wasmmod_inspect  # type: ignore
 
         return wasmmod_inspect
     except ImportError:
         pass
+
     here = Path(__file__).resolve()
-    candidates = [
-        here.parents[4] / "metalpython" / "extmod" / "wasmmod" / "tools",
-        here.parents[5] / "metalpython" / "extmod" / "wasmmod" / "tools",
-        Path("/home/ladmin/Devel/os-sdk/packages/metalpython/extmod/wasmmod/tools"),
+    candidates: list[Path] = [
+        here.parent / "wasmmod_tools",  # bundled for Docker / PyPI client
     ]
+    env = (os.environ.get("WASMMOD_TOOLS") or "").strip()
+    if env:
+        candidates.append(Path(env))
+    candidates.append(Path("/opt/wasmmod-tools"))
+    # Sibling checkouts: …/packages/metal-cdn/… → …/packages/metalpython/…
+    for idx in (4, 5, 6):
+        if len(here.parents) > idx:
+            candidates.append(
+                here.parents[idx] / "metalpython" / "extmod" / "wasmmod" / "tools"
+            )
+    # Dev laptop fallback (harmless if absent).
+    candidates.append(
+        Path.home() / "Devel/os-sdk/packages/metalpython/extmod/wasmmod/tools"
+    )
+
     for tools in candidates:
         path = tools / "wasmmod_inspect.py"
         if not path.is_file():
@@ -254,7 +269,11 @@ def _wasmmod_inspect_mod() -> Any | None:
             continue
         mod = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = mod
-        spec.loader.exec_module(mod)
+        try:
+            spec.loader.exec_module(mod)
+        except Exception:
+            sys.modules.pop(spec.name, None)
+            continue
         return mod
     return None
 
@@ -269,7 +288,11 @@ def list_pack_symbols(data: bytes) -> list[SymbolInfo]:
     except ValueError:
         naked = data
     out: list[SymbolInfo] = []
-    for s in mod.list_symbols(naked):
+    try:
+        syms = mod.list_symbols(naked)
+    except Exception:
+        return []
+    for s in syms:
         out.append(
             SymbolInfo(
                 name=s.name,
