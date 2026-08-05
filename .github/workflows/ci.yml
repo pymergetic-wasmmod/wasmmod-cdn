@@ -23,7 +23,9 @@ jobs:
       - name: Install
         run: |
           python -m pip install -U pip
-          pip install --pre -e ./client -e ".[dev]" --config-settings editable_mode=compat
+          # Alpha dist only — do not --pre the whole env (httpx/starlette break).
+          pip install --pre 'pymergetic-wasmmod-tools>=0.1.0a1'
+          pip install -e ./client -e ".[dev]" --config-settings editable_mode=compat
 
       - name: Ruff
         run: ruff check pymergetic tests
