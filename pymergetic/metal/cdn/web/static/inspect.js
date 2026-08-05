@@ -262,14 +262,18 @@
     return data;
   }
 
-  async function loadHex(sectionIndex, offset) {
+  async function loadHex(sectionIndex, offset, limit) {
     const { state } = ensureUi();
     const root = artifactRoot(state.opts);
     const off = Number(offset) || 0;
+    const lim =
+      limit != null && Number.isFinite(Number(limit)) && Number(limit) > 0
+        ? Math.min(Number(limit), HEX_PREVIEW)
+        : HEX_PREVIEW;
     const url =
       `${root}/sections/raw?index=${encodeURIComponent(String(sectionIndex))}` +
       `&offset=${encodeURIComponent(String(off))}` +
-      `&limit=${HEX_PREVIEW}`;
+      `&limit=${encodeURIComponent(String(lim))}`;
     const res = await fetch(url, { headers: { Accept: "application/octet-stream" } });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -277,16 +281,20 @@
       return;
     }
     const buf = await res.arrayBuffer();
-    state.hexHtml = hexdumpHtml(buf, HEX_PREVIEW, off);
+    state.hexHtml = hexdumpHtml(buf, lim, off);
   }
 
-  async function loadAsm(sectionIndex, offset) {
+  async function loadAsm(sectionIndex, offset, limit) {
     const { state } = ensureUi();
     const root = artifactRoot(state.opts);
+    const lim =
+      limit != null && Number.isFinite(Number(limit)) && Number(limit) > 0
+        ? Math.min(Number(limit), DISASM_LIMIT)
+        : DISASM_LIMIT;
     const url =
       `${root}/disasm?index=${encodeURIComponent(String(sectionIndex))}` +
       `&offset=${encodeURIComponent(String(offset || 0))}` +
-      `&limit=${DISASM_LIMIT}`;
+      `&limit=${encodeURIComponent(String(lim))}`;
     try {
       const lines = await fetchJson(url);
       state.asmHtml = formatAsm(lines);
@@ -412,7 +420,11 @@
     } catch (_) {
       state.locations = [];
     }
-    state.locIndex = 0;
+    // Prefer twin/def/dwarf over the leading role=sym stub for the source pane.
+    {
+      const better = state.locations.findIndex((l) => l && l.role && l.role !== "sym");
+      state.locIndex = better >= 0 ? better : 0;
+    }
     renderLocBar();
 
     // Use only this symbol's section — do not inherit openInspect's sectionIndex
@@ -429,9 +441,11 @@
       sec = await resolveCodeSectionIndex();
     }
     const off = Number(sym.offset) || 0;
+    const size = Number(sym.size) || 0;
+    const win = size > 0 ? size : null;
     const jobs = [loadSourceForLoc()];
     if (sec != null && Number.isFinite(sec) && sec < 65500) {
-      jobs.push(loadHex(sec, off), loadAsm(sec, off));
+      jobs.push(loadHex(sec, off, win), loadAsm(sec, off, win));
     } else {
       const msg = wantsCode
         ? '<span class="muted">No section index for hex/asm.</span>'
@@ -464,6 +478,7 @@
     state.hexHtml = "";
     state.asmHtml = "";
     state.sourceHtml = "";
+    renderLocBar(); // clear stale multi-loc chips from a prior open
     state.tab =
       opts.tab ||
       (opts.mpyPath ? "asm" : opts.symbol || opts.addr != null ? "source" : "hex");
