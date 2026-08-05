@@ -4,6 +4,8 @@
  * Site-wide: window.openInspect({
  *   filename, version?, package?, symbol?, addr?, sectionIndex?, mpyPath?, tab?
  * })
+ *
+ * Keys: / filter · ↑/↓ symbols · 1 hex · 2 asm · 3 source · Esc close
  */
 (() => {
   const HEX_PREVIEW = 65536;
@@ -57,6 +59,49 @@
       }
     });
     return best;
+  }
+
+  function guessLang(path) {
+    const lower = String(path || "")
+      .toLowerCase()
+      .replace(/\\/g, "/");
+    const base = lower.split("/").pop() || lower;
+    if (lower.endsWith(".py") || lower.endsWith(".pyi")) return "python";
+    if (lower.endsWith(".c") || lower.endsWith(".h")) return "c";
+    if (
+      lower.endsWith(".cc") ||
+      lower.endsWith(".cpp") ||
+      lower.endsWith(".cxx") ||
+      lower.endsWith(".hpp") ||
+      lower.endsWith(".hh")
+    ) {
+      return "cpp";
+    }
+    if (lower.endsWith(".rs")) return "rust";
+    if (lower.endsWith(".js") || lower.endsWith(".mjs") || lower.endsWith(".cjs")) {
+      return "javascript";
+    }
+    if (lower.endsWith(".ts") || lower.endsWith(".tsx")) return "typescript";
+    if (lower.endsWith(".toml") || lower.endsWith(".ini") || base === "pack.toml") {
+      return "ini";
+    }
+    if (lower.endsWith(".md")) return "markdown";
+    if (lower.endsWith(".json")) return "json";
+    return "";
+  }
+
+  function highlightCode(text, lang) {
+    if (window.hljs && lang && window.hljs.getLanguage(lang)) {
+      try {
+        return window.hljs.highlight(text, {
+          language: lang,
+          ignoreIllegals: true,
+        }).value;
+      } catch (_) {
+        /* fall through */
+      }
+    }
+    return esc(text);
   }
 
   function paintHexByte(b) {
@@ -197,9 +242,52 @@
       renderLocBar();
       loadSourceForLoc().then(paintActive);
     });
+    dialog.addEventListener("keydown", (ev) => {
+      const inFilter = document.activeElement === els.filter;
+      if (ev.key === "/" && !inFilter) {
+        const tag = (document.activeElement && document.activeElement.tagName) || "";
+        if (tag !== "INPUT" && tag !== "TEXTAREA") {
+          ev.preventDefault();
+          els.filter.focus();
+          els.filter.select();
+        }
+        return;
+      }
+      if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+        ev.preventDefault();
+        moveSym(ev.key === "ArrowDown" ? 1 : -1);
+        return;
+      }
+      if (inFilter) return;
+      if (ev.key === "1") {
+        ev.preventDefault();
+        setTab("hex");
+      } else if (ev.key === "2") {
+        ev.preventDefault();
+        setTab("asm");
+      } else if (ev.key === "3") {
+        ev.preventDefault();
+        setTab("source");
+      }
+    });
 
     ui = { dialog, els, state };
     return ui;
+  }
+
+  function moveSym(delta) {
+    const { els, state } = ensureUi();
+    const btns = Array.from(els.list.querySelectorAll(".inspect-sym-btn"));
+    if (!btns.length) return;
+    const cur = state.selected && state.selected.name;
+    let idx = btns.findIndex((b) => b.dataset.sym === cur);
+    if (idx < 0) idx = delta > 0 ? -1 : 0;
+    idx = Math.max(0, Math.min(btns.length - 1, idx + delta));
+    const name = btns[idx].dataset.sym;
+    const sym = state.symbols.find((s) => s.name === name);
+    if (!sym) return;
+    selectSymbol(sym);
+    btns[idx].scrollIntoView({ block: "nearest" });
   }
 
   function setTab(tab) {
@@ -374,6 +462,7 @@
         return;
       }
       let text = String(meta.text);
+      const lang = guessLang(path);
       if (loc.line != null && loc.line > 0) {
         const lines = text.split("\n");
         const i = loc.line - 1;
@@ -385,7 +474,7 @@
           const num = String(n + 1).padStart(4, " ");
           const cls = n === i ? "inspect-src-hit" : "";
           chunk.push(
-            `<span class="${cls}"><span class="hx-off">${mark}${num}</span>  ${esc(lines[n])}</span>`
+            `<span class="${cls}"><span class="hx-off">${mark}${num}</span>  ${highlightCode(lines[n], lang)}</span>`
           );
         }
         state.sourceHtml =
@@ -393,7 +482,8 @@
           chunk.join("\n");
       } else {
         state.sourceHtml =
-          `<div class="muted">${esc(path)} · ${esc(role)}</div>\n` + esc(text.slice(0, 12000));
+          `<div class="muted">${esc(path)} · ${esc(role)}</div>\n` +
+          highlightCode(text.slice(0, 12000), lang);
       }
     } catch (err) {
       state.sourceHtml =
@@ -515,6 +605,11 @@
     els.body.textContent = "Loading…";
     setTab(state.tab);
     dialog.showModal();
+    try {
+      els.filter.focus({ preventScroll: true });
+    } catch (_) {
+      els.filter.focus();
+    }
 
     const root = artifactRoot(state.opts);
     try {
@@ -629,5 +724,7 @@
     fmtSize,
     cdnPrefix,
     artifactRoot,
+    pickBestLocIndex,
+    guessLang,
   };
 })();
