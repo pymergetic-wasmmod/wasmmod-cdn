@@ -42,15 +42,18 @@ Add a **Trusted Publisher** (not pending) with:
 | Workflow name | `publish-pypi-client.yml` | `publish-pypi-server.yml` |
 | Environment | *(empty)* | *(empty)* |
 
-Then re-run the failed workflow(s) (or `gh workflow run` / re-tag). No new tag
-needed if `v0.1.0a8` artifacts were already built.
+**Filename including `.yml`** — not the workflow `name:` title, not
+`publish-pypi.yml`. a6 shipped with an API token; OIDC only works after these
+rows exist on the **project** publishing pages.
+
+Then re-run the failed workflow(s) (or tag again). No new tag needed if the
+tag’s workflow already has the fix and publishers match.
 
 Also delete the repo secret **`PYPI_API_TOKEN`** if it still exists — a leftover
 API token can confuse debugging; workflows are OIDC-only.
 
 If upload fails with `OIDC scoped token is not valid for project …`, the
-publisher row above is missing or mistyped (workflow filename is the usual
-typo).
+publisher row above is missing or the workflow filename is mistyped.
 
 ### Pending publishers (new projects only)
 

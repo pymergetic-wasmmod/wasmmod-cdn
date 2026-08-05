@@ -42,5 +42,6 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist-client/
-          # No password — OIDC only. An API token would skip Trusted Publishing
-          # and leave the pending publisher stuck.
+          # OIDC only — never set password / PYPI_API_TOKEN here.
+          # Filename must match PyPI Trusted Publisher exactly (incl. .yml).
+          attestations: false
