@@ -197,3 +197,48 @@ async def test_read_only_grant_cannot_publish_on_child(
         files=[("files", ("ro.x.wasm", b"\x00asm", "application/octet-stream"))],
     )
     assert denied.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_upstream_publish_claimed_package_via_grant_prefix(
+    push_pair: tuple[AsyncClient, AsyncClient],
+) -> None:
+    """Federation bot may publish under grant prefix even when package is claimed."""
+    parent, child = push_pair
+    # Child admin claims leaf.owned before federated publish.
+    claim = await child.post("/cdn/packages/leaf.owned/claim")
+    assert claim.status_code == 200, claim.text
+
+    meta = {
+        "package": "leaf.owned",
+        "version": "0.3.0",
+        "lead": True,
+        "pin": False,
+        "aot_version": 6,
+        "deps": {},
+        "maintainer_email": "uparent@cdn.pymergetic.com",
+    }
+    files = [
+        (
+            "files",
+            ("leaf.owned.wasm", b"\x00asm\x01\x00\x00\x00own", "application/octet-stream"),
+        ),
+    ]
+    pr = await parent.post(
+        "/cdn/publish",
+        data={"meta": json.dumps(meta), "upstream": "true"},
+        files=files,
+    )
+    assert pr.status_code == 201, pr.text
+    assert (await child.get("/cdn/packages/leaf.owned")).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_cli_parser_upstream_flag() -> None:
+    from pymergetic.metal.cdn.cli_parser import build_parser
+
+    ns = build_parser().parse_args(
+        ["publish", "leaf.x", "0.1.0", "x.wasm", "--upstream", "--no-pin"]
+    )
+    assert ns.upstream is True
+    assert ns.no_pin is True

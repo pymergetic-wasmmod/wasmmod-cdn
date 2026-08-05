@@ -91,7 +91,11 @@ Content-Type: multipart/form-data
 meta=…&upstream=true&files=…
 ```
 
-Parent ACL still applies; bytes land only on the peer. Peer must allow the federation bot (unclaimed + `auto_claim_on_publish`, or ACL). May set `X-Metal-Origin: remote`.
+Parent ACL still applies; bytes land only on the peer. Peer must allow the federation bot:
+unclaimed + `auto_claim_on_publish`, **or** an active grant prefix covering the package
+(bot may publish claimed packs under its grant). May set `X-Metal-Origin: remote`.
+
+CLI: `metal-cdn publish pkg 1.0.0 ./pkg.wasm --upstream`
 
 ### Catalog + UI (P2)
 

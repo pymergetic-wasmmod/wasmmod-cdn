@@ -167,6 +167,7 @@ def _cmd_publish(args: argparse.Namespace) -> int:
             pin=not args.no_pin,
             aot_version=args.aot_version,
             force=args.force,
+            upstream=args.upstream,
         )
     except ClientError as exc:
         return fail(exc, force=args.force)

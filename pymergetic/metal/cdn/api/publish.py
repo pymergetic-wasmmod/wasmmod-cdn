@@ -13,6 +13,7 @@ from pymergetic.metal.cdn.api.deps import (
     AuthUserDep,
     OrgServiceDep,
     PublishServiceDep,
+    SessionDep,
     SettingsDep,
     StorageDep,
     TrustServiceDep,
@@ -26,6 +27,7 @@ from pymergetic.metal.cdn.models import (
     PublishRequest,
     PublishResult,
 )
+from pymergetic.metal.cdn.services.federation.grant_acl import federation_bot_may_publish
 from pymergetic.metal.cdn.services.federation.publish_upstream import (
     forward_publish,
     push_origin_headers,
@@ -90,6 +92,7 @@ async def publish_pack(
     trust: TrustServiceDep,
     settings: SettingsDep,
     actor: AuthUserDep,
+    session: SessionDep,
     reg: FederationRegistryDep,
     proxy: FederationProxyDep,
     meta: Annotated[str, Form(description="JSON PublishRequest")],
@@ -121,7 +124,13 @@ async def publish_pack(
                         raise HTTPException(status_code=409, detail=str(exc)) from exc
             else:
                 raise HTTPException(status_code=403, detail="claim package first")
-        elif not await acl.can_publish(request.package, publisher_id):
+        elif not await acl.can_publish(
+            request.package, publisher_id
+        ) and not await federation_bot_may_publish(
+            session,
+            user_id=publisher_id,
+            package_name=request.package,
+        ):
             raise HTTPException(
                 status_code=http_status.HTTP_403_FORBIDDEN,
                 detail="publisher lacks ACL for this package",
