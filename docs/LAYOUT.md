@@ -76,3 +76,5 @@ index) so hex/asm differ per export; memory/global exports stay offset 0.
 ELF example packs enable `[source] embed` so `locations` can resolve C defs from
 `wasmmod.source` without pyelftools (same as Wasm packs). Host `addr2line`
 similarly unlocks DWARF file:line for `…/addr2line` without pyelftools.
+`…/files?path=` accepts exact pack/source paths and unique basename matches
+(so DWARF ``hello.c`` opens ``src/hello.c``).

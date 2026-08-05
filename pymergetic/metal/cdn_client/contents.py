@@ -1619,28 +1619,86 @@ def _read_from_pack_payload(payload: bytes, relpath: str) -> tuple[bytes, str] |
 
 def extract_embedded_file(data: bytes, relpath: str) -> EmbeddedFileView:
     """Pull one embedded path from wasmmod.source (preferred) or wasmmod.pack."""
-    body, section, kind = extract_embedded_bytes(data, relpath)
-    return _to_file_view(relpath, section, kind, body)
+    body, section, kind, resolved = extract_embedded_bytes(data, relpath)
+    return _to_file_view(resolved, section, kind, body)
+
+
+def _list_embedded_paths(naked: bytes) -> list[str]:
+    """All paths in wasmmod.source then wasmmod.pack (source first, unique)."""
+    out: list[str] = []
+    seen: set[str] = set()
+    src_raw = extract_custom_section(naked, SOURCE_SECTION)
+    if src_raw is not None:
+        try:
+            for f in parse_source_payload(src_raw).files:
+                if f.path not in seen:
+                    seen.add(f.path)
+                    out.append(f.path)
+        except ValueError:
+            pass
+    pack_raw = extract_custom_section(naked, PACK_SECTION)
+    if pack_raw is not None:
+        try:
+            for f in parse_pack_payload(pack_raw).files:
+                if f.path not in seen:
+                    seen.add(f.path)
+                    out.append(f.path)
+        except ValueError:
+            pass
+    return out
+
+
+def _resolve_embedded_relpath(naked: bytes, relpath: str) -> str:
+    """Exact path, else unique basename / suffix match (DWARF often yields ``hello.c``)."""
+    paths = _list_embedded_paths(naked)
+    if relpath in paths:
+        return relpath
+    base = relpath.rsplit("/", 1)[-1]
+    hits = [p for p in paths if p == base or p.endswith("/" + base)]
+    if len(hits) == 1:
+        return hits[0]
+    if "/" in relpath:
+        hits = [p for p in paths if p.endswith("/" + relpath)]
+        if len(hits) == 1:
+            return hits[0]
+    raise FileNotFoundError(relpath)
 
 
 def extract_embedded_bytes(
     data: bytes, relpath: str
-) -> tuple[bytes, Literal["source", "pack"], str | None]:
-    """Return ``(body, section, kind)`` for an embedded path."""
+) -> tuple[bytes, Literal["source", "pack"], str | None, str]:
+    """Return ``(body, section, kind, resolved_path)`` for an embedded path."""
     if ".." in relpath.split("/") or relpath.startswith("/"):
         raise ValueError("invalid embedded path")
     naked = unwrap_mpzl(data)
+    resolved = relpath
     src_raw = extract_custom_section(naked, SOURCE_SECTION)
     if src_raw is not None:
-        body = _read_from_source_payload(src_raw, relpath)
+        body = _read_from_source_payload(src_raw, resolved)
         if body is not None:
-            return body, "source", None
+            return body, "source", None, resolved
     pack_raw = extract_custom_section(naked, PACK_SECTION)
     if pack_raw is not None:
-        hit = _read_from_pack_payload(pack_raw, relpath)
+        hit = _read_from_pack_payload(pack_raw, resolved)
         if hit is not None:
             body, kind = hit
-            return body, "pack", kind
+            return body, "pack", kind, resolved
+    # Basename / suffix fallback (DWARF compile unit names).
+    try:
+        resolved = _resolve_embedded_relpath(naked, relpath)
+    except FileNotFoundError:
+        raise FileNotFoundError(relpath) from None
+    if resolved == relpath:
+        raise FileNotFoundError(relpath)
+    if src_raw is not None:
+        body = _read_from_source_payload(src_raw, resolved)
+        if body is not None:
+            return body, "source", None, resolved
+    if pack_raw is not None:
+        hit = _read_from_pack_payload(pack_raw, resolved)
+        if hit is not None:
+            body, kind = hit
+            return body, "pack", kind, resolved
     raise FileNotFoundError(relpath)
 
 

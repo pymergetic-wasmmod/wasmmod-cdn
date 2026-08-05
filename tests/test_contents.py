@@ -308,6 +308,13 @@ def test_extract_embedded_source_and_pack() -> None:
     assert pack_view.kind == "py"
     assert pack_view.text == "x = 1\n"
 
+    # DWARF-style basename resolves uniquely into the source tree.
+    src_only = _minimal_wasm(_custom_section("wasmmod.source", src))
+    resolved = extract_embedded_file(src_only, "__init__.py")
+    assert resolved.path == "src/__init__.py"
+    assert resolved.section == "source"
+    assert resolved.text == "print('hi')\n"
+
 
 def _mpws(sig: bytes, chain: bytes = b"") -> bytes:
     out = bytearray(b"MPWS")
@@ -610,7 +617,7 @@ def test_pack_symbols_addr2line_disasm_hello_elf() -> None:
 
 def test_pack_mpy_disasm_hello_elf() -> None:
     data = _hello_elf_bytes()
-    body, section, _kind = extract_embedded_bytes(
+    body, section, _kind, _resolved = extract_embedded_bytes(
         data, "__init__.upy.mpy6.sib31.mpy"
     )
     assert section in ("pack", "source")

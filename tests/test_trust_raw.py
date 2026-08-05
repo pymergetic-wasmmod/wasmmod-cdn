@@ -165,7 +165,7 @@ async def test_trust_crud_and_raw_file(client: AsyncClient, tmp_path: Path) -> N
     assert raw.content == b"print(1)\n"
     assert "attachment" in raw.headers.get("content-disposition", "")
 
-    body, section, _kind = extract_embedded_bytes(wasm, "hello.py")
+    body, section, _kind, _resolved = extract_embedded_bytes(wasm, "hello.py")
     assert body == b"print(1)\n"
     assert section == "source"
 

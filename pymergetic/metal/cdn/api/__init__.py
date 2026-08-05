@@ -758,7 +758,7 @@ def _embedded_raw_response(view_data: bytes, *, path: str) -> Response:
 async def embedded_file_raw_lead(filename: str, path: str, storage: StorageDep) -> Response:
     data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
     try:
-        body, _section, _kind = extract_embedded_bytes(data, path)
+        body, _section, _kind, _resolved = extract_embedded_bytes(data, path)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"embedded path not found: {path}") from exc
     except ValueError as exc:
@@ -772,7 +772,7 @@ async def embedded_file_raw_pin(
 ) -> Response:
     data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
     try:
-        body, _section, _kind = extract_embedded_bytes(data, path)
+        body, _section, _kind, _resolved = extract_embedded_bytes(data, path)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"embedded path not found: {path}") from exc
     except ValueError as exc:
@@ -865,7 +865,7 @@ async def mpy_disasm_lead(
 ) -> list[DisasmLineInfo]:
     data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
     try:
-        body, _section, _kind = extract_embedded_bytes(data, path)
+        body, _section, _kind, _resolved = extract_embedded_bytes(data, path)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"embedded path not found: {path}") from exc
     except ValueError as exc:
@@ -881,7 +881,7 @@ async def mpy_disasm_pin(
 ) -> list[DisasmLineInfo]:
     data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
     try:
-        body, _section, _kind = extract_embedded_bytes(data, path)
+        body, _section, _kind, _resolved = extract_embedded_bytes(data, path)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=f"embedded path not found: {path}") from exc
     except ValueError as exc:
