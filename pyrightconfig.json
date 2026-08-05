@@ -1,17 +1,34 @@
 {
-  "include": ["pymergetic", "tests"],
-  "exclude": ["**/.venv", "**/__pycache__", ".data", "client/*.egg-info", "**/*.tpl.py"],
-  "extraPaths": ["."],
+  "include": [
+    "pymergetic",
+    "tests"
+  ],
+  "exclude": [
+    "**/.venv",
+    "**/__pycache__",
+    ".data",
+    "client/*.egg-info",
+    "**/*.tpl.py"
+  ],
+  "extraPaths": [
+    ".",
+    "../wasmmod-tools/src"
+  ],
   "venvPath": ".",
   "venv": ".venv",
   "pythonVersion": "3.12",
   "pythonPlatform": "Linux",
   "typeCheckingMode": "basic",
   "reportMissingImports": "error",
+  "reportMissingModuleSource": "none",
+  "stubPath": "typings",
   "executionEnvironments": [
     {
       "root": ".",
-      "extraPaths": ["."],
+      "extraPaths": [
+        ".",
+        "../wasmmod-tools/src"
+      ],
       "pythonVersion": "3.12"
     }
   ]

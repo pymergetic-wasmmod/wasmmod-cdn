@@ -225,16 +225,9 @@ class ArtifactContents(BaseModel):
 
 
 def _wasmmod_inspect_mod() -> Any | None:
-    """Load shared inspect helpers from ``pymergetic-wasmmod-tools`` (or legacy paths)."""
+    """Load shared inspect helpers from ``pymergetic-wasmmod-tools``."""
     try:
         from pymergetic.wasmmod.tools import inspect as wasmmod_inspect
-
-        return wasmmod_inspect
-    except ImportError:
-        pass
-
-    try:
-        import wasmmod_inspect  # type: ignore
 
         return wasmmod_inspect
     except ImportError:
@@ -249,16 +242,9 @@ def _wasmmod_inspect_mod() -> Any | None:
     for idx in (4, 5, 6):
         if len(here.parents) > idx:
             candidates.append(here.parents[idx] / "wasmmod-tools" / "src")
-            candidates.append(
-                here.parents[idx] / "metalpython" / "extmod" / "wasmmod" / "tools"
-            )
     candidates.append(Path.home() / "Devel/os-sdk/packages/wasmmod-tools" / "src")
-    candidates.append(
-        Path.home() / "Devel/os-sdk/packages/metalpython/extmod/wasmmod/tools"
-    )
 
     for tools in candidates:
-        # Package src layout
         if (tools / "pymergetic" / "wasmmod" / "tools" / "inspect.py").is_file():
             if str(tools) not in sys.path:
                 sys.path.insert(0, str(tools))
@@ -268,28 +254,6 @@ def _wasmmod_inspect_mod() -> Any | None:
                 return wasmmod_inspect
             except ImportError:
                 pass
-        path = tools / "wasmmod_inspect.py"
-        if not path.is_file():
-            continue
-        if str(tools) not in sys.path:
-            sys.path.insert(0, str(tools))
-        try:
-            import wasmmod_inspect  # type: ignore
-
-            return wasmmod_inspect
-        except ImportError:
-            pass
-        spec = importlib.util.spec_from_file_location("wasmmod_inspect", path)
-        if spec is None or spec.loader is None:
-            continue
-        mod = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = mod
-        try:
-            spec.loader.exec_module(mod)
-        except Exception:
-            sys.modules.pop(spec.name, None)
-            continue
-        return mod
     return None
 
 
