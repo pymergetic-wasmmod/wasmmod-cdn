@@ -496,7 +496,7 @@ def test_slice_bytes_limit_cap() -> None:
 
 
 def test_embedded_text_sources_skips_readme() -> None:
-    """README.md mentioning ``hello(`` must not become a locations def hit."""
+    """README.md / docs/ mentioning ``hello(`` must not become locations hits."""
     from pymergetic.metal.cdn_client.contents import _embedded_text_sources
 
     pack = _pack_v3(
@@ -509,6 +509,7 @@ def test_embedded_text_sources_skips_readme() -> None:
         "0.1.0",
         [
             ("README.md", b"# Demo\n\nCall hello() from the pack.\n"),
+            ("docs/sample.cpp", b"void demo() { hello(); }\n"),
             ("src/hello.c", b"int hello(void) { return 42; }\n"),
         ],
     )
@@ -518,11 +519,17 @@ def test_embedded_text_sources_skips_readme() -> None:
     )
     keys = set(_embedded_text_sources(wasm))
     assert "README.md" not in keys
+    assert "docs/sample.cpp" not in keys
     assert "src/hello.c" in keys
     assert "__init__.py" in keys
     locs = pack_locations(wasm, "hello")
     assert not any(loc.path == "README.md" for loc in locs)
+    assert not any(loc.path.startswith("docs/") for loc in locs)
     assert any(loc.path == "src/hello.c" and loc.role == "def" for loc in locs)
+    # Call-site-only .py lines are not twins.
+    assert not any(
+        loc.role == "twin" and loc.path == "__init__.py" and loc.line != 1 for loc in locs
+    )
 
 
 def test_pack_symbols_addr2line_disasm_hello_elf() -> None:

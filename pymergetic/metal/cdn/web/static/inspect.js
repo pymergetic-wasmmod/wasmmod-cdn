@@ -420,10 +420,26 @@
     } catch (_) {
       state.locations = [];
     }
-    // Prefer twin/def/dwarf over the leading role=sym stub for the source pane.
+    // Prefer def/dwarf/decl, then twin, over the leading role=sym stub.
     {
-      const better = state.locations.findIndex((l) => l && l.role && l.role !== "sym");
-      state.locIndex = better >= 0 ? better : 0;
+      const rank = (role) =>
+        role === "def" || role === "dwarf" || role === "decl"
+          ? 0
+          : role === "twin"
+            ? 1
+            : role && role !== "sym"
+              ? 2
+              : 3;
+      let best = 0;
+      let bestRank = 3;
+      state.locations.forEach((l, i) => {
+        const r = rank(l && l.role);
+        if (r < bestRank) {
+          bestRank = r;
+          best = i;
+        }
+      });
+      state.locIndex = best;
     }
     renderLocBar();
 

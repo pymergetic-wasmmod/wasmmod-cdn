@@ -325,11 +325,13 @@ _CODE_SOURCE_SUFFIXES = (".py", ".pyi", ".c", ".h", ".cc", ".cpp", ".hpp", ".rs"
 
 
 def _is_code_source_path(path: str) -> bool:
-    """True for paths worth scanning for symbol defs (not README.md / .wat / …)."""
+    """True for paths worth scanning for symbol defs (not README.md / docs/ / .wat)."""
     if not path or path.endswith(".mpy"):
         return False
-    lower = path.lower()
-    return lower.endswith(_CODE_SOURCE_SUFFIXES)
+    norm = path.replace("\\", "/").lstrip("./").lower()
+    if norm.startswith("docs/") or "/docs/" in f"/{norm}":
+        return False
+    return norm.endswith(_CODE_SOURCE_SUFFIXES)
 
 
 def _embedded_text_sources(data: bytes) -> dict[str, str]:
