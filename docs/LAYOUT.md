@@ -63,7 +63,7 @@ Thin wrap over shared `wasmmod_inspect` (not a private parser). Prefix:
 | `…/inspect` | Aggregate (pack/source/sig/sections/**symbols**/`has_dwarf`) |
 | `…/symbols` | Symbol list |
 | `…/addr2line?addr=` | Location[] for address |
-| `…/locations?name=` | Location[] for symbol (multi-loc OK) |
+| `…/locations?name=` | Location[] for symbol (multi-loc OK; code sources only — skip `docs/` / README; C/Rust defs need body-like forms, not comments/call sites) |
 | `…/disasm?index=&offset=&limit=` | Disasm lines (ELF **shndx** / Wasm code window) |
 | `…/sections` · `…/sections/raw?index=&offset=&limit=` | Section list / ranged bytes |
 | `…/files` · `…/files/raw` · `…/files/mpy-disasm?path=` | Embedded files + basic mpy-dis |
