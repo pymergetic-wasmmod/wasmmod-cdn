@@ -6,6 +6,15 @@
 {% block content %}
 <section class="hero">
   <p class="eyebrow">package</p>
+  {% if fed_origin == 'remote' %}
+  <p class="fed-banner" role="status">
+    <span class="pill pill-remote">remote</span>
+    Federated via {{ fed_peer_label or 'peer CDN' }}.
+    {% if fed_peer_browse_url %}
+    <a href="{{ fed_peer_browse_url }}" rel="noopener" target="_blank">Visit on remote CDN</a>
+    {% endif %}
+  </p>
+  {% endif %}
   <div class="hero-title-row">
     <h1>{{ name }}</h1>
     {% if package_versions %}

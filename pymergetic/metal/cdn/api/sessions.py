@@ -27,9 +27,7 @@ async def list_sessions(
 ) -> list[ShellSessionRead]:
     user_id, anon_id, label = ensure_principal(request, user)
     ensure_csrf_token(request)
-    return await shells.list_mine(
-        user_id=user_id, anon_id=anon_id, principal_label=label
-    )
+    return await shells.list_mine(user_id=user_id, anon_id=anon_id, principal_label=label)
 
 
 @sessions_router.get("/{session_id}/activity", response_model=ShellActivityResponse)

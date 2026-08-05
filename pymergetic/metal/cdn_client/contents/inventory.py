@@ -12,6 +12,7 @@ from pymergetic.metal.cdn_client.contents.const import (
     SIG_SECTION,
     SOURCE_SECTION,
 )
+from pymergetic.metal.cdn_client.contents.host_ops import list_pack_symbols, pack_has_dwarf
 from pymergetic.metal.cdn_client.contents.models import (
     ArtifactBinaryKind,
     ArtifactContents,
@@ -20,7 +21,6 @@ from pymergetic.metal.cdn_client.contents.models import (
     PackageContents,
 )
 from pymergetic.metal.cdn_client.contents.mpzl import unwrap_mpzl
-from pymergetic.metal.cdn_client.contents.host_ops import list_pack_symbols, pack_has_dwarf
 from pymergetic.metal.cdn_client.contents.parse import (
     aot_version_from_filename,
     parse_deps_payload,

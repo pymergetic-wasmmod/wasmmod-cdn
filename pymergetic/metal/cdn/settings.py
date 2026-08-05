@@ -172,6 +172,32 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Federation (prefix-mounted child CDNs) — control plane in P0; proxy later.
+    federation_secrets_key: str | None = Field(
+        default=None,
+        description=(
+            "Fernet key material for encrypting peer bearer tokens at rest. "
+            "Empty → derive from session_secret."
+        ),
+    )
+    federation_max_hops: int = Field(
+        default=8,
+        ge=1,
+        le=64,
+        description="Max parent→child→… hops when proxying (P1+)",
+    )
+    federation_allow_private_net: bool = Field(
+        default=False,
+        description="Allow link-local / RFC1918 peer URLs (lab only)",
+    )
+    federation_mounts_json: str | None = Field(
+        default=None,
+        description=(
+            'Optional bootstrap mounts JSON: '
+            '[{"prefix":"a.b","url":"https://leaf/cdn","token":"mcdn_…","label":"leaf"}]'
+        ),
+    )
+
     @field_validator("base_path")
     @classmethod
     def _base_path_ok(cls, value: str) -> str:
@@ -202,7 +228,7 @@ class Settings(BaseSettings):
         v = value.strip().rstrip("/")
         if not v:
             return None
-        if not (v.startswith("http://") or v.startswith("https://")):
+        if not v.startswith(("http://", "https://")):
             raise ValueError("public_origin must be an http(s) URL")
         return v
 

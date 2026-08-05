@@ -67,8 +67,9 @@
       {% macro nav_nodes(nodes, depth=0) -%}
       <ul class="tree {% if depth == 0 %}tree-roots{% else %}tree-children{% endif %}"{% if depth > 0 %} hidden{% endif %}>
         {% for node in nodes %}
-        <li class="tree-node {% if node.is_folder %}is-folder{% endif %} {% if node.is_package and not node.is_folder %}is-leaf{% endif %} {% if node.is_package %}is-package{% endif %}"
+        <li class="tree-node {% if node.is_folder %}is-folder{% endif %} {% if node.is_package and not node.is_folder %}is-leaf{% endif %} {% if node.is_package %}is-package{% endif %}{% if node.origin == 'remote' %} is-remote{% endif %}"
             data-name="{{ node.name|lower }}"
+            data-origin="{{ node.origin or 'local' }}"
             {% if node.full_name %}data-package="{{ node.full_name }}" data-search="{{ node.full_name|lower }}"{% else %}data-search="{{ node.name|lower }}"{% endif %}>
           {% if node.is_folder %}
           <div class="tree-row">

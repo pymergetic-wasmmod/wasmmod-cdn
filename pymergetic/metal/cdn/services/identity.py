@@ -30,6 +30,10 @@ from pymergetic.metal.cdn.security import (
     hash_password,
     verify_password,
 )
+from pymergetic.metal.cdn.services.federation.scopes import (
+    scopes_from_storage,
+    scopes_to_storage,
+)
 
 
 class UserService:
@@ -113,7 +117,14 @@ class ApiKeyService:
 
     async def create(self, user_id: UUID, data: ApiKeyCreate) -> ApiKeyCreated:
         full, prefix, key_hash = generate_api_key()
-        row = ApiKey(user_id=user_id, name=data.name, prefix=prefix, key_hash=key_hash)
+        scopes_raw = scopes_to_storage(data.scopes)
+        row = ApiKey(
+            user_id=user_id,
+            name=data.name,
+            prefix=prefix,
+            key_hash=key_hash,
+            scopes=scopes_raw,
+        )
         self._session.add(row)
         await self._session.commit()
         await self._session.refresh(row)
@@ -122,6 +133,7 @@ class ApiKeyService:
             name=row.name,
             prefix=row.prefix,
             key=full,
+            scopes=scopes_from_storage(row.scopes),
             created_at=row.created_at,
         )
 
@@ -129,7 +141,19 @@ class ApiKeyService:
         result = await self._session.exec(
             select(ApiKey).where(ApiKey.user_id == user_id).order_by(col(ApiKey.created_at))
         )
-        return [ApiKeyRead.model_validate(r) for r in result.all()]
+        out: list[ApiKeyRead] = []
+        for r in result.all():
+            out.append(
+                ApiKeyRead(
+                    id=r.id,
+                    name=r.name,
+                    prefix=r.prefix,
+                    scopes=scopes_from_storage(r.scopes),
+                    created_at=r.created_at,
+                    revoked_at=r.revoked_at,
+                )
+            )
+        return out
 
     async def revoke(self, user_id: UUID, key_id: UUID) -> bool:
         row = await self._session.get(ApiKey, key_id)

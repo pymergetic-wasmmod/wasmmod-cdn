@@ -19,6 +19,7 @@ from pymergetic.metal.cdn.api.deps import (
     StorageDep,
     TrustServiceDep,
 )
+from pymergetic.metal.cdn.api.fed_deps import FederationProxyDep, FederationRegistryDep
 from pymergetic.metal.cdn.layout import ChannelLayout
 from pymergetic.metal.cdn.middleware.logging import metrics_text
 from pymergetic.metal.cdn.models import (
@@ -42,6 +43,7 @@ from pymergetic.metal.cdn.models import (
     VisibilityUpdate,
 )
 from pymergetic.metal.cdn.resolve import resolve_install_order
+from pymergetic.metal.cdn.services.federation.forward import forward_json, resolve_mount
 from pymergetic.metal.cdn.storage import collect_orphan_keys
 
 orgs_router = APIRouter(prefix="/orgs", tags=["orgs"])
@@ -221,9 +223,12 @@ def register_package_extensions(packages_router: APIRouter) -> None:
     @packages_router.get("/{name:path}/versions", response_model=list[PackageVersionOption])
     async def package_versions(
         name: str,
+        request: Request,
         indexes: IndexServiceDep,
         acl: AclServiceDep,
         user: OptionalUserDep,
+        reg: FederationRegistryDep,
+        proxy: FederationProxyDep,
     ) -> list[PackageVersionOption]:
         """Lead + pin channels that publish ``name`` (inspect / catalog pickers)."""
         try:
@@ -235,9 +240,19 @@ def register_package_extensions(packages_router: APIRouter) -> None:
         ):
             raise HTTPException(status_code=404, detail="package not found")
         rows = await indexes.package_versions(name)
-        if not rows:
+        if rows:
+            return rows
+        mount = await resolve_mount(reg, name)
+        if mount is None:
             raise HTTPException(status_code=404, detail="package not found")
-        return rows
+        data = await forward_json(
+            proxy=proxy,
+            reg=reg,
+            mount=mount,
+            path=f"/packages/{name}/versions",
+            request=request,
+        )
+        return [PackageVersionOption.model_validate(x) for x in data]
 
     @packages_router.post("/{name:path}/successor", response_model=PackageEntry)
     async def set_successor(

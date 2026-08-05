@@ -228,7 +228,7 @@ metal-cdn db upgrade   # Alembic
 
 ## Related
 
-- [docs/LAYOUT.md](docs/LAYOUT.md) · [docs/INDEX.md](docs/INDEX.md) · [docs/PROXY.md](docs/PROXY.md)
+- [docs/LAYOUT.md](docs/LAYOUT.md) · [docs/INDEX.md](docs/INDEX.md) · [docs/PROXY.md](docs/PROXY.md) · [docs/FEDERATION.md](docs/FEDERATION.md)
 - [docs/CLIENT.md](docs/CLIENT.md) · [docs/RELEASE.md](docs/RELEASE.md) · [docs/ROADMAP.md](docs/ROADMAP.md)
 - Pack format: [wasmmod PACK.md](https://github.com/pymergetic/wasmmod/blob/main/docs/PACK.md)
 

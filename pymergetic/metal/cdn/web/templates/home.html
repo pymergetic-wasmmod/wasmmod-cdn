@@ -45,6 +45,14 @@
       </select>
     </label>
     <label class="pkg-filter">
+      <span class="visually-hidden">Origin</span>
+      <select id="pkg-origin" aria-label="Origin filter">
+        <option value="all">Any origin</option>
+        <option value="local">Local</option>
+        <option value="remote">Federated</option>
+      </select>
+    </label>
+    <label class="pkg-filter">
       <span class="visually-hidden">Sort</span>
       <select id="pkg-sort" aria-label="Sort packages">
         <option value="date-desc">Newest first</option>
@@ -74,10 +82,11 @@
       </thead>
       <tbody>
         {% for pkg in catalog %}
-        <tr class="pkg-row"
+        <tr class="pkg-row{% if pkg.origin == 'remote' %} is-remote{% endif %}"
             data-name="{{ pkg.name|lower }}"
-            data-search="{{ (pkg.name ~ ' ' ~ (pkg.maintainer_email or '') ~ ' ' ~ (pkg.description or '') ~ ' ' ~ (pkg.deps.keys()|list|join(' ')) ~ ' ' ~ (pkg.needed_by|join(' ')))|lower }}"
+            data-search="{{ (pkg.name ~ ' ' ~ (pkg.maintainer_email or '') ~ ' ' ~ (pkg.description or '') ~ ' ' ~ (pkg.deps.keys()|list|join(' ')) ~ ' ' ~ (pkg.needed_by|join(' ')) ~ ' ' ~ (pkg.peer_label or '') ~ ' ' ~ (pkg.origin or ''))|lower }}"
             data-channel="{{ pkg.channel }}"
+            data-origin="{{ pkg.origin or 'local' }}"
             data-yanked="{{ '1' if pkg.yanked else '0' }}"
             data-deprecated="{{ '1' if pkg.deprecated else '0' }}"
             data-updated="{{ pkg.updated_at.isoformat() if pkg.updated_at else '' }}"
@@ -87,6 +96,10 @@
             data-needed="{{ pkg.needed_by|length }}">
           <td class="pkg-fqn">
             <a href="{{ package_href(pkg.channel, pkg.name) }}">{{ pkg.name }}</a>
+            {% if pkg.origin == 'remote' and pkg.peer_browse_url %}
+            <a class="pkg-remote-link" href="{{ pkg.peer_browse_url }}" rel="noopener" target="_blank"
+               title="Open on {{ pkg.peer_label or 'remote CDN' }}">Visit remote</a>
+            {% endif %}
             {% if pkg.description %}
             <span class="pkg-desc muted">{{ pkg.description }}</span>
             {% endif %}
@@ -134,9 +147,10 @@
           </td>
           <td class="pkg-arts mono">{{ pkg.artifact_count }}</td>
           <td class="pkg-flags">
+            {% if pkg.origin == 'remote' %}<span class="pill pill-remote" title="{{ pkg.peer_label or 'federated' }}">remote</span>{% endif %}
             {% if pkg.yanked %}<span class="pill pill-warn">yanked</span>{% endif %}
             {% if pkg.deprecated %}<span class="pill pill-warn">deprecated</span>{% endif %}
-            {% if not pkg.yanked and not pkg.deprecated %}<span class="muted">—</span>{% endif %}
+            {% if pkg.origin != 'remote' and not pkg.yanked and not pkg.deprecated %}<span class="muted">—</span>{% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -160,6 +174,7 @@
   const statusEl = document.getElementById("pkg-status");
   const channelEl = document.getElementById("pkg-channel");
   const depsEl = document.getElementById("pkg-deps");
+  const originEl = document.getElementById("pkg-origin");
   const sortEl = document.getElementById("pkg-sort");
   const countEl = document.getElementById("pkg-count");
   const emptyEl = document.getElementById("pkg-empty");
@@ -170,12 +185,14 @@
     const status = statusEl.value;
     const channel = channelEl.value;
     const deps = depsEl.value;
+    const origin = originEl ? originEl.value : "all";
     let visible = 0;
     rows.forEach((row) => {
       const hay = row.dataset.search || "";
       const yanked = row.dataset.yanked === "1";
       const deprecated = row.dataset.deprecated === "1";
       const ch = row.dataset.channel || "";
+      const org = row.dataset.origin || "local";
       const nDeps = Number(row.dataset.deps || 0);
       const nNeeded = Number(row.dataset.needed || 0);
       let ok = !q || hay.includes(q);
@@ -187,6 +204,8 @@
       if (ok && deps === "has-deps") ok = nDeps > 0;
       if (ok && deps === "needed") ok = nNeeded > 0;
       if (ok && deps === "leaf") ok = nDeps === 0 && nNeeded === 0;
+      if (ok && origin === "local") ok = org !== "remote";
+      if (ok && origin === "remote") ok = org === "remote";
       row.hidden = !ok;
       if (ok) visible += 1;
     });
@@ -213,7 +232,8 @@
     if (emptyEl) emptyEl.hidden = visible > 0;
   }
 
-  [qEl, statusEl, channelEl, depsEl, sortEl].forEach((el) => {
+  [qEl, statusEl, channelEl, depsEl, originEl, sortEl].forEach((el) => {
+    if (!el) return;
     el.addEventListener("input", apply);
     el.addEventListener("change", apply);
   });

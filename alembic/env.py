@@ -13,6 +13,7 @@ from sqlmodel import SQLModel
 
 # Import models so metadata is populated.
 import pymergetic.metal.cdn.models  # noqa: F401
+import pymergetic.metal.cdn.services.federation.tables  # noqa: F401
 from pymergetic.metal.cdn.settings import get_settings
 
 config = context.config

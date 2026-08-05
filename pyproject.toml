@@ -9,6 +9,7 @@ authors = [{ name = "Rouven Raudzus", email = "raudzus@pymergetic.com" }]
 dependencies = [
     "pymergetic-metal-cdn-client>=0.1.0a3",
     "cryptography>=42",
+    "httpx>=0.27.0",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.32.0",
     "sqlmodel>=0.0.22",

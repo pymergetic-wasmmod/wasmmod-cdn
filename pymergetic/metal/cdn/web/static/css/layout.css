@@ -111,6 +111,16 @@
   background: rgba(61, 156, 253, 0.14);
   color: var(--fg);
 }
+.tree-node.is-remote > .tree-row .tree-name,
+.tree-node.is-remote > .tree-leaf .tree-name {
+  color: var(--remote);
+}
+.tree-node.is-remote > .tree-row,
+.tree-node.is-remote > .tree-leaf {
+  border-left: 2px solid rgba(201, 162, 39, 0.55);
+  margin-left: 0.15rem;
+  padding-left: 0.2rem;
+}
 .tree-name {
   font-family: var(--mono);
   font-size: 0.9rem;

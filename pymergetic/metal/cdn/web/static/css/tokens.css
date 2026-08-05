@@ -3,8 +3,10 @@
   --bg: #0f1419;
   --fg: #e7ecf1;
   --muted: #8b9aab;
-  --accent: #3d9cfd;
+    --accent: #3d9cfd;
   --ready: #8ecf9a;
+  --remote: #c9a227;
+  --remote-dim: rgba(201, 162, 39, 0.12);
   --line: #243041;
   --card: #161d27;
   --sidebar: #121820;
