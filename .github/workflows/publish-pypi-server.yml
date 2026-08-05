@@ -1,4 +1,6 @@
-# Publish pymergetic-metal-cdn (own workflow file = own PyPI pending publisher).
+# Publish pymergetic-metal-cdn.
+# Prefer Trusted Publishing (OIDC). Until project publishers match this filename,
+# set repo secret PYPI_API_TOKEN (user/org scope covering both packages) — same as a6.
 name: publish-pypi-server
 
 on:
@@ -18,10 +20,11 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # No `environment:` — pending publisher is registered with empty / any env.
     permissions:
-      id-token: write # OIDC Trusted Publishing (graduates pending → normal)
+      id-token: write
       contents: read
+    env:
+      HAS_PYPI_TOKEN: ${{ secrets.PYPI_API_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,11 +40,21 @@ jobs:
           python -m build --wheel --sdist --outdir dist-server .
           twine check dist-server/*
 
-      - name: Publish server to PyPI
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run)
+      - name: Publish server to PyPI (OIDC)
+        if: >-
+          (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run))
+          && env.HAS_PYPI_TOKEN != 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist-server/
-          # OIDC only — never set password / PYPI_API_TOKEN here.
-          # Filename must match PyPI Trusted Publisher exactly (incl. .yml).
+          attestations: false
+
+      - name: Publish server to PyPI (API token escape hatch)
+        if: >-
+          (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.dry_run))
+          && env.HAS_PYPI_TOKEN == 'true'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-server/
+          password: ${{ secrets.PYPI_API_TOKEN }}
           attestations: false
