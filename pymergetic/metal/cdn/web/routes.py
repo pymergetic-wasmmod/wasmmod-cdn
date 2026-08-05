@@ -154,6 +154,21 @@ async def publish_page(request: Request, indexes: IndexServiceDep) -> HTMLRespon
     return templates.TemplateResponse(request, "publish.html", ctx)
 
 
+@web_router.get("/federation", response_class=HTMLResponse, include_in_schema=False)
+async def federation_page(request: Request, indexes: IndexServiceDep) -> HTMLResponse:
+    ctx = await _shell_context(
+        indexes, active_channel="lead", page="federation", request=request
+    )
+    user = ctx.get("current_user")
+    if user is None:
+        return RedirectResponse(
+            url=_url("login") + "?next=" + _url("federation"), status_code=307
+        )
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="admin required")
+    return templates.TemplateResponse(request, "federation.html", ctx)
+
+
 @web_router.get("/sessions", response_class=HTMLResponse, include_in_schema=False)
 async def sessions_page(
     request: Request,

@@ -33,6 +33,9 @@
         <a href="{{ href('channels', 'lead') }}" class="{% if active_page == 'browse' or not active_page %}is-active{% endif %}">Browse</a>
         <a href="{{ href('authors') }}" class="{% if active_page == 'users' %}is-active{% endif %}">Users</a>
         <a href="{{ href('publish') }}" class="{% if active_page == 'publish' %}is-active{% endif %}">Publish</a>
+        {% if current_user and current_user.is_admin %}
+        <a href="{{ href('federation') }}" class="{% if active_page == 'federation' %}is-active{% endif %}">Federation</a>
+        {% endif %}
         <a href="{{ href('sessions') }}" class="{% if active_page == 'sessions' %}is-active{% endif %}">Sessions</a>
         <a href="{{ href('docs') }}" class="{% if active_page == 'docs' %}is-active{% endif %}">API</a>
         {% if current_user %}

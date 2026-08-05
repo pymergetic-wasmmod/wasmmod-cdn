@@ -5,5 +5,6 @@
 @import url("css/artifacts.css"); /* Artifact panels, hexdump, source dialog chrome */
 @import url("css/inspect.css"); /* Inspect commander dual-pane */
 @import url("css/chrome.css"); /* Footer, auth/publish forms, shared muted/code */
+@import url("css/federation.css"); /* Admin federation link UI */
 @import url("css/sessions.css"); /* Shell sessions tab */
 @import url("css/repl.css"); /* Floating MicroPython REPL */

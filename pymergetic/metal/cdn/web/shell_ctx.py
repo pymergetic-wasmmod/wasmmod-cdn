@@ -73,6 +73,12 @@ async def _shell_context(
                     mtimes_css.append(int(child.stat().st_mtime))
                 except OSError:
                     pass
+        fed_js = static_dir / "federation.js"
+        if fed_js.is_file():
+            try:
+                mtimes_css.append(int(fed_js.stat().st_mtime))
+            except OSError:
+                pass
         if mtimes_css:
             site_css_v = format(max(mtimes_css), "x")
         inspect_js = static_dir / "inspect.js"

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Federation — {{ brand_name }}{% endblock %}
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">admin</p>
+  <h1>Federation</h1>
+  <p class="lede">
+    Link child CDNs under a package-name prefix. Child accepts a grant (one-time API key);
+    parent creates a peer + mount with that bearer. Devices keep using this CDN’s URL.
+  </p>
+</section>
+
+<div id="fed-root" class="fed-page" data-base="{{ base_path }}">
+  <p id="fed-msg" class="muted" role="status"></p>
+
+  <section class="fed-panel" aria-labelledby="fed-status-h">
+    <h2 id="fed-status-h">Status</h2>
+    <dl id="fed-status" class="fed-status muted">Loading…</dl>
+  </section>
+
+  <div class="fed-grid">
+    <section class="fed-panel" aria-labelledby="fed-child-h">
+      <h2 id="fed-child-h">Child — accept grant</h2>
+      <p class="muted fed-help">Run on the <em>child</em> CDN. Copy the revealed API key to the parent mount.</p>
+      <form id="fed-accept" class="auth-form fed-form">
+        <label>Prefix <input name="prefix" required placeholder="a.b" autocomplete="off" /></label>
+        <label>Parent label <input name="parent_label" required placeholder="parent-cdn" autocomplete="off" /></label>
+        <label>Parent base URL <input name="parent_base_url" type="url" placeholder="https://parent.example/cdn" /></label>
+        <label>Key name <input name="key_name" value="federation-parent" /></label>
+        <button type="submit">Accept grant</button>
+      </form>
+      <pre id="fed-accept-out" class="fed-secret" hidden></pre>
+    </section>
+
+    <section class="fed-panel" aria-labelledby="fed-parent-h">
+      <h2 id="fed-parent-h">Parent — peer + mount</h2>
+      <p class="muted fed-help">Run on the <em>parent</em>. Use the child’s grant API key as the bearer.</p>
+      <form id="fed-link" class="auth-form fed-form">
+        <label>Peer label <input name="label" required placeholder="leaf" autocomplete="off" /></label>
+        <label>Child CDN URL <input name="base_url" type="url" required placeholder="https://leaf.example/cdn" /></label>
+        <label>Browse URL (optional) <input name="public_browse_url" type="url" placeholder="same as base if empty" /></label>
+        <label>Mount prefix <input name="prefix" required placeholder="a.b" autocomplete="off" /></label>
+        <label>Bearer token <input name="bearer_token" required autocomplete="off" spellcheck="false" /></label>
+        <button type="submit">Create peer + mount</button>
+      </form>
+    </section>
+  </div>
+
+  <section class="fed-panel" aria-labelledby="fed-peers-h">
+    <h2 id="fed-peers-h">Peers</h2>
+    <div id="fed-peers" class="fed-table-wrap muted">Loading…</div>
+  </section>
+
+  <section class="fed-panel" aria-labelledby="fed-mounts-h">
+    <h2 id="fed-mounts-h">Mounts</h2>
+    <div id="fed-mounts" class="fed-table-wrap muted">Loading…</div>
+  </section>
+
+  <section class="fed-panel" aria-labelledby="fed-grants-h">
+    <h2 id="fed-grants-h">Grants (this CDN as child)</h2>
+    <div id="fed-grants" class="fed-table-wrap muted">Loading…</div>
+  </section>
+</div>
+
+<script src="{{ href('static', 'federation.js') }}{% if site_css_v %}?v={{ site_css_v }}{% endif %}" defer></script>
+{% endblock %}

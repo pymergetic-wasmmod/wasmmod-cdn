@@ -8,7 +8,6 @@ from fastapi.responses import Response
 from pymergetic.metal.cdn.api.artifact_io import (
     _artifact_or_forward,
     _embedded_raw_response,
-    _load_artifact_bytes,
     _load_artifact_bytes_fed,
     _section_raw_response,
 )
@@ -122,8 +121,19 @@ async def inspect_artifact_pin(
 
 
 @artifacts_router.get("/lead/{filename}/files", response_model=EmbeddedFileView)
-async def embedded_file_lead(filename: str, path: str, storage: StorageDep) -> EmbeddedFileView:
-    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+async def embedded_file_lead(filename: str, path: str, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep) -> EmbeddedFileView:
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel="lead",
+        filename=filename,
+        peer_path=f"/artifacts/lead/{filename}",
+    )
     try:
         return extract_embedded_file(data, path)
     except FileNotFoundError as exc:
@@ -134,9 +144,20 @@ async def embedded_file_lead(filename: str, path: str, storage: StorageDep) -> E
 
 @artifacts_router.get("/pin/{version}/{filename}/files", response_model=EmbeddedFileView)
 async def embedded_file_pin(
-    version: str, filename: str, path: str, storage: StorageDep
+    version: str, filename: str, path: str, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep
 ) -> EmbeddedFileView:
-    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel=f"@{version}",
+        filename=filename,
+        peer_path=f"/artifacts/pin/{version}/{filename}",
+    )
     try:
         return extract_embedded_file(data, path)
     except FileNotFoundError as exc:
@@ -146,8 +167,19 @@ async def embedded_file_pin(
 
 
 @artifacts_router.get("/lead/{filename}/files/raw")
-async def embedded_file_raw_lead(filename: str, path: str, storage: StorageDep) -> Response:
-    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+async def embedded_file_raw_lead(filename: str, path: str, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep) -> Response:
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel="lead",
+        filename=filename,
+        peer_path=f"/artifacts/lead/{filename}",
+    )
     try:
         body, _section, _kind, _resolved = extract_embedded_bytes(data, path)
     except FileNotFoundError as exc:
@@ -159,9 +191,20 @@ async def embedded_file_raw_lead(filename: str, path: str, storage: StorageDep) 
 
 @artifacts_router.get("/pin/{version}/{filename}/files/raw")
 async def embedded_file_raw_pin(
-    version: str, filename: str, path: str, storage: StorageDep
+    version: str, filename: str, path: str, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep
 ) -> Response:
-    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel=f"@{version}",
+        filename=filename,
+        peer_path=f"/artifacts/pin/{version}/{filename}",
+    )
     try:
         body, _section, _kind, _resolved = extract_embedded_bytes(data, path)
     except FileNotFoundError as exc:
@@ -172,48 +215,114 @@ async def embedded_file_raw_pin(
 
 
 @artifacts_router.get("/lead/{filename}/symbols", response_model=list[SymbolInfo])
-async def symbols_lead(filename: str, storage: StorageDep) -> list[SymbolInfo]:
-    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+async def symbols_lead(filename: str, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep) -> list[SymbolInfo]:
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel="lead",
+        filename=filename,
+        peer_path=f"/artifacts/lead/{filename}",
+    )
     return list_pack_symbols(data)
 
 
 @artifacts_router.get("/pin/{version}/{filename}/symbols", response_model=list[SymbolInfo])
-async def symbols_pin(version: str, filename: str, storage: StorageDep) -> list[SymbolInfo]:
-    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+async def symbols_pin(version: str, filename: str, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep) -> list[SymbolInfo]:
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel=f"@{version}",
+        filename=filename,
+        peer_path=f"/artifacts/pin/{version}/{filename}",
+    )
     return list_pack_symbols(data)
 
 
 @artifacts_router.get("/lead/{filename}/addr2line", response_model=list[LocationInfo])
-async def addr2line_lead(filename: str, addr: int, storage: StorageDep) -> list[LocationInfo]:
+async def addr2line_lead(filename: str, addr: int, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep) -> list[LocationInfo]:
     """Map ``addr`` (decimal integer query) to source/symbol locations.
 
     Pass a decimal integer (e.g. ``?addr=16``). Hex ``0x`` prefixes are not
     required — clients should convert before calling.
     """
-    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel="lead",
+        filename=filename,
+        peer_path=f"/artifacts/lead/{filename}",
+    )
     return pack_addr2line(data, addr)
 
 
 @artifacts_router.get("/pin/{version}/{filename}/addr2line", response_model=list[LocationInfo])
 async def addr2line_pin(
-    version: str, filename: str, addr: int, storage: StorageDep
+    version: str, filename: str, addr: int, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep
 ) -> list[LocationInfo]:
     """Pin variant of addr2line (``addr`` is a decimal integer query param)."""
-    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel=f"@{version}",
+        filename=filename,
+        peer_path=f"/artifacts/pin/{version}/{filename}",
+    )
     return pack_addr2line(data, addr)
 
 
 @artifacts_router.get("/lead/{filename}/locations", response_model=list[LocationInfo])
-async def locations_lead(filename: str, name: str, storage: StorageDep) -> list[LocationInfo]:
-    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+async def locations_lead(filename: str, name: str, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep) -> list[LocationInfo]:
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel="lead",
+        filename=filename,
+        peer_path=f"/artifacts/lead/{filename}",
+    )
     return pack_locations(data, name)
 
 
 @artifacts_router.get("/pin/{version}/{filename}/locations", response_model=list[LocationInfo])
 async def locations_pin(
-    version: str, filename: str, name: str, storage: StorageDep
+    version: str, filename: str, name: str, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep
 ) -> list[LocationInfo]:
-    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel=f"@{version}",
+        filename=filename,
+        peer_path=f"/artifacts/pin/{version}/{filename}",
+    )
     return pack_locations(data, name)
 
 
@@ -221,11 +330,22 @@ async def locations_pin(
 async def disasm_lead(
     filename: str,
     index: int,
+    request: Request,
     storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep,
     offset: int = 0,
     limit: int = 64,
 ) -> list[DisasmLineInfo]:
-    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel="lead",
+        filename=filename,
+        peer_path=f"/artifacts/lead/{filename}",
+    )
     return pack_disasm(data, index, offset=offset, limit=limit)
 
 
@@ -234,19 +354,41 @@ async def disasm_pin(
     version: str,
     filename: str,
     index: int,
+    request: Request,
     storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep,
     offset: int = 0,
     limit: int = 64,
 ) -> list[DisasmLineInfo]:
-    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel=f"@{version}",
+        filename=filename,
+        peer_path=f"/artifacts/pin/{version}/{filename}",
+    )
     return pack_disasm(data, index, offset=offset, limit=limit)
 
 
 @artifacts_router.get("/lead/{filename}/files/mpy-disasm", response_model=list[DisasmLineInfo])
 async def mpy_disasm_lead(
-    filename: str, path: str, storage: StorageDep, limit: int = 80
+    filename: str, path: str, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep, limit: int = 80
 ) -> list[DisasmLineInfo]:
-    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel="lead",
+        filename=filename,
+        peer_path=f"/artifacts/lead/{filename}",
+    )
     try:
         body, _section, _kind, _resolved = extract_embedded_bytes(data, path)
     except FileNotFoundError as exc:
@@ -260,9 +402,20 @@ async def mpy_disasm_lead(
     "/pin/{version}/{filename}/files/mpy-disasm", response_model=list[DisasmLineInfo]
 )
 async def mpy_disasm_pin(
-    version: str, filename: str, path: str, storage: StorageDep, limit: int = 80
+    version: str, filename: str, path: str, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep, limit: int = 80
 ) -> list[DisasmLineInfo]:
-    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel=f"@{version}",
+        filename=filename,
+        peer_path=f"/artifacts/pin/{version}/{filename}",
+    )
     try:
         body, _section, _kind, _resolved = extract_embedded_bytes(data, path)
     except FileNotFoundError as exc:
@@ -273,8 +426,19 @@ async def mpy_disasm_pin(
 
 
 @artifacts_router.get("/lead/{filename}/sections", response_model=list[ContainerSectionInfo])
-async def sections_lead(filename: str, storage: StorageDep) -> list[ContainerSectionInfo]:
-    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+async def sections_lead(filename: str, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep) -> list[ContainerSectionInfo]:
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel="lead",
+        filename=filename,
+        peer_path=f"/artifacts/lead/{filename}",
+    )
     return list_container_sections(data)
 
 
@@ -282,9 +446,20 @@ async def sections_lead(filename: str, storage: StorageDep) -> list[ContainerSec
     "/pin/{version}/{filename}/sections", response_model=list[ContainerSectionInfo]
 )
 async def sections_pin(
-    version: str, filename: str, storage: StorageDep
+    version: str, filename: str, request: Request,
+    storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep
 ) -> list[ContainerSectionInfo]:
-    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel=f"@{version}",
+        filename=filename,
+        peer_path=f"/artifacts/pin/{version}/{filename}",
+    )
     return list_container_sections(data)
 
 
@@ -292,11 +467,22 @@ async def sections_pin(
 async def section_raw_lead(
     filename: str,
     index: int,
+    request: Request,
     storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep,
     offset: int = 0,
     limit: int | None = None,
 ) -> Response:
-    data = await _load_artifact_bytes(storage, channel="lead", filename=filename)
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel="lead",
+        filename=filename,
+        peer_path=f"/artifacts/lead/{filename}",
+    )
     try:
         body = extract_container_section(data, index=index)
         sections = list_container_sections(data)
@@ -314,11 +500,22 @@ async def section_raw_pin(
     version: str,
     filename: str,
     index: int,
+    request: Request,
     storage: StorageDep,
+    reg: FederationRegistryDep,
+    proxy: FederationProxyDep,
     offset: int = 0,
     limit: int | None = None,
 ) -> Response:
-    data = await _load_artifact_bytes(storage, channel=f"@{version}", filename=filename)
+    data = await _load_artifact_bytes_fed(
+        storage=storage,
+        request=request,
+        reg=reg,
+        proxy=proxy,
+        channel=f"@{version}",
+        filename=filename,
+        peer_path=f"/artifacts/pin/{version}/{filename}",
+    )
     try:
         body = extract_container_section(data, index=index)
         sections = list_container_sections(data)

@@ -67,14 +67,25 @@ On local miss (package / versions / artifact GET|HEAD):
 3. Response may include `X-Metal-Origin: remote` and `X-Metal-Fed-Mount: <prefix>`.
 4. Local package/artifact of the same name **shadows** the peer (no remote headers).
 
-Still later: ticket auth (Ed25519), inspect-subpath beyond `/inspect`, publish upstream.
+Still later: ticket auth (Ed25519), publish upstream.
 
 ### Catalog + UI (P2)
 
 - Merged browse catalog / `GET /packages?channel=lead` with `origin=remote`, mount + peer browse URL.
 - Sidebar nav rebuilds from the merged catalog; remote nodes tinted.
 - Flags: **remote** pill, **Visit remote** link, origin filter; package page banner.
+- Inspect subpaths (`/files`, `/symbols`, `/disasm`, …) load via the same federation-aware artifact path as `/inspect`.
 
-## UI (planned)
+### Admin UI (P3)
 
-Federated rows: distinct color/icon; button opens `peer_browse_url` (or `public_browse_url`).
+Browse **Federation** (admin nav) at `/federation`:
+
+- Status counts + `proxy_ready`
+- **Child**: accept grant → one-time API key reveal
+- **Parent**: create peer + mount with bearer in one step
+- List / delete peers & mounts; revoke grants
+
+## UI
+
+Federated catalog rows use remote tint + **Visit remote** (`peer_browse_url`).
+Admin link flow is the `/federation` page above (API under `/admin/federation/*` remains available for scripts).
