@@ -280,41 +280,42 @@ step_seed() {
   _py_bin="$(cd "$(dirname "$(command -v python3)")" && pwd)"
   PATH="${_py_bin}:/usr/bin:/bin:${PATH}" make -C "$examples" sign-packs
   echo "==> publish samples → $CDN_URL (Bearer)"
-  [[ -f "$packs/hello.wasm" ]] || { echo "FAIL: missing $packs/hello.wasm" >&2; exit 1; }
+  local EX=pymergetic.wasmmod_examples
+  [[ -f "$packs/${EX}.hello.wasm" ]] || { echo "FAIL: missing $packs/${EX}.hello.wasm" >&2; exit 1; }
 
-  local hello_files=("$packs/hello.wasm")
-  [[ -f "$packs/hello.elf" ]] && hello_files+=("$packs/hello.elf")
-  [[ -f "$packs/hello.x86_64.elf" ]] && hello_files+=("$packs/hello.x86_64.elf")
-  [[ -f "$packs/hello.aarch64.elf" ]] && hello_files+=("$packs/hello.aarch64.elf")
-  pub_pkg hello "${hello_files[@]}"
+  local hello_files=("$packs/${EX}.hello.wasm")
+  [[ -f "$packs/${EX}.hello.elf" ]] && hello_files+=("$packs/${EX}.hello.elf")
+  [[ -f "$packs/${EX}.hello.x86_64.elf" ]] && hello_files+=("$packs/${EX}.hello.x86_64.elf")
+  [[ -f "$packs/${EX}.hello.aarch64.elf" ]] && hello_files+=("$packs/${EX}.hello.aarch64.elf")
+  pub_pkg "${EX}.hello" "${hello_files[@]}"
 
-  local client_files=("$packs/client.wasm")
-  [[ -f "$packs/client.elf" ]] && client_files+=("$packs/client.elf")
-  [[ -f "$packs/client.x86_64.elf" ]] && client_files+=("$packs/client.x86_64.elf")
-  pub_pkg client '{"hello":"0.1.0"}' "${client_files[@]}"
+  local client_files=("$packs/${EX}.client.wasm")
+  [[ -f "$packs/${EX}.client.elf" ]] && client_files+=("$packs/${EX}.client.elf")
+  [[ -f "$packs/${EX}.client.x86_64.elf" ]] && client_files+=("$packs/${EX}.client.x86_64.elf")
+  pub_pkg "${EX}.client" "{\"${EX}.hello\":\"0.1.0\"}" "${client_files[@]}"
 
   local host_files=()
-  [[ -f "$packs/hostcall.elf" ]] && host_files+=("$packs/hostcall.elf")
-  [[ -f "$packs/hostcall.x86_64.elf" ]] && host_files+=("$packs/hostcall.x86_64.elf")
+  [[ -f "$packs/${EX}.hostcall.elf" ]] && host_files+=("$packs/${EX}.hostcall.elf")
+  [[ -f "$packs/${EX}.hostcall.x86_64.elf" ]] && host_files+=("$packs/${EX}.hostcall.x86_64.elf")
   if [[ ${#host_files[@]} -gt 0 ]]; then
-    pub_pkg hostcall "${host_files[@]}"
+    pub_pkg "${EX}.hostcall" "${host_files[@]}"
   fi
 
   local ticks_files=()
-  [[ -f "$packs/ticks.wasm" ]] && ticks_files+=("$packs/ticks.wasm")
-  [[ -f "$packs/ticks.elf" ]] && ticks_files+=("$packs/ticks.elf")
+  [[ -f "$packs/${EX}.ticks.wasm" ]] && ticks_files+=("$packs/${EX}.ticks.wasm")
+  [[ -f "$packs/${EX}.ticks.elf" ]] && ticks_files+=("$packs/${EX}.ticks.elf")
   if [[ ${#ticks_files[@]} -gt 0 ]]; then
-    pub_pkg ticks "${ticks_files[@]}"
+    pub_pkg "${EX}.ticks" "${ticks_files[@]}"
   fi
 
-  pub_pkg mixed                "$packs/mixed.wasm"
-  pub_pkg bridge               "$packs/bridge.wasm"
-  pub_pkg test_a               "$packs/test_a.wasm"
-  pub_pkg test_a.test_d        "$packs/test_a.test_d.wasm"
-  pub_pkg test_a.test_b.test_c '{"test_a.test_d":"0.1.0"}' "$packs/test_a.test_b.test_c.wasm"
-  pub_pkg test_a2              "$packs/test_a2.wasm"
-  pub_pkg test_a2.test_d2      "$packs/test_a2.test_d2.wasm"
-  pub_pkg test_a2.test_b2.test_c2 '{"test_a2.test_d2":"0.1.0"}' "$packs/test_a2.test_b2.test_c2.wasm"
+  pub_pkg "${EX}.mixed"                "$packs/${EX}.mixed.wasm"
+  pub_pkg "${EX}.bridge"               "$packs/${EX}.bridge.wasm"
+  pub_pkg "${EX}.test_a"               "$packs/${EX}.test_a.wasm"
+  pub_pkg "${EX}.test_a.test_d"        "$packs/${EX}.test_a.test_d.wasm"
+  pub_pkg "${EX}.test_a.test_b.test_c" "{\"${EX}.test_a.test_d\":\"0.1.0\"}" "$packs/${EX}.test_a.test_b.test_c.wasm"
+  pub_pkg "${EX}.test_a2"              "$packs/${EX}.test_a2.wasm"
+  pub_pkg "${EX}.test_a2.test_d2"      "$packs/${EX}.test_a2.test_d2.wasm"
+  pub_pkg "${EX}.test_a2.test_b2.test_c2" "{\"${EX}.test_a2.test_d2\":\"0.1.0\"}" "$packs/${EX}.test_a2.test_b2.test_c2.wasm"
 
   # First-party host engine (self-describing micropython.wasm + wasmmod.source).
   local eng_src eng_pub
@@ -336,12 +337,12 @@ step_seed() {
   echo "==> lead packages:"
   curl -sf "$CDN_URL/index/lead" | python3 -c \
     "import sys,json; print('   ', ', '.join(sorted(json.load(sys.stdin).get('packages',{}))))"
-  echo -n "==> signature check hello.wasm … "
-  curl -sf "$CDN_URL/artifacts/lead/hello.wasm/inspect" | python3 -c \
+  echo -n "==> signature check ${EX}.hello.wasm … "
+  curl -sf "$CDN_URL/artifacts/lead/${EX}.hello.wasm/inspect" | python3 -c \
     'import sys,json; d=json.load(sys.stdin); ok=bool(d.get("signed") and d.get("sig")); print("signed" if ok else "UNSIGNED"); raise SystemExit(0 if ok else 1)'
-  if [[ -f "$packs/hello.elf" ]]; then
-    echo -n "==> signature check hello.elf … "
-    curl -sf "$CDN_URL/artifacts/lead/hello.elf/inspect" | python3 -c \
+  if [[ -f "$packs/${EX}.hello.elf" ]]; then
+    echo -n "==> signature check ${EX}.hello.elf … "
+    curl -sf "$CDN_URL/artifacts/lead/${EX}.hello.elf/inspect" | python3 -c \
       'import sys,json; d=json.load(sys.stdin); ok=bool(d.get("signed") and d.get("sig")); print("signed" if ok else "UNSIGNED"); raise SystemExit(0 if ok else 1)'
   fi
 }
@@ -381,5 +382,5 @@ echo
 echo "OK  UI     $CDN_URL/"
 echo "    auth   REQUIRE_AUTH on — login ${METAL_CDN_BOOTSTRAP_ADMIN_EMAIL:-demo@…}"
 echo "    secrets $SECRETS_ENV  |  token $SECRETS_TOKEN"
-echo "    shell  open µPy panel → packages()  |  import hello"
+echo "    shell  open µPy panel → packages()  |  import pymergetic.wasmmod_examples.hello"
 echo "    stop   docker rm -f $NAME"

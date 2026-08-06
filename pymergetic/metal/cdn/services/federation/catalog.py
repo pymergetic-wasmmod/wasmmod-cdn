@@ -154,6 +154,7 @@ def nav_from_catalog(catalog: list[PackageSummary]) -> list[PackageNavNode]:
     """Build sidebar nav from a (possibly federated) flat catalog."""
     by_name: dict[str, list[PackageVersionOption]] = {}
     origins: dict[str, tuple[str, str | None]] = {}
+    roles: dict[str, str | None] = {}
     for pkg in catalog:
         opt = PackageVersionOption(
             channel=pkg.channel,
@@ -167,11 +168,10 @@ def nav_from_catalog(catalog: list[PackageSummary]) -> list[PackageNavNode]:
         )
         by_name.setdefault(pkg.name, []).append(opt)
         origins[pkg.name] = (pkg.origin, pkg.peer_browse_url)
+        if pkg.name not in roles or roles[pkg.name] is None:
+            roles[pkg.name] = pkg.role
 
-    roots: list[PackageNavNode] = []
-    for full_name in sorted(by_name.keys()):
-        parts = full_name.split(".") if "." in full_name else full_name.split("/")
-        IndexService._nav_insert(roots, parts, full_name, by_name[full_name])
+    roots = IndexService.build_package_nav(by_name, roles)
     _tag_nav_origins(roots, origins)
     return roots
 
@@ -187,7 +187,12 @@ def _tag_nav_origins(
             node.peer_browse_url = browse
         if node.children:
             _tag_nav_origins(node.children, origins)
-        if node.is_folder and not node.is_package and _all_remote_descendants(node):
+        if (
+            node.is_folder
+            and not node.is_package
+            and node.name != "Platform"
+            and _all_remote_descendants(node)
+        ):
             node.origin = "remote"
 
 

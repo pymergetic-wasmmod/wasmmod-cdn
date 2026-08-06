@@ -212,6 +212,11 @@ class PackageSummary(BaseModel):
     mount_prefix: str | None = None
     peer_label: str | None = None
     peer_browse_url: str | None = None
+    # Platform engine/kernel identity (from contents.tags.role or known names).
+    role: str | None = Field(
+        default=None,
+        description="host | kernel when this is a platform pack; else None",
+    )
 
 
 class MaintainerSummary(BaseModel):
@@ -257,6 +262,7 @@ class PackageNavNode(BaseModel):
     versions: list[PackageVersionOption] = Field(default_factory=list)
     origin: str = "local"
     peer_browse_url: str | None = None
+    role: str | None = None
 
     @property
     def is_folder(self) -> bool:
@@ -270,6 +276,10 @@ class PackageNavNode(BaseModel):
     @property
     def is_remote(self) -> bool:
         return self.origin == "remote"
+
+    @property
+    def is_platform(self) -> bool:
+        return self.role in ("host", "kernel")
 
 
 class HealthResponse(BaseModel):

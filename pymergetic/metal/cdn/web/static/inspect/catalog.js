@@ -9,17 +9,29 @@ import { fetchJson } from "./http.js";
 import { hooks, requireUi } from "./ctx.js";
 import { flashMeta, setMetaStatus } from "./view.js";
 
+function roleRank(role) {
+  if (role === "host") return 0;
+  if (role === "kernel") return 1;
+  return 2;
+}
+
 export async function ensurePackageList() {
   const { state } = requireUi();
   if (state.packages && state.packages.length) return;
   const root = cdnPrefix();
   try {
     const rows = await fetchJson(`${root}/packages?channel=lead`);
-    state.packages = (rows || [])
-      .map((r) => r.name)
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b));
+    const rich = (rows || [])
+      .filter((r) => r && r.name)
+      .map((r) => ({ name: r.name, role: r.role || null }));
+    rich.sort((a, b) => {
+      const rr = roleRank(a.role) - roleRank(b.role);
+      return rr !== 0 ? rr : a.name.localeCompare(b.name);
+    });
+    state.packageMeta = Object.fromEntries(rich.map((r) => [r.name, r]));
+    state.packages = rich.map((r) => r.name);
   } catch (_) {
+    state.packageMeta = {};
     state.packages = state.opts && state.opts.package ? [state.opts.package] : [];
   }
 }

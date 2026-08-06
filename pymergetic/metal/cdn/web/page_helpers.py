@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse
 from pymergetic.metal.cdn.db import Database
 from pymergetic.metal.cdn.layout import ChannelLayout, ChannelRef
 from pymergetic.metal.cdn.models import PackageEntry
+from pymergetic.metal.cdn.services.index_service import package_role
 from pymergetic.metal.cdn.services.channel import IndexService
 from pymergetic.metal.cdn.services.federation.catalog import enrich_shell_lists
 from pymergetic.metal.cdn.services.federation.forward import forward_json, resolve_mount
@@ -91,6 +92,7 @@ async def _package_page(
             "fed_origin": fed_origin,
             "fed_peer_label": fed_peer_label,
             "fed_peer_browse_url": fed_peer_browse_url,
+            "package_role": package_role(name, entry),
         }
     )
     return templates.TemplateResponse(request, "package.html", ctx)

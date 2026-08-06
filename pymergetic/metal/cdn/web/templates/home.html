@@ -147,10 +147,12 @@
           </td>
           <td class="pkg-arts mono">{{ pkg.artifact_count }}</td>
           <td class="pkg-flags">
+            {% if pkg.role == 'host' %}<span class="pill pill-host">host</span>{% endif %}
+            {% if pkg.role == 'kernel' %}<span class="pill pill-kernel">kernel</span>{% endif %}
             {% if pkg.origin == 'remote' %}<span class="pill pill-remote" title="{{ pkg.peer_label or 'federated' }}">remote</span>{% endif %}
             {% if pkg.yanked %}<span class="pill pill-warn">yanked</span>{% endif %}
             {% if pkg.deprecated %}<span class="pill pill-warn">deprecated</span>{% endif %}
-            {% if pkg.origin != 'remote' and not pkg.yanked and not pkg.deprecated %}<span class="muted">—</span>{% endif %}
+            {% if not pkg.role and pkg.origin != 'remote' and not pkg.yanked and not pkg.deprecated %}<span class="muted">—</span>{% endif %}
           </td>
         </tr>
         {% endfor %}

@@ -450,11 +450,13 @@ export function renderNav() {
         ? [pkg]
         : [];
     if (pkg && !pkgs.includes(pkg)) pkgs.unshift(pkg);
+    const meta = state.packageMeta || {};
     els.packageSel.innerHTML = pkgs
-      .map(
-        (n) =>
-          `<option value="${esc(n)}"${n === pkg ? " selected" : ""}>${esc(n)}</option>`
-      )
+      .map((n) => {
+        const role = meta[n] && meta[n].role;
+        const label = role ? `${n} · ${role}` : n;
+        return `<option value="${esc(n)}"${n === pkg ? " selected" : ""}>${esc(label)}</option>`;
+      })
       .join("");
     els.packageSel.disabled = pkgs.length < 1;
 

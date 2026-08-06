@@ -70,9 +70,10 @@
       {% macro nav_nodes(nodes, depth=0) -%}
       <ul class="tree {% if depth == 0 %}tree-roots{% else %}tree-children{% endif %}"{% if depth > 0 %} hidden{% endif %}>
         {% for node in nodes %}
-        <li class="tree-node {% if node.is_folder %}is-folder{% endif %} {% if node.is_package and not node.is_folder %}is-leaf{% endif %} {% if node.is_package %}is-package{% endif %}{% if node.origin == 'remote' %} is-remote{% endif %}"
+        <li class="tree-node {% if node.is_folder %}is-folder{% endif %} {% if node.is_package and not node.is_folder %}is-leaf{% endif %} {% if node.is_package %}is-package{% endif %}{% if node.origin == 'remote' %} is-remote{% endif %}{% if node.role == 'host' %} is-host{% elif node.role == 'kernel' %} is-kernel{% endif %}{% if node.name == 'Platform' %} is-platform{% endif %}"
             data-name="{{ node.name|lower }}"
             data-origin="{{ node.origin or 'local' }}"
+            data-role="{{ node.role or '' }}"
             {% if node.full_name %}data-package="{{ node.full_name }}" data-search="{{ node.full_name|lower }}"{% else %}data-search="{{ node.name|lower }}"{% endif %}>
           {% if node.is_folder %}
           <div class="tree-row">
@@ -86,6 +87,7 @@
               href="{{ package_href(default_ch if active_package != node.full_name else active_channel, node.full_name) }}"
               data-package="{{ node.full_name }}"
             >{{ node.name }}</a>
+            {% if node.role == 'host' %}<span class="pill pill-host">host</span>{% elif node.role == 'kernel' %}<span class="pill pill-kernel">kernel</span>{% endif %}
             {% if node.versions|length > 1 %}
             <label class="tree-ver-wrap">
               <span class="visually-hidden">Version</span>
@@ -119,6 +121,7 @@
             >
               <span class="tree-name">{{ node.name }}</span>
             </a>
+            {% if node.role == 'host' %}<span class="pill pill-host">host</span>{% elif node.role == 'kernel' %}<span class="pill pill-kernel">kernel</span>{% endif %}
             {% if node.versions|length > 1 %}
             <label class="tree-ver-wrap">
               <span class="visually-hidden">Version</span>

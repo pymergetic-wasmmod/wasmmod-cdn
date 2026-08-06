@@ -232,6 +232,16 @@ a.ver:hover { text-decoration: underline; }
   color: var(--remote);
   border: 1px solid rgba(201, 162, 39, 0.45);
 }
+.pill-host {
+  background: var(--host-dim);
+  color: var(--host);
+  border: 1px solid rgba(106, 159, 181, 0.45);
+}
+.pill-kernel {
+  background: var(--kernel-dim);
+  color: var(--kernel);
+  border: 1px solid rgba(142, 207, 154, 0.45);
+}
 .pkg-remote-link {
   margin-left: 0.35rem;
   font-size: 0.78rem;

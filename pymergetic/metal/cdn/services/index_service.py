@@ -19,6 +19,23 @@ from pymergetic.metal.cdn.models import (
 )
 from pymergetic.metal.cdn.storage import ObjectStorage
 
+# Known platform FQNs when an older index lacks contents.tags.role.
+_KNOWN_PLATFORM_ROLES: dict[str, str] = {
+    "pymergetic.wasmmod": "host",
+    "pymergetic.metal": "kernel",
+}
+
+
+def package_role(name: str, entry: PackageEntry | None = None) -> str | None:
+    """Return ``host`` / ``kernel`` from contents tags or known-name fallback."""
+    tags = None
+    if entry is not None and entry.contents is not None:
+        tags = entry.contents.tags or {}
+        role = (tags.get("role") or "").strip().lower()
+        if role in ("host", "kernel"):
+            return role
+    return _KNOWN_PLATFORM_ROLES.get(name)
+
 
 def sign_index(index: ChannelIndex, key: str) -> str:
     """HMAC-SHA256 over canonical JSON without the signature field."""
@@ -103,6 +120,7 @@ class IndexService:
                     homepage=entry.homepage,
                     updated_at=entry.updated_at or index.generated,
                     version_count=1,
+                    role=package_role(name, entry),
                 )
             )
         return out
@@ -169,6 +187,7 @@ class IndexService:
                     deps=deps,
                     deps_ok=deps_ok,
                     needed_by=sorted(needed_by.get(name, ())),
+                    role=package_role(name, primary),
                 )
             )
         out.sort(key=lambda s: s.name)
@@ -315,6 +334,7 @@ class IndexService:
     async def browse_package_nav(self) -> list[PackageNavNode]:
         """Package-centric collapsible tree (dots / slash prefixes → folders)."""
         by_name: dict[str, list[PackageVersionOption]] = {}
+        roles: dict[str, str | None] = {}
         for channel in await self.discover_channels():
             for pkg in await self.list_packages(channel):
                 opt = PackageVersionOption(
@@ -328,6 +348,8 @@ class IndexService:
                     artifact_count=pkg.artifact_count,
                 )
                 by_name.setdefault(pkg.name, []).append(opt)
+                if pkg.name not in roles or roles[pkg.name] is None:
+                    roles[pkg.name] = pkg.role
 
         for name, opts in by_name.items():
             lead = [o for o in opts if o.channel == "lead"]
@@ -338,14 +360,48 @@ class IndexService:
             )
             by_name[name] = lead + pins
 
-        roots: list[PackageNavNode] = []
+        return IndexService.build_package_nav(by_name, roles)
+
+    @staticmethod
+    def build_package_nav(
+        by_name: dict[str, list[PackageVersionOption]],
+        roles: dict[str, str | None] | None = None,
+    ) -> list[PackageNavNode]:
+        """Build nav tree; pin Platform group for host/kernel packs."""
+        roles = roles or {}
+        platform: list[tuple[str, list[PackageVersionOption], str]] = []
+        guests: list[str] = []
         for full_name in sorted(by_name.keys()):
+            role = roles.get(full_name) or package_role(full_name)
+            if role in ("host", "kernel"):
+                platform.append((full_name, by_name[full_name], role))
+            else:
+                guests.append(full_name)
+
+        roots: list[PackageNavNode] = []
+        if platform:
+            leaves: list[PackageNavNode] = []
+            for full_name, versions, role in platform:
+                leaf_name = full_name.rsplit(".", 1)[-1]
+                leaves.append(
+                    PackageNavNode(
+                        name=leaf_name,
+                        full_name=full_name,
+                        versions=versions,
+                        role=role,
+                    )
+                )
+            roots.append(PackageNavNode(name="Platform", children=leaves))
+
+        for full_name in guests:
             parts = (
                 full_name.split(".")
                 if "." in full_name
                 else full_name.split("/")
             )
-            self._nav_insert(roots, parts, full_name, by_name[full_name])
+            IndexService._nav_insert(
+                roots, parts, full_name, by_name[full_name], roles.get(full_name)
+            )
         return roots
 
     @staticmethod
@@ -354,6 +410,7 @@ class IndexService:
         parts: list[str],
         full_name: str,
         versions: list[PackageVersionOption],
+        role: str | None = None,
     ) -> None:
         if not parts:
             return
@@ -363,9 +420,16 @@ class IndexService:
                 if node.name == head:
                     node.full_name = full_name
                     node.versions = versions
+                    if role is not None:
+                        node.role = role
                     return
             siblings.append(
-                PackageNavNode(name=head, full_name=full_name, versions=versions)
+                PackageNavNode(
+                    name=head,
+                    full_name=full_name,
+                    versions=versions,
+                    role=role,
+                )
             )
             return
         folder: PackageNavNode | None = None
@@ -376,7 +440,9 @@ class IndexService:
         if folder is None:
             folder = PackageNavNode(name=head)
             siblings.append(folder)
-        IndexService._nav_insert(folder.children, rest, full_name, versions)
+        IndexService._nav_insert(
+            folder.children, rest, full_name, versions, role
+        )
 
     @staticmethod
     def parse_channel(channel: str) -> ChannelRef:

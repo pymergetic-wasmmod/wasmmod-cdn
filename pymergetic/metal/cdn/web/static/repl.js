@@ -324,6 +324,18 @@
       append("Try: invalid package name " + JSON.stringify(pkg), "mpy-err");
       return;
     }
+    // Platform engines must not be guest-loaded into WAMR (self-load OOM).
+    if (
+      pkg === "pymergetic.wasmmod" ||
+      pkg === "pymergetic.upy" ||
+      pkg === "pymergetic.metal"
+    ) {
+      append(
+        "Try: " + pkg + " is a host/platform module — use Inspect, not Play.",
+        "mpy-err"
+      );
+      return;
+    }
     expand({ boot: false });
     if (!sessionReady) {
       firstOpenWait = true;

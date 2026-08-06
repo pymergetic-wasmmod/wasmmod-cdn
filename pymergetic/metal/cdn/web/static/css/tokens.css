@@ -7,6 +7,10 @@
   --ready: #8ecf9a;
   --remote: #c9a227;
   --remote-dim: rgba(201, 162, 39, 0.12);
+  --host: #6a9fb5;
+  --host-dim: rgba(106, 159, 181, 0.12);
+  --kernel: #8ecf9a;
+  --kernel-dim: rgba(142, 207, 154, 0.12);
   --line: #243041;
   --card: #161d27;
   --sidebar: #121820;

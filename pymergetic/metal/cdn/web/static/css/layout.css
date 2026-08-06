@@ -121,6 +121,49 @@
   margin-left: 0.15rem;
   padding-left: 0.2rem;
 }
+.tree-node.is-host > .tree-row .tree-name,
+.tree-node.is-host > .tree-leaf .tree-name {
+  color: var(--host);
+}
+.tree-node.is-host > .tree-row,
+.tree-node.is-host > .tree-leaf {
+  border-left: 2px solid rgba(106, 159, 181, 0.55);
+  margin-left: 0.15rem;
+  padding-left: 0.2rem;
+}
+.tree-node.is-kernel > .tree-row .tree-name,
+.tree-node.is-kernel > .tree-leaf .tree-name {
+  color: var(--kernel);
+}
+.tree-node.is-kernel > .tree-row,
+.tree-node.is-kernel > .tree-leaf {
+  border-left: 2px solid rgba(142, 207, 154, 0.55);
+  margin-left: 0.15rem;
+  padding-left: 0.2rem;
+}
+.tree-node.is-platform > .tree-row .tree-name {
+  color: var(--fg);
+  font-weight: 600;
+}
+.tree-row .pill,
+.tree-leaf .pill {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  line-height: 1.2;
+  align-self: center;
+}
+.pill-host {
+  background: var(--host-dim);
+  color: var(--host);
+  border: 1px solid rgba(106, 159, 181, 0.45);
+}
+.pill-kernel {
+  background: var(--kernel-dim);
+  color: var(--kernel);
+  border: 1px solid rgba(142, 207, 154, 0.45);
+}
 .tree-name {
   font-family: var(--mono);
   font-size: 0.9rem;

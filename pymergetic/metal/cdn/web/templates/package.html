@@ -15,8 +15,14 @@
     {% endif %}
   </p>
   {% endif %}
+  {% if package_role in ('host', 'kernel') %}
+  <p class="fed-banner" role="status">
+    <span class="pill pill-{{ package_role }}">{{ package_role }}</span>
+    Platform {{ package_role }} — Inspect only; Play/Try guest-load is disabled.
+  </p>
+  {% endif %}
   <div class="hero-title-row">
-    <h1>{{ name }}</h1>
+    <h1>{{ name }}{% if package_role in ('host', 'kernel') %} <span class="pill pill-{{ package_role }}">{{ package_role }}</span>{% endif %}</h1>
     {% if package_versions %}
     <label class="pkg-ver-picker">
       <span class="muted">channel</span>
@@ -248,7 +254,7 @@
               <path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/>
             </svg>
           </a>
-          {% if experimental_repl and repl_ready and (a.path.endswith('.wasm') or a.path.endswith('.wasm.zlib') or '.aot' in a.path) %}
+          {% if experimental_repl and repl_ready and package_role not in ('host', 'kernel') and (a.path.endswith('.wasm') or a.path.endswith('.wasm.zlib') or '.aot' in a.path) %}
           <button type="button" class="icon-btn try-btn" data-mpy-try="{{ name }}"
                   title="Try in µPy shell: import {{ name }}; exports({{ name }})"
                   aria-label="Try {{ name }} in MicroPython shell">
@@ -544,7 +550,11 @@
       }
     }
     if (data.source) {
-      html += `<h3>Source tree <code>${esc(data.source.name)}</code> ${esc(data.source.pkg_version || "")}</h3>
+      const tags = data.source.tags || {};
+      const tagBits = Object.keys(tags).map((k) => `${esc(k)}=${esc(tags[k])}`).join(" · ");
+      html += `<h3>Source tree <code>${esc(data.source.name)}</code> ${esc(data.source.pkg_version || "")}${
+        tagBits ? ` <span class="muted">${tagBits}</span>` : ""
+      }</h3>
         <ul class="file-tree">`;
       for (const f of sourceFiles) {
         html += fileRow(f.path, filesBase, filesRaw, esc(fmtSize(f.raw_len)), ctx);
