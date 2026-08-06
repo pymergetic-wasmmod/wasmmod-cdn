@@ -315,6 +315,24 @@ step_seed() {
   pub_pkg test_a2              "$packs/test_a2.wasm"
   pub_pkg test_a2.test_d2      "$packs/test_a2.test_d2.wasm"
   pub_pkg test_a2.test_b2.test_c2 '{"test_a2.test_d2":"0.1.0"}' "$packs/test_a2.test_b2.test_c2.wasm"
+
+  # First-party host engine (self-describing micropython.wasm + wasmmod.source).
+  local eng_src eng_pub
+  eng_src="$mp/ports/webassembly/build-wasmmod/pymergetic.wasmmod.wasm"
+  [[ -f "$eng_src" ]] || eng_src="$mp/ports/webassembly/build-wasmmod/micropython.wasm"
+  if [[ -f "$eng_src" ]]; then
+    eng_pub="$packs/pymergetic.wasmmod.wasm"
+    cp -f "$eng_src" "$eng_pub"
+    echo "SIGN $eng_pub (host engine)"
+    python3 "$mp/extmod/wasmmod/tools/wasmmod.py" sign sign \
+      --key "$examples/.keys/sign/leaf.key.pem" \
+      --chain "$examples/.keys/sign/chain.der" \
+      "$eng_pub"
+    pub_pkg pymergetic.wasmmod "$eng_pub"
+  else
+    echo "WARN: no host engine wasm at build-wasmmod — skip pymergetic.wasmmod publish" >&2
+  fi
+
   echo "==> lead packages:"
   curl -sf "$CDN_URL/index/lead" | python3 -c \
     "import sys,json; print('   ', ', '.join(sorted(json.load(sys.stdin).get('packages',{}))))"
