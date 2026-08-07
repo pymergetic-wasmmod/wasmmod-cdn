@@ -1,24 +1,40 @@
 /**
- * metal-cdn browser MicroPython shell.
- * Expects static/repl/micropython.mjs (+ .wasm) from ports/webassembly.
+ * metal-cdn browser MicroPython shell — one panel, N engine *instances*.
  *
- * Warm-up: load µPy + autoexec in the background shortly after page load
- * (panel stays collapsed). First open/try waits if still starting; after that
- * the shell is instant and status shows "ready".
+ * Engines: mp | mpwm | upy (vanilla) — each keeps its own runtime + transcript.
+ * Pill click = focus that instance (others stay warm).
  */
 (() => {
   const panel = document.getElementById("mpy-repl");
   if (!panel) return;
 
-  const outEl = document.getElementById("mpy-repl-out");
-  const inEl = document.getElementById("mpy-repl-in");
   const termEl = document.getElementById("mpy-repl-term");
+  const inEl = document.getElementById("mpy-repl-in");
   const toggleBtn = document.getElementById("mpy-repl-toggle");
   const statusEl = document.getElementById("mpy-repl-status");
   const basePath = panel.dataset.basePath || "";
-  const mjsUrl = panel.dataset.mjsUrl || (basePath + "/static/repl/micropython.mjs");
   const assetV = panel.dataset.replAssetV || "";
-  /** Append deploy bust to wasm/mjs sibling fetches (import() query is not enough). */
+  const autoexecUrl = panel.dataset.autoexecUrl || (basePath + "/repl/autoexec.py");
+  let engineId = panel.dataset.replEngine || "mp";
+
+  /** @type {Map<string, EngineInst>} */
+  const engines = new Map();
+
+  /**
+   * @typedef {{
+   *   id: string,
+   *   mjsUrl: string,
+   *   outEl: HTMLElement,
+   *   mp: any,
+   *   loading: Promise<any>|null,
+   *   sessionReady: boolean,
+   *   sessionLoading: Promise<void>|null,
+   *   shellSessionId: string|null,
+   *   firstOpenWait: boolean,
+   *   status: string,
+   * }} EngineInst
+   */
+
   function bustUrl(url) {
     if (!assetV) return url;
     try {
@@ -29,16 +45,7 @@
       return url + (url.includes("?") ? "&" : "?") + "v=" + encodeURIComponent(assetV);
     }
   }
-  const autoexecUrl = panel.dataset.autoexecUrl || (basePath + "/repl/autoexec.py");
 
-  let mp = null;
-  let loading = null;
-  let sessionReady = false;
-  let sessionLoading = null;
-  let shellSessionId = null;
-  let firstOpenWait = false;
-
-  /** autoexec URL with optional ?cdn= from data-cdn-base (set by base.html). */
   function sessionAutoexecUrl() {
     const cdn = (panel.dataset.cdnBase || "").trim().replace(/\/$/, "");
     if (!cdn) return autoexecUrl;
@@ -51,22 +58,65 @@
     }
   }
 
+  function cur() {
+    return engines.get(engineId) || null;
+  }
+
+  function ensureOutEl(id) {
+    let el = panel.querySelector('[data-engine-out="' + id + '"]');
+    if (el) return el;
+    el = document.createElement("div");
+    el.className = "mpy-repl-out";
+    el.dataset.engineOut = id;
+    el.hidden = true;
+    el.setAttribute("aria-live", "polite");
+    const line = termEl && termEl.querySelector(".mpy-repl-line");
+    if (termEl && line) termEl.insertBefore(el, line);
+    else if (termEl) termEl.appendChild(el);
+    return el;
+  }
+
+  function getOrCreateEngine(id, mjsUrl) {
+    let e = engines.get(id);
+    if (e) {
+      if (mjsUrl && !e.mjsUrl) e.mjsUrl = mjsUrl;
+      return e;
+    }
+    e = {
+      id,
+      mjsUrl: mjsUrl || "",
+      outEl: ensureOutEl(id),
+      mp: null,
+      loading: null,
+      sessionReady: false,
+      sessionLoading: null,
+      shellSessionId: null,
+      firstOpenWait: false,
+      status: "idle",
+    };
+    engines.set(id, e);
+    return e;
+  }
+
   function scrollTerm() {
-    const el = termEl || outEl;
+    const el = termEl;
     if (el) el.scrollTop = el.scrollHeight;
   }
 
-  function append(line, cls) {
-    if (!outEl) return;
+  function append(line, cls, eng) {
+    const e = eng || cur();
+    if (!e || !e.outEl) return;
     const span = document.createElement("div");
     if (cls) span.className = cls;
     span.textContent = line;
-    outEl.appendChild(span);
-    scrollTerm();
+    e.outEl.appendChild(span);
+    if (e.id === engineId) scrollTerm();
   }
 
-  function setStatus(text) {
-    if (!statusEl) return;
+  function setStatus(text, eng) {
+    const e = eng || cur();
+    if (e) e.status = text || "";
+    if (!statusEl || (e && e.id !== engineId)) return;
     statusEl.textContent = text || "";
     statusEl.classList.toggle("is-ready", text === "ready");
     statusEl.classList.toggle("is-busy", /…$|\.\.\.$/.test(text || "") || text === "starting");
@@ -80,15 +130,44 @@
     return panel.classList.contains("is-open");
   }
 
+  function showEngineOut(id) {
+    panel.querySelectorAll("[data-engine-out]").forEach((el) => {
+      el.hidden = el.dataset.engineOut !== id;
+    });
+  }
+
+  function markEngineActive(id) {
+    panel.querySelectorAll("[data-mpy-engine]").forEach((btn) => {
+      btn.classList.toggle("is-active", btn.getAttribute("data-mpy-engine") === id);
+    });
+    panel.dataset.replEngine = id;
+  }
+
+  function focusEngine(id, mjsHref) {
+    const next = String(id || "").trim();
+    if (!next) return;
+    const href = String(mjsHref || "").trim();
+    const e = getOrCreateEngine(next, href);
+    if (href) e.mjsUrl = href;
+    engineId = next;
+    markEngineActive(next);
+    showEngineOut(next);
+    setStatus(e.status || (e.sessionReady ? "ready" : "idle"), e);
+    scrollTerm();
+    // Boot this instance if needed; leave others alone.
+    void ensureSession({ quiet: !panelOpen() }).catch(() => {});
+  }
+
   function expand({ boot = true } = {}) {
     panel.classList.remove("is-mini");
     panel.classList.add("is-open");
     panel.setAttribute("aria-expanded", "true");
     focusInput();
     if (boot) {
-      if (!sessionReady) {
-        firstOpenWait = true;
-        setStatus("starting…");
+      const e = cur();
+      if (e && !e.sessionReady) {
+        e.firstOpenWait = true;
+        setStatus("starting…", e);
       }
       void ensureSession({ quiet: false }).catch(() => {});
     }
@@ -113,6 +192,7 @@
   }
 
   async function postSessionEvent(kind, { package: pkg = null, path = "" } = {}) {
+    const e = cur();
     try {
       const token = await csrfToken();
       const headers = {
@@ -128,7 +208,8 @@
           kind,
           path,
           package: pkg,
-          session_id: shellSessionId,
+          session_id: e && e.shellSessionId,
+          engine: engineId,
         }),
       });
     } catch (_) {
@@ -136,46 +217,9 @@
     }
   }
 
-  async function ensureMp() {
-    if (mp) return mp;
-    if (loading) return loading;
-    loading = (async () => {
-      setStatus("loading…");
-      const mod = await import(mjsUrl);
-      const loadMicroPython = mod.loadMicroPython || mod.default?.loadMicroPython;
-      if (!loadMicroPython) throw new Error("loadMicroPython missing from micropython.mjs");
-      // Stock locateFile is `url || scriptDirectory + path`. Passing url= busted
-      // .wasm forces a fresh binary (mjs ?v= alone does not bust the sibling wasm).
-      const loadOpts = {
-        stdout: (line) => append(String(line).replace(/\n$/, ""), "mpy-out"),
-        stderr: (line) => append(String(line).replace(/\n$/, ""), "mpy-err"),
-      };
-      if (assetV) {
-        loadOpts.url = bustUrl(
-          String(mjsUrl).replace(/micropython\.mjs(\?.*)?$/i, "micropython.wasm"),
-        );
-      }
-      mp = await loadMicroPython(loadOpts);
-      // Stock µPy runPythonAsync omits ccall { async: true }; wasmmod js.fetch needs it.
-      // Keep metalpython api.js untouched — wrap here via mp._module.
-      patchRunPythonAsyncify(mp);
-      if (!sessionReady) setStatus("warming…");
-      return mp;
-    })();
-    try {
-      return await loading;
-    } catch (err) {
-      loading = null;
-      setStatus("unavailable");
-      append("REPL load failed: " + (err && err.message ? err.message : err), "mpy-err");
-      throw err;
-    }
-  }
-
-  function patchRunPythonAsyncify(runtime) {
+  function patchRunPythonAsyncify(runtime, eng) {
     const Module = runtime && runtime._module;
     if (!Module || typeof Module.ccall !== "function" || runtime.__metalAsyncify) return;
-    // Same as ports/webassembly/proxy_js.js — exception payload in *out.
     const PROXY_KIND_MP_EXCEPTION = -1;
     runtime.runPythonAsync = (code) => {
       const src = String(code ?? "");
@@ -191,7 +235,6 @@
         { async: true },
       ).then(() => {
         try {
-          // Stock api.js converts *value and throws PythonError; we print into the term.
           const kind = Module.getValue(value, "i32");
           if (kind === PROXY_KIND_MP_EXCEPTION) {
             const strLen = Module.getValue(value + 4, "i32");
@@ -200,7 +243,7 @@
             Module._free(strPtr);
             const parts = String(raw).split("\x04");
             const tb = (parts[1] || parts[0] || raw).replace(/\s+$/, "");
-            tb.split("\n").forEach((ln) => append(ln, "mpy-err"));
+            tb.split("\n").forEach((ln) => append(ln, "mpy-err", eng));
           }
         } finally {
           Module._free(buf);
@@ -211,16 +254,50 @@
     runtime.__metalAsyncify = true;
   }
 
-  /**
-   * Stock mp_js_do_exec uses FILE_INPUT (expression values discarded). For a
-   * one-line expression, eval + print(repr). Do NOT wrap import/from or
-   * multi-line blocks — nested eval/exec breaks CDN multi-fetch + asyncify
-   * (e.g. import test_a2.test_b2.test_c2 → ImportError: no module named 'test_a2').
-   */
+  async function ensureMp(eng) {
+    const e = eng || cur();
+    if (!e) throw new Error("no engine");
+    if (e.mp) return e.mp;
+    if (e.loading) return e.loading;
+    if (!e.mjsUrl) throw new Error("engine " + e.id + " has no mjs");
+    e.loading = (async () => {
+      setStatus("loading…", e);
+      const mod = await import(e.mjsUrl);
+      const loadMicroPython = mod.loadMicroPython || mod.default?.loadMicroPython;
+      if (!loadMicroPython) throw new Error("loadMicroPython missing from micropython.mjs");
+      const loadOpts = {
+        stdout: (line) => append(String(line).replace(/\n$/, ""), "mpy-out", e),
+        stderr: (line) => append(String(line).replace(/\n$/, ""), "mpy-err", e),
+      };
+      if (assetV) {
+        loadOpts.url = bustUrl(
+          String(e.mjsUrl).replace(/micropython\.mjs(\?.*)?$/i, "micropython.wasm"),
+        );
+      }
+      e.mp = await loadMicroPython(loadOpts);
+      patchRunPythonAsyncify(e.mp, e);
+      if (!e.sessionReady) setStatus("warming…", e);
+      return e.mp;
+    })();
+    try {
+      return await e.loading;
+    } catch (err) {
+      e.loading = null;
+      setStatus("unavailable", e);
+      append("REPL load failed: " + (err && err.message ? err.message : err), "mpy-err", e);
+      throw err;
+    }
+  }
+
   function withReplDisplay(src) {
     const text = String(src ?? "").replace(/\s+$/, "");
     if (!text) return text;
     if (text.includes("\n") || /^(import\s|from\s)/.test(text)) {
+      return text;
+    }
+    // Bare calls (packages(), import-driven helpers): exec as a statement.
+    // eval()+Asyncify(js.fetch) nests too deep → RuntimeError: unreachable.
+    if (/^[A-Za-z_][\w.]*\(.*\)\s*$/.test(text)) {
       return text;
     }
     const quoted = JSON.stringify(text);
@@ -241,17 +318,19 @@
   }
 
   async function run(code, { echo = true, bootstrap = false, quiet = false } = {}) {
+    const e = cur();
+    if (!e) return;
     if (!quiet) expand({ boot: false });
     if (!bootstrap) {
       await ensureSession({ quiet: false });
     } else {
-      await ensureMp();
+      await ensureMp(e);
     }
-    const runtime = await ensureMp();
+    const runtime = await ensureMp(e);
     const text = String(code || "").replace(/\s+$/, "");
     if (!text) return;
     if (echo) {
-      text.split("\n").forEach((ln) => append(">>> " + ln, "mpy-in"));
+      text.split("\n").forEach((ln) => append(">>> " + ln, "mpy-in", e));
     }
     const execText = bootstrap ? text : withReplDisplay(text);
     try {
@@ -268,45 +347,44 @@
       String(msg)
         .replace(/\s+$/, "")
         .split("\n")
-        .forEach((ln) => append(ln, "mpy-err"));
+        .forEach((ln) => append(ln, "mpy-err", e));
     }
   }
 
-  /**
-   * Fetch server autoexec.py once: wasm.cdn + hook + intro (no pack load).
-   * @param {{ quiet?: boolean }} opts quiet=true keeps the panel collapsed (background warm).
-   */
   async function ensureSession({ quiet = false } = {}) {
-    if (sessionReady) return;
-    if (sessionLoading) {
+    const e = cur();
+    if (!e) return;
+    if (e.sessionReady) return;
+    if (e.sessionLoading) {
       if (!quiet && !panelOpen()) expand({ boot: false });
-      return sessionLoading;
+      return e.sessionLoading;
     }
-    sessionLoading = (async () => {
+    e.sessionLoading = (async () => {
       if (!quiet) expand({ boot: false });
-      await ensureMp();
-      setStatus(firstOpenWait || !quiet ? "starting…" : "warming…");
+      await ensureMp(e);
+      setStatus(e.firstOpenWait || !quiet ? "starting…" : "warming…", e);
       const res = await fetch(sessionAutoexecUrl(), {
         credentials: "same-origin",
         headers: { Accept: "text/x-python,text/plain" },
       });
       if (!res.ok) throw new Error("autoexec HTTP " + res.status);
-      shellSessionId = res.headers.get("X-Shell-Session-Id") || shellSessionId;
+      e.shellSessionId = res.headers.get("X-Shell-Session-Id") || e.shellSessionId;
       const code = await res.text();
       await run(code, { echo: false, bootstrap: true, quiet });
-      sessionReady = true;
-      firstOpenWait = false;
-      setStatus("ready");
+      e.sessionReady = true;
+      e.firstOpenWait = false;
+      setStatus("ready", e);
     })();
     try {
-      await sessionLoading;
+      await e.sessionLoading;
     } catch (err) {
-      sessionLoading = null;
-      firstOpenWait = false;
-      setStatus("session failed");
+      e.sessionLoading = null;
+      e.firstOpenWait = false;
+      setStatus("session failed", e);
       append(
         "Session bootstrap failed: " + (err && err.message ? err.message : err),
         "mpy-err",
+        e,
       );
       throw err;
     }
@@ -319,12 +397,10 @@
   async function tryPackage(name) {
     const pkg = String(name || "").trim();
     if (!pkg) return;
-    // Safe dotted identifier only (catalog / pack names).
     if (!/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(pkg)) {
       append("Try: invalid package name " + JSON.stringify(pkg), "mpy-err");
       return;
     }
-    // Platform engines must not be guest-loaded into WAMR (self-load OOM).
     if (
       pkg === "pymergetic.wasmmod" ||
       pkg === "pymergetic.upy" ||
@@ -332,23 +408,54 @@
     ) {
       append(
         "Try: " + pkg + " is a host/platform module — use Inspect, not Play.",
-        "mpy-err"
+        "mpy-err",
       );
       return;
     }
+    // Prefer mp/mpwm for pack try; vanilla upy can't import wasm packs.
+    if (engineId === "upy") {
+      const mpBtn = panel.querySelector('[data-mpy-engine="mp"]:not([disabled])');
+      const wm = panel.querySelector('[data-mpy-engine="mpwm"]:not([disabled])');
+      const btn = mpBtn || wm;
+      if (btn) {
+        focusEngine(btn.getAttribute("data-mpy-engine"), btn.getAttribute("data-mjs-href"));
+      }
+    }
     expand({ boot: false });
-    if (!sessionReady) {
-      firstOpenWait = true;
-      setStatus("starting…");
+    const e = cur();
+    if (e && !e.sessionReady) {
+      e.firstOpenWait = true;
+      setStatus("starting…", e);
     }
     await ensureSession({ quiet: false });
     void postSessionEvent("try_package", { package: pkg, path: "/try/" + pkg });
-    // Separate runs: import must not go through eval/exec wrap (CDN nested packs).
     await run("import " + pkg, { echo: true });
     await run("exports(" + pkg + ")", { echo: true });
   }
 
   if (toggleBtn) toggleBtn.addEventListener("click", () => toggle());
+
+  // Register all engine pills as separate instances.
+  panel.querySelectorAll("[data-mpy-engine]").forEach((btn) => {
+    const id = btn.getAttribute("data-mpy-engine");
+    const href = btn.getAttribute("data-mjs-href") || "";
+    if (id && !btn.disabled && href) getOrCreateEngine(id, href);
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (btn.disabled) return;
+      focusEngine(id, href);
+      if (panel.classList.contains("is-mini")) expand({ boot: true });
+    });
+  });
+
+  // Seed default / legacy single-engine.
+  const defHref =
+    panel.dataset.mjsUrl ||
+    (basePath + "/static/repl/micropython.mjs");
+  getOrCreateEngine(engineId, defHref);
+  markEngineActive(engineId);
+  showEngineOut(engineId);
 
   if (termEl) {
     termEl.addEventListener("click", (ev) => {
@@ -384,19 +491,15 @@
     }
   });
 
-  /** Background warm: load µPy + autoexec without opening the panel. */
   function startBackgroundWarm() {
+    // Only warm the focused engine; others boot on first pill click (own instance).
     const kick = () => {
-      ensureSession({ quiet: true }).catch(() => {
-        /* status already set */
-      });
+      ensureSession({ quiet: true }).catch(() => {});
     };
-    // Short delay so first paint isn't competing with wasm download.
-    const delayMs = 450;
     if (typeof window.requestIdleCallback === "function") {
-      window.requestIdleCallback(kick, { timeout: delayMs + 1200 });
+      window.requestIdleCallback(kick, { timeout: 1600 });
     } else {
-      setTimeout(kick, delayMs);
+      setTimeout(kick, 450);
     }
   }
 
@@ -411,5 +514,10 @@
     bootCdn,
     ensureSession,
     ensureMp,
+    focusEngine,
+    switchEngine: focusEngine,
+    get engine() {
+      return engineId;
+    },
   };
 })();

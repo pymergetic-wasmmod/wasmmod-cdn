@@ -1,20 +1,15 @@
-# Browser MicroPython assets (not committed).
+# Browser MicroPython assets (not committed)
 
-Populate from metalpython (wasmmod variant preferred for Try / `wasm.cdn`):
+Three **sibling** checkouts next to `metal-cdn` (or set env). Pill order: **mp · mpwm · upy**.
+
+| Dir | Env | Sibling folder | Role |
+|-----|-----|----------------|------|
+| `mp/` | `METALPYTHON` | `../metalpython` | mpwm + metalmod |
+| `mpwm/` | `METALPYTHON_WM` | `../metalpython-wasmmod` | upy + wasmmod |
+| `upy/` | `MICROPYTHON` | `../micropython` | vanilla upstream µPy |
+
+metal-cdn does **not** assume an os-sdk `packages/` layout — only env or `../name`.
 
 ```bash
-# after: make -C ports/webassembly VARIANT=wasmmod
-./scripts/sync-repl-assets.sh /path/to/metalpython/ports/webassembly/build-wasmmod
+./scripts/dev-up.sh
 ```
-
-Stock typing-only REPL (no pack import):
-
-```bash
-# after: make -C ports/webassembly VARIANT=standard
-./scripts/sync-repl-assets.sh /path/to/metalpython/ports/webassembly/build-standard
-```
-
-Expected files:
-
-- `micropython.mjs`
-- `micropython.wasm`

@@ -26,7 +26,7 @@
 /* Mini ≈ ⅓ of the previous “open” size; same glass as maximized */
 .mpy-repl.is-mini {
   --mpy-term-h: 4rem;
-  --mpy-panel-w: min(11rem, calc(100vw - 1.5rem));
+  --mpy-panel-w: min(16.5rem, calc(100vw - 1.5rem));
   font-size: 0.68rem;
 }
 /* Maximized ≈ 3× previous open size */
@@ -40,12 +40,44 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  gap: 0.25rem;
   background: rgba(0, 0, 0, 0.12);
   border-bottom: 1px solid rgba(36, 48, 65, 0.4);
 }
 .mpy-repl.is-mini .mpy-repl-bar {
   background: rgba(0, 0, 0, 0.12);
   border-bottom-color: rgba(36, 48, 65, 0.4);
+}
+.mpy-repl-engines {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.15rem;
+  padding: 0.2rem 0.25rem 0.2rem 0.35rem;
+}
+.mpy-repl-engine {
+  border: 1px solid rgba(36, 48, 65, 0.55);
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--muted, #8b949e);
+  border-radius: 4px;
+  padding: 0.12rem 0.35rem;
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.mpy-repl-engine.is-active {
+  color: var(--accent);
+  border-color: rgba(106, 159, 181, 0.65);
+  background: rgba(106, 159, 181, 0.12);
+}
+.mpy-repl-engine:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.mpy-repl.is-mini .mpy-repl-engine {
+  font-size: 0.58rem;
+  padding: 0.08rem 0.28rem;
 }
 .mpy-repl-toggle {
   flex: 1;
@@ -59,6 +91,7 @@
   padding: 0.35rem 0.55rem;
   cursor: pointer;
   font: inherit;
+  min-width: 0;
 }
 .mpy-repl.is-mini .mpy-repl-toggle { padding: 0.2rem 0.4rem; }
 .mpy-repl-title { font-weight: 700; color: var(--accent); }

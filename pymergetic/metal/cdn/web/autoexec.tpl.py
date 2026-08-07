@@ -13,9 +13,11 @@ SESSION_ID = "__TPL_SESSION_ID__"
 PRINCIPAL = "__TPL_PRINCIPAL__"
 _DRIVER_HINT = "__TPL_DRIVER_HINT__"
 _LEAD_PACKAGES = "__TPL_LEAD_PACKAGES__"
+_PACKAGES_SRC = "snapshot"  # "live" after boot refresh; "snapshot" on stock upy
 
 def _boot():
     import sys
+    global _LEAD_PACKAGES, _PACKAGES_SRC
 
     def _pad(s, n):
         # MicroPython str has no width-pad helpers — pad manually.
@@ -41,14 +43,15 @@ def _boot():
     _row("├──", "runtime")
     _row("│   ├──", "upy", uv)
     try:
-        wasm = __import__("wasm")  # µPy builtin; absent → ImportError (handled)
+        # Canonical face is pymergetic.wasmmod (no top-level `wasm`).
+        import pymergetic.wasmmod as wasm
     except ImportError as e:
         _row("│   └──", "wasmmod", "missing — " + str(e))
         _row("├──", "session")
         _row("│   ├──", "id", SESSION_ID or "(none)")
         _row("│   └──", "principal", PRINCIPAL)
         _row("├──", "packs", str(n_packs) + " on " + CHANNEL + " (snapshot)")
-        _row("└──", "ready", "stock REPL · no wasm · packages() still lists names")
+        _row("└──", "ready", "stock REPL · no wasmmod · packages() still lists names")
         return False
     ver = getattr(wasm, "version", "?")
     aot = getattr(wasm, "AOT_VERSION", None)
@@ -96,14 +99,17 @@ def _boot():
         except Exception:
             pass
     _row("│   └──", "driver", str(drv) + " · hook on")
-    # Prefer live catalog count; fall back to autoexec snapshot.
+    # Refresh baked list once at boot (packages() reuses it — avoids a second
+    # Asyncify catalog fetch from the REPL, which can Abort on stack size).
     pack_n = n_packs
     pack_src = "snapshot"
     try:
         cat = getattr(wasm, "catalog", None)
         if callable(cat):
             live = cat(channel=CHANNEL)
-            pack_n = len(live)
+            _LEAD_PACKAGES = list(live)
+            _PACKAGES_SRC = "live"
+            pack_n = len(_LEAD_PACKAGES)
             pack_src = "live"
     except Exception:
         pass
@@ -115,21 +121,40 @@ def _boot():
     return True
 
 
-def packages(limit=40):
-    """List lead-channel package names (live catalog, else autoexec snapshot)."""
-    names = None
-    src = "snapshot"
-    try:
-        wasm = __import__("wasm")
-        cat = getattr(wasm, "catalog", None)
-        if callable(cat):
-            names = cat(channel=CHANNEL)
-            src = "live"
-    except Exception:
-        names = None
-    if names is None:
-        names = _LEAD_PACKAGES
-        src = "snapshot"
+def packages(limit=40, refresh=False):
+    """List lead-channel package names.
+
+    Default: boot-refreshed list (live on mp/mpwm, baked snapshot on upy).
+    refresh=True: call wasm.catalog() again (extra Asyncify fetch).
+    """
+    global _LEAD_PACKAGES, _PACKAGES_SRC
+    names = _LEAD_PACKAGES
+    src = _PACKAGES_SRC
+    why = None
+    if refresh:
+        try:
+            import pymergetic.wasmmod as wasm
+            cat = getattr(wasm, "catalog", None)
+            if not callable(cat):
+                why = "wasm.catalog missing — showing cached names"
+            else:
+                names = list(cat(channel=CHANNEL))
+                _LEAD_PACKAGES = names
+                _PACKAGES_SRC = "live"
+                src = "live"
+        except ImportError:
+            why = "no pymergetic.wasmmod (stock µPy) — baked lead names only; cannot import packs"
+            src = "snapshot"
+        except Exception as e:
+            why = "wasm.catalog failed — " + str(e) + " (cached names)"
+            names = _LEAD_PACKAGES
+            src = _PACKAGES_SRC
+    elif src == "snapshot":
+        why = "baked lead snapshot only (no live catalog) — cannot import packs here"
+    if why:
+        print("WARN:", why)
+        if src == "snapshot":
+            print("WARN: switch engine to mp / mpwm for live catalog + imports")
     n = len(names)
     show = names[: max(0, int(limit))]
     for name in show:
@@ -171,8 +196,10 @@ def help(topic=None):
         print("└── exports(hello)       inspect after import")
         return
     if t == "packages":
-        print("packages(limit=40) prefers wasm.catalog() when online,")
-        print("else the snapshot baked into autoexec. Browse UI:", BROWSE_URL)
+        print("packages(limit=40) lists names from boot (live on mp/mpwm).")
+        print("packages(refresh=True) re-fetches wasm.catalog().")
+        print("On stock upy: WARN + baked snapshot (names only; import fails).")
+        print("Browse UI:", BROWSE_URL)
         print("JSON index:", INDEX_URL)
         return
     if t == "import":
@@ -181,7 +208,7 @@ def help(topic=None):
         print("  exports(hello)")
         print("  import test_a.test_b   # dotted FQN ok")
         print("  exports(test_a.test_b)")
-        print("Packs resolve via wasm.cdn →", CDN)
+        print("Packs resolve via pymergetic.wasmmod.cdn →", CDN)
         return
     if t in ("exports", "export"):
         print("exports(mod) — public names (no leading _), type, first docstring line.")
@@ -193,7 +220,8 @@ def help(topic=None):
         print("CDN base:", CDN)
         print("wasm.session_id:", end=" ")
         try:
-            print(__import__("wasm").session_id())
+            import pymergetic.wasmmod as wasm
+            print(wasm.session_id())
         except Exception:
             print("(n/a)")
         print("Re-bind:  wasm.cdn(CDN); wasm.install_hook(); wasm.session_id(SESSION_ID)")

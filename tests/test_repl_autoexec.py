@@ -20,10 +20,16 @@ def test_render_autoexec_contains_boot_and_help() -> None:
         session_id="11111111-1111-1111-1111-111111111111",
         principal="anon",
     )
+    assert "import pymergetic.wasmmod as wasm" in src
     assert "wasm.cdn(CDN)" in src
     assert "wasm.install_hook()" in src
     assert "wasm.session_id(SESSION_ID)" in src
+    assert '__import__("wasm")' not in src
     assert "def packages(" in src
+    assert "refresh" in src
+    assert "_PACKAGES_SRC" in src
+    assert "WARN:" in src
+    assert "baked lead" in src
     assert "def exports(" in src
     assert "wasm.catalog" in src
     assert "def help(" in src

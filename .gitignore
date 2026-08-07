@@ -35,5 +35,9 @@ deploy/certbot/www/
 pymergetic/metal/cdn/web/static/repl/*.mjs
 pymergetic/metal/cdn/web/static/repl/*.wasm
 pymergetic/metal/cdn/web/static/repl/*.map
+pymergetic/metal/cdn/web/static/repl/mpwm/
+pymergetic/metal/cdn/web/static/repl/mp-wm/
+pymergetic/metal/cdn/web/static/repl/mp/
+pymergetic/metal/cdn/web/static/repl/upy/
 !pymergetic/metal/cdn/web/static/repl/README.md
 !pymergetic/metal/cdn/web/static/repl/.gitkeep

@@ -190,7 +190,6 @@ def _tag_nav_origins(
         if (
             node.is_folder
             and not node.is_package
-            and node.name != "Platform"
             and _all_remote_descendants(node)
         ):
             node.origin = "remote"

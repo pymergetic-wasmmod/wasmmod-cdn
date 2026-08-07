@@ -12,8 +12,11 @@
 #   docker gets REQUIRE_AUTH=true + bootstrap admin; seed uses Bearer from .secrets/token
 #
 # Env overrides:
-#   METALPYTHON   path to metalpython tree (default: sibling ../metalpython)
+#   MICROPYTHON      vanilla upstream MicroPython (default: sibling ../micropython)
+#   METALPYTHON_WM   metalpython-wasmmod → engine mpwm (sibling ../metalpython-wasmmod)
+#   METALPYTHON      metalpython product → engine mp (sibling ../metalpython)
 #   METAL_CDN_URL http://127.0.0.1:8000/cdn
+# Trees are discovered as *siblings of this repo* or via env — never os-sdk/packages/.
 #   METAL_CDN_IMAGE metal-cdn
 #   METAL_CDN_NAME  metal-cdn
 #   METAL_CDN_PORT  8000
@@ -109,17 +112,16 @@ seed_token() {
   tr -d '[:space:]' <"$SECRETS_TOKEN"
 }
 
-find_metalpython() {
-  if [[ -n "${METALPYTHON:-}" ]]; then
-    echo "$METALPYTHON"
+_find_upy_tree() {
+  # $1 = env override value (may be empty); remaining = candidate paths
+  local override="$1"
+  shift
+  if [[ -n "$override" ]]; then
+    echo "$override"
     return
   fi
   local cand
-  for cand in \
-    "$ROOT/../metalpython" \
-    "$ROOT/../../metalpython" \
-    "$HOME/Devel/os-sdk/packages/metalpython"
-  do
+  for cand in "$@"; do
     if [[ -d "$cand/extmod/wasmmod/ports/micropython/webassembly" ]]; then
       echo "$(cd "$cand" && pwd)"
       return
@@ -128,12 +130,90 @@ find_metalpython() {
   return 1
 }
 
+find_micropython() {
+  # Vanilla upstream — sibling of metal-cdn (or MICROPYTHON=).
+  local override="${MICROPYTHON:-}" cand
+  if [[ -n "$override" ]]; then
+    echo "$override"
+    return
+  fi
+  for cand in "$ROOT/../micropython" "$ROOT/../../micropython"; do
+    if [[ -d "$cand/ports/webassembly" && -f "$cand/py/mpconfig.h" ]]; then
+      # Reject metalpython trees that carry wasmmod.
+      if [[ ! -d "$cand/extmod/wasmmod" ]]; then
+        echo "$(cd "$cand" && pwd)"
+        return
+      fi
+    fi
+  done
+  return 1
+}
+
+find_metalpython() {
+  _find_upy_tree "${METALPYTHON:-}" \
+    "$ROOT/../metalpython" \
+    "$ROOT/../../metalpython"
+}
+
+find_metalpython_wm() {
+  _find_upy_tree "${METALPYTHON_WM:-}" \
+    "$ROOT/../metalpython-wasmmod" \
+    "$ROOT/../../metalpython-wasmmod"
+}
+
+ensure_wasmmod_tools_python() {
+  # tools/wasmmod.py imports pymergetic.wasmmod.tools (nested dev/tools).
+  # Prefer editable install in metal-cdn .venv; else PYTHONPATH the src tree.
+  local mp="$1" tools_src tools_py
+  tools_src="$mp/extmod/wasmmod/dev/tools/src"
+  tools_py="$ROOT/.venv/bin/python"
+  if [[ -x "$tools_py" ]]; then
+    if ! "$tools_py" -c 'import pymergetic.wasmmod.tools' >/dev/null 2>&1; then
+      echo "==> pip install -e wasmmod dev/tools → $tools_py"
+      "$tools_py" -m pip install -e "$mp/extmod/wasmmod/dev/tools" -q
+    fi
+    # Put venv first so make's python3 hits the installed tools.
+    PATH="$(dirname "$tools_py"):$PATH"
+    export PATH
+  elif [[ -d "$tools_src" ]]; then
+    export PYTHONPATH="${tools_src}${PYTHONPATH:+:$PYTHONPATH}"
+  else
+    echo "FAIL: no wasmmod tools at $mp/extmod/wasmmod/dev/tools (submodule init?)" >&2
+    exit 1
+  fi
+}
+
+build_and_sync_engine() {
+  # $1 = tree root; $2 = engine id (mp|mpwm|upy)
+  local tree="$1" engine="$2" build
+  ensure_emsdk
+  echo "==> make submodules (ports/webassembly) [$engine]  ($tree)"
+  make -C "$tree/ports/webassembly" submodules
+  make -C "$tree/mpy-cross" -j"$(nproc 2>/dev/null || echo 4)"
+
+  if [[ "$engine" == "upy" ]]; then
+    # Vanilla upstream MicroPython — NOT metalpython / NOT wasmmod.
+    build="$tree/ports/webassembly/build-standard"
+    echo "==> build browser VANILLA µPy [$engine]  ($tree)"
+    make -C "$tree/ports/webassembly" VARIANT=standard BUILD=build-standard \
+      -j"$(nproc 2>/dev/null || echo 4)"
+  else
+    build="$tree/ports/webassembly/build-wasmmod"
+    echo "==> build browser µPy+wasmmod [$engine]  ($tree)"
+    ensure_wasmmod_tools_python "$tree"
+    make -C "$tree/extmod/wasmmod/ports/micropython/webassembly" \
+      -j"$(nproc 2>/dev/null || echo 4)"
+  fi
+  echo "==> sync REPL assets [$engine]"
+  "$ROOT/scripts/sync-repl-assets.sh" "$build" "$engine"
+}
+
 ensure_emsdk() {
   if command -v emcc >/dev/null 2>&1; then
     return 0
   fi
   local envf
-  for envf in "${EMSDK}/emsdk_env.sh" "$HOME/emsdk/emsdk_env.sh"; do
+  for envf in "${EMSDK:+$EMSDK/emsdk_env.sh}" "$HOME/emsdk/emsdk_env.sh"; do
     if [[ -f "$envf" ]]; then
       # shellcheck disable=SC1090
       source "$envf"
@@ -145,17 +225,39 @@ ensure_emsdk() {
 }
 
 step_upy() {
-  local mp build
-  mp="$(find_metalpython)" || {
-    echo "FAIL: metalpython not found (set METALPYTHON=…)" >&2
+  local vanilla mp_wm mp any=0
+  # Three DIFFERENT trees / roles (siblings of metal-cdn, or env):
+  #   mp    = ../metalpython           (mpwm + metalmod)
+  #   mpwm  = ../metalpython-wasmmod   (upy + wasmmod)
+  #   upy   = ../micropython           (vanilla upstream)
+  if mp="$(find_metalpython)"; then
+    build_and_sync_engine "$mp" mp
+    any=1
+  else
+    echo "note: metalpython not found (set METALPYTHON=… or sibling ../metalpython) — skip mp"
+  fi
+  if mp_wm="$(find_metalpython_wm)"; then
+    build_and_sync_engine "$mp_wm" mpwm
+    any=1
+  else
+    echo "note: metalpython-wasmmod not found (set METALPYTHON_WM=… or sibling ../metalpython-wasmmod) — skip mpwm"
+  fi
+  if vanilla="$(find_micropython)"; then
+    build_and_sync_engine "$vanilla" upy
+    any=1
+  else
+    echo "note: vanilla micropython not found (set MICROPYTHON=… or sibling ../micropython) — skip upy"
+  fi
+  if [[ "$any" -eq 0 ]]; then
+    echo "FAIL: no engine trees found (set MICROPYTHON / METALPYTHON_WM / METALPYTHON, or clone siblings next to metal-cdn)" >&2
     exit 1
-  }
-  build="$mp/ports/webassembly/build-wasmmod"
-  echo "==> build browser µPy+wasmmod  ($mp)"
-  ensure_emsdk
-  make -C "$mp/extmod/wasmmod/ports/micropython/webassembly" -j"$(nproc 2>/dev/null || echo 4)"
-  echo "==> sync REPL assets"
-  "$ROOT/scripts/sync-repl-assets.sh" "$build"
+  fi
+  local flat="$ROOT/pymergetic/metal/cdn/web/static/repl"
+  if [[ ! -f "$flat/micropython.mjs" && -f "$flat/mp/micropython.mjs" ]]; then
+    cp -f "$flat/mp/"micropython.mjs "$flat/mp/"micropython.wasm "$flat/" 2>/dev/null || true
+  elif [[ ! -f "$flat/micropython.mjs" && -f "$flat/mpwm/micropython.mjs" ]]; then
+    cp -f "$flat/mpwm/"micropython.mjs "$flat/mpwm/"micropython.wasm "$flat/" 2>/dev/null || true
+  fi
 }
 
 step_reseed_volume() {
@@ -275,10 +377,9 @@ step_seed() {
   packs="$mp/extmod/wasmmod/examples/packs"
   examples="$mp/extmod/wasmmod/examples"
   echo "==> build + sign example packs (wasmmod.sig / examples/.keys)"
-  # Prefer system cmake over broken emsdk shims, but keep the active
-  # interpreter (venv) so tools/wasmmod.py can import pymergetic-wasmmod-tools.
-  _py_bin="$(cd "$(dirname "$(command -v python3)")" && pwd)"
-  PATH="${_py_bin}:/usr/bin:/bin:${PATH}" make -C "$examples" sign-packs
+  ensure_wasmmod_tools_python "$mp"
+  # Prefer system cmake over broken emsdk shims; venv python already first via ensure_*.
+  PATH="$(dirname "$(command -v python3)"):/usr/bin:/bin:${PATH}" make -C "$examples" sign-packs
   echo "==> publish samples → $CDN_URL (Bearer)"
   local EX=pymergetic.wasmmod_examples
   [[ -f "$packs/${EX}.hello.wasm" ]] || { echo "FAIL: missing $packs/${EX}.hello.wasm" >&2; exit 1; }
@@ -360,8 +461,11 @@ if [[ "$SEED_ONLY" -eq 0 && "$DO_UPY" -eq 1 ]]; then
   step_upy
 elif [[ "$DO_DOCKER" -eq 1 ]]; then
   # docker still needs assets if missing
-  if [[ ! -f "$ROOT/pymergetic/metal/cdn/web/static/repl/micropython.mjs" ]]; then
-    echo "note: no synced micropython.mjs — building µPy first"
+  if [[ ! -f "$ROOT/pymergetic/metal/cdn/web/static/repl/micropython.mjs" \
+     && ! -f "$ROOT/pymergetic/metal/cdn/web/static/repl/mpwm/micropython.mjs" \
+     && ! -f "$ROOT/pymergetic/metal/cdn/web/static/repl/mp/micropython.mjs" \
+     && ! -f "$ROOT/pymergetic/metal/cdn/web/static/repl/upy/micropython.mjs" ]]; then
+    echo "note: no synced REPL assets — building µPy first"
     step_upy
   fi
 fi

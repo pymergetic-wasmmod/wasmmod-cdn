@@ -23,7 +23,8 @@ find_wasmmod() {
   local cand
   for cand in \
     "$ROOT/../metalpython/extmod/wasmmod" \
-    "$HOME/Devel/os-sdk/packages/metalpython/extmod/wasmmod"
+    "$ROOT/../metalpython-wasmmod/extmod/wasmmod" \
+    "$ROOT/../../metalpython/extmod/wasmmod"
   do
     if [[ -f "$cand/requirements-publish.txt" ]]; then
       echo "$(cd "$cand" && pwd)"

@@ -70,7 +70,7 @@
       {% macro nav_nodes(nodes, depth=0) -%}
       <ul class="tree {% if depth == 0 %}tree-roots{% else %}tree-children{% endif %}"{% if depth > 0 %} hidden{% endif %}>
         {% for node in nodes %}
-        <li class="tree-node {% if node.is_folder %}is-folder{% endif %} {% if node.is_package and not node.is_folder %}is-leaf{% endif %} {% if node.is_package %}is-package{% endif %}{% if node.origin == 'remote' %} is-remote{% endif %}{% if node.role == 'host' %} is-host{% elif node.role == 'kernel' %} is-kernel{% endif %}{% if node.name == 'Platform' %} is-platform{% endif %}"
+        <li class="tree-node {% if node.is_folder %}is-folder{% endif %} {% if node.is_package and not node.is_folder %}is-leaf{% endif %} {% if node.is_package %}is-package{% endif %}{% if node.origin == 'remote' %} is-remote{% endif %}{% if node.role == 'host' %} is-host{% elif node.role == 'kernel' %} is-kernel{% endif %}"
             data-name="{{ node.name|lower }}"
             data-origin="{{ node.origin or 'local' }}"
             data-role="{{ node.role or '' }}"
@@ -87,7 +87,7 @@
               href="{{ package_href(default_ch if active_package != node.full_name else active_channel, node.full_name) }}"
               data-package="{{ node.full_name }}"
             >{{ node.name }}</a>
-            {% if node.role == 'host' %}<span class="pill pill-host">host</span>{% elif node.role == 'kernel' %}<span class="pill pill-kernel">kernel</span>{% endif %}
+            {% if node.role == 'host' %}<span class="role-mark role-host" title="Host engine — Inspect only; Play disabled" aria-label="host"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="1" y="2" width="14" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4 14h8M8 11v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>{% elif node.role == 'kernel' %}<span class="role-mark role-kernel" title="Kernel module — Inspect only; Play disabled" aria-label="kernel"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>{% endif %}
             {% if node.versions|length > 1 %}
             <label class="tree-ver-wrap">
               <span class="visually-hidden">Version</span>
@@ -113,15 +113,14 @@
           {{ nav_nodes(node.children, depth + 1) }}
           {% else %}
           {% set default_ch = node.versions[0].channel if node.versions else 'lead' %}
-          <div class="tree-leaf">
+          <div class="tree-row">
+            <span class="tree-toggle-spacer" aria-hidden="true"></span>
             <a
-              class="tree-pkg {% if active_package == node.full_name %}is-active{% endif %}"
+              class="tree-pkg tree-name {% if active_package == node.full_name %}is-active{% endif %}"
               href="{{ package_href(default_ch if active_package != node.full_name else active_channel, node.full_name) }}"
               data-package="{{ node.full_name }}"
-            >
-              <span class="tree-name">{{ node.name }}</span>
-            </a>
-            {% if node.role == 'host' %}<span class="pill pill-host">host</span>{% elif node.role == 'kernel' %}<span class="pill pill-kernel">kernel</span>{% endif %}
+            >{{ node.name }}</a>
+            {% if node.role == 'host' %}<span class="role-mark role-host" title="Host engine — Inspect only; Play disabled" aria-label="host"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="1" y="2" width="14" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4 14h8M8 11v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>{% elif node.role == 'kernel' %}<span class="role-mark role-kernel" title="Kernel module — Inspect only; Play disabled" aria-label="kernel"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>{% endif %}
             {% if node.versions|length > 1 %}
             <label class="tree-ver-wrap">
               <span class="visually-hidden">Version</span>
@@ -180,11 +179,24 @@
     aria-expanded="false"
     data-base-path="{{ base_path }}"
     data-cdn-base="{{ (base_path or '') and (base_path) or '' }}"
-    data-mjs-url="{{ href('static', 'repl', 'micropython.mjs') }}{% if repl_asset_v %}?v={{ repl_asset_v }}{% endif %}"
+    data-mjs-url="{{ repl_default_mjs or href('static', 'repl', 'micropython.mjs') }}{% if repl_asset_v %}?v={{ repl_asset_v }}{% endif %}"
     data-repl-asset-v="{{ repl_asset_v }}"
+    data-repl-engine="{{ repl_default_engine or 'mp' }}"
     data-autoexec-url="{{ href('repl', 'autoexec.py') }}"
   >
     <div class="mpy-repl-bar">
+      <div class="mpy-repl-engines" role="group" aria-label="µPy engine">
+        {% for e in repl_engines or [] %}
+        <button
+          type="button"
+          class="mpy-repl-engine{% if e.id == (repl_default_engine or 'mp') %} is-active{% endif %}"
+          data-mpy-engine="{{ e.id }}"
+          data-mjs-href="{{ e.mjs_href }}{% if e.ready and repl_asset_v %}?v={{ repl_asset_v }}{% endif %}"
+          title="{{ e.title }}"
+          {% if not e.ready %}disabled{% endif %}
+        >{{ e.label }}</button>
+        {% endfor %}
+      </div>
       <button type="button" id="mpy-repl-toggle" class="mpy-repl-toggle" title="Toggle MicroPython shell size">
         <span class="mpy-repl-title">µPy</span>
         <span id="mpy-repl-status" class="mpy-repl-status muted">{% if repl_ready %}idle{% else %}loading…{% endif %}</span>
@@ -192,7 +204,16 @@
     </div>
     <div class="mpy-repl-body">
       <div class="mpy-repl-term" id="mpy-repl-term" tabindex="-1">
-        <div id="mpy-repl-out" class="mpy-repl-out" aria-live="polite"></div>
+        {% for e in repl_engines or [] %}
+        <div
+          class="mpy-repl-out"
+          data-engine-out="{{ e.id }}"
+          aria-live="polite"
+          {% if e.id != (repl_default_engine or 'mp') %}hidden{% endif %}
+        ></div>
+        {% else %}
+        <div id="mpy-repl-out" class="mpy-repl-out" data-engine-out="mp" aria-live="polite"></div>
+        {% endfor %}
         <div class="mpy-repl-line">
           <span class="mpy-repl-prompt" aria-hidden="true">>>> </span>
           <label class="visually-hidden" for="mpy-repl-in">Python input</label>

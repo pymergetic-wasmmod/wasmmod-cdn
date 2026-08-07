@@ -367,40 +367,23 @@ class IndexService:
         by_name: dict[str, list[PackageVersionOption]],
         roles: dict[str, str | None] | None = None,
     ) -> list[PackageNavNode]:
-        """Build nav tree; pin Platform group for host/kernel packs."""
+        """Build nav tree from dotted package names (natural org tree).
+
+        Host/kernel packs stay under ``pymergetic.*`` like everyone else; role
+        is carried on the node for UI flagging (color + compact mark), not a
+        separate Platform group.
+        """
         roles = roles or {}
-        platform: list[tuple[str, list[PackageVersionOption], str]] = []
-        guests: list[str] = []
-        for full_name in sorted(by_name.keys()):
-            role = roles.get(full_name) or package_role(full_name)
-            if role in ("host", "kernel"):
-                platform.append((full_name, by_name[full_name], role))
-            else:
-                guests.append(full_name)
-
         roots: list[PackageNavNode] = []
-        if platform:
-            leaves: list[PackageNavNode] = []
-            for full_name, versions, role in platform:
-                leaf_name = full_name.rsplit(".", 1)[-1]
-                leaves.append(
-                    PackageNavNode(
-                        name=leaf_name,
-                        full_name=full_name,
-                        versions=versions,
-                        role=role,
-                    )
-                )
-            roots.append(PackageNavNode(name="Platform", children=leaves))
-
-        for full_name in guests:
+        for full_name in sorted(by_name.keys()):
             parts = (
                 full_name.split(".")
                 if "." in full_name
                 else full_name.split("/")
             )
+            role = roles.get(full_name) or package_role(full_name)
             IndexService._nav_insert(
-                roots, parts, full_name, by_name[full_name], roles.get(full_name)
+                roots, parts, full_name, by_name[full_name], role
             )
         return roots
 

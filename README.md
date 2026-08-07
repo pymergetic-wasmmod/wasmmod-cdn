@@ -102,7 +102,7 @@ Version comes from git tags via [setuptools-scm](https://github.com/pypa/setupto
 ## Quick start
 
 ```sh
-cd packages/metal-cdn
+# from the metal-cdn repo root
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ./client -e ".[dev]" --config-settings editable_mode=compat
 cp .env.example .env
@@ -114,7 +114,15 @@ metal-cdn serve --reload
 ### Docker one-shot
 
 Rebuild browser µPy (if needed), sync REPL assets, `docker build`/`run` with
-**auth required**, seed sample packs with a Bearer token:
+**auth required**, seed sample packs with a Bearer token.
+
+Engine trees are **siblings of this repo** (or set env) — not an os-sdk `packages/` path:
+
+| Engine | Env | Default sibling |
+|--------|-----|-----------------|
+| `mp` | `METALPYTHON` | `../metalpython` |
+| `mpwm` | `METALPYTHON_WM` | `../metalpython-wasmmod` |
+| `upy` | `MICROPYTHON` | `../micropython` |
 
 ```sh
 ./scripts/ensure-secrets.sh   # once → .secrets/cdn.env (gitignored)
@@ -124,7 +132,7 @@ Rebuild browser µPy (if needed), sync REPL assets, `docker build`/`run` with
 ```
 
 Flags: `--no-upy`, `--no-seed`, `--seed-only`, `--reseed`.  
-Env: `METALPYTHON`, `METAL_CDN_URL`, `METAL_CDN_PORT`, `METAL_CDN_SESSION_SECRET`.  
+Env: `MICROPYTHON`, `METALPYTHON_WM`, `METALPYTHON`, `METAL_CDN_URL`, `METAL_CDN_PORT`, `METAL_CDN_SESSION_SECRET`.  
 Details: [docs/CLIENT.md](docs/CLIENT.md#public-test-first-boot-auth-on).
 
 ### Public TLS edge
