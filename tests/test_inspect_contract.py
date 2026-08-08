@@ -42,6 +42,8 @@ async def test_inspect_capabilities_and_self(tmp_path: Path) -> None:
         assert body["theme"] == "cdn"
         assert body["fastapi"] is True
         assert body["microdot"] is False
+        assert body["vfs_static"] is False
+        assert body["static_embed"] is False
 
         self = await ac.get("/cdn/inspect/self")
         assert self.status_code == 200
@@ -50,6 +52,7 @@ async def test_inspect_capabilities_and_self(tmp_path: Path) -> None:
         assert sbody["name"] == "pymergetic.wasmmod"
         assert sbody["role"] == "host"
         assert sbody["has_source"] is False
+        assert sbody["static_backend"] == "none"
         assert sbody["source_files"] == []
 
         page = await ac.get("/cdn/inspect/")
