@@ -2,6 +2,9 @@
 
 CDN already owns GET /health (HealthResponse). Adapter mounts capabilities +
 self-desc + stubs with include_health=False, then shared www at /inspect.
+
+Monorepo: pymergetic + pymergetic.metal are PEP 420 namespaces — append the
+metal src portion onto pymergetic.metal.__path__ (never seal with __init__.py).
 """
 
 from __future__ import annotations
@@ -22,11 +25,7 @@ def _packages_root() -> Path:
 
 
 def _ensure_metal_inspect_path() -> None:
-    """Expose metal's inspect package on pymergetic.metal.__path__ (monorepo).
-
-    Do not sys.path-insert metal src: that shadows the already-imported CDN
-    pymergetic package once metal ships pymergetic/__init__.py for freezing.
-    """
+    """Add metal's inspect as another PEP 420 portion of pymergetic.metal."""
     try:
         import pymergetic.metal.inspect.adapter_fastapi  # noqa: F401
 
@@ -34,7 +33,7 @@ def _ensure_metal_inspect_path() -> None:
     except ImportError:
         pass
 
-    metal_dir = (
+    metal_portion = (
         _packages_root()
         / "metalpython"
         / "extmod"
@@ -43,13 +42,18 @@ def _ensure_metal_inspect_path() -> None:
         / "pymergetic"
         / "metal"
     )
-    if not metal_dir.is_dir():
+    if not metal_portion.is_dir():
         return
+
+    import pymergetic
     import pymergetic.metal as metal_pkg
 
-    path = str(metal_dir)
-    if path not in metal_pkg.__path__:
-        metal_pkg.__path__.append(path)
+    pym_portion = str(metal_portion.parent)  # .../src/pymergetic
+    metal_path = str(metal_portion)
+    if pym_portion not in pymergetic.__path__:
+        pymergetic.__path__.append(pym_portion)
+    if metal_path not in metal_pkg.__path__:
+        metal_pkg.__path__.append(metal_path)
 
 
 def _inspect_www_dir() -> Path | None:
