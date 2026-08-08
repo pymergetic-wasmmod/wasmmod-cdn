@@ -1,13 +1,12 @@
 """Shared Inspect contract routes via metal FastAPIAdapter.
 
 CDN already owns GET /health (HealthResponse). Adapter mounts capabilities +
-NotImplemented stubs with include_health=False, then shared www at /inspect.
+self-desc + stubs with include_health=False, then shared www at /inspect.
 """
 
 from __future__ import annotations
 
 import logging
-import sys
 from pathlib import Path
 
 from fastapi import APIRouter, FastAPI
@@ -23,18 +22,34 @@ def _packages_root() -> Path:
 
 
 def _ensure_metal_inspect_path() -> None:
-    """Dev/monorepo: metal inspect Py lives under metalpython/extmod/metal/src."""
+    """Expose metal's inspect package on pymergetic.metal.__path__ (monorepo).
+
+    Do not sys.path-insert metal src: that shadows the already-imported CDN
+    pymergetic package once metal ships pymergetic/__init__.py for freezing.
+    """
     try:
         import pymergetic.metal.inspect.adapter_fastapi  # noqa: F401
 
         return
     except ImportError:
         pass
-    metal_src = _packages_root() / "metalpython" / "extmod" / "metal" / "src"
-    if metal_src.is_dir():
-        p = str(metal_src)
-        if p not in sys.path:
-            sys.path.insert(0, p)
+
+    metal_dir = (
+        _packages_root()
+        / "metalpython"
+        / "extmod"
+        / "metal"
+        / "src"
+        / "pymergetic"
+        / "metal"
+    )
+    if not metal_dir.is_dir():
+        return
+    import pymergetic.metal as metal_pkg
+
+    path = str(metal_dir)
+    if path not in metal_pkg.__path__:
+        metal_pkg.__path__.append(path)
 
 
 def _inspect_www_dir() -> Path | None:

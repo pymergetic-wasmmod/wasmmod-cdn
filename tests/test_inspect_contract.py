@@ -26,7 +26,7 @@ def _settings(tmp_path: Path) -> Settings:
 
 
 @pytest.mark.asyncio
-async def test_inspect_capabilities_and_stub(tmp_path: Path) -> None:
+async def test_inspect_capabilities_and_self(tmp_path: Path) -> None:
     app = create_app(_settings(tmp_path))
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -43,9 +43,14 @@ async def test_inspect_capabilities_and_stub(tmp_path: Path) -> None:
         assert body["fastapi"] is True
         assert body["microdot"] is False
 
-        stub = await ac.get("/cdn/inspect/self")
-        assert stub.status_code == 501
-        assert stub.json()["error"] == "NotImplemented"
+        self = await ac.get("/cdn/inspect/self")
+        assert self.status_code == 200
+        sbody = self.json()
+        assert sbody["schema"] == 1
+        assert sbody["name"] == "pymergetic.wasmmod"
+        assert sbody["role"] == "host"
+        assert sbody["has_source"] is False
+        assert sbody["source_files"] == []
 
         page = await ac.get("/cdn/inspect/")
         assert page.status_code == 200
