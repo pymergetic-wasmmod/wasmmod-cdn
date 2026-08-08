@@ -151,6 +151,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_web(settings.base_path)
     app.include_router(build_api_router(), prefix=prefix)
     app.include_router(web_router, prefix=prefix)
+    # Shared Inspect contract (/capabilities, stub /inspect/self); keep CDN /health.
+    from pymergetic.metal.cdn.api.inspect_contract import mount_inspect_contract
+
+    mount_inspect_contract(app, prefix=prefix)
 
     class _ReplAwareStaticFiles(StaticFiles):
         """µPy REPL assets must not be sticky-cached across deploys."""
