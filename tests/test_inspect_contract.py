@@ -46,3 +46,11 @@ async def test_inspect_capabilities_and_stub(tmp_path: Path) -> None:
         stub = await ac.get("/cdn/inspect/self")
         assert stub.status_code == 501
         assert stub.json()["error"] == "NotImplemented"
+
+        page = await ac.get("/cdn/inspect/")
+        assert page.status_code == 200
+        assert "<title>Inspect</title>" in page.text
+        # Shared www assets resolve under the mount.
+        css = await ac.get("/cdn/inspect/css/themes/cdn.css")
+        assert css.status_code == 200
+        assert "--accent" in css.text
