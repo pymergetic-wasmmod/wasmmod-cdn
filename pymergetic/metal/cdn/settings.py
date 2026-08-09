@@ -99,6 +99,24 @@ class Settings(BaseSettings):
     artifact_cache_lead_s: int = Field(default=60, ge=0)
     artifact_cache_pin_s: int = Field(default=86400, ge=0)
 
+    # Decoded (naked) artifact bytes for inspect/files — LRU + idle TTL.
+    # Wire HTTP Cache-Control above is separate; this is server-side zlib→naked.
+    naked_cache_max_bytes: int = Field(
+        default=256 * 1024 * 1024,
+        ge=0,
+        description="Max retained naked bytes (0 disables). Twins share one entry.",
+    )
+    naked_cache_idle_ttl_s: float = Field(
+        default=600.0,
+        ge=0,
+        description="Evict unused naked entries after this many seconds (0 = no idle TTL)",
+    )
+    naked_cache_max_entries: int = Field(
+        default=256,
+        ge=0,
+        description="Max distinct naked payloads retained (0 disables)",
+    )
+
     # Storage backend: local filesystem or S3/MinIO.
     storage_backend: str = Field(default="local", description="local | s3 | minio")
     s3_endpoint: str | None = Field(default=None, description="e.g. http://127.0.0.1:9000")
@@ -142,7 +160,7 @@ class Settings(BaseSettings):
         default=True,
         description=(
             "Show the minimizable MicroPython shell and package Try buttons "
-            "(needs static/repl/micropython.mjs from ports/webassembly)"
+            "(mp prefers CDN lead pymergetic.metal.arch.wasm; static/repl/* is fallback)"
         ),
     )
 

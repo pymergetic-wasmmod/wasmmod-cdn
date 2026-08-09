@@ -146,18 +146,25 @@ this CDN from a different page origin.
 Needs public **80→8080**. Nginx can be up on the self-signed cert first.
 
 ```sh
+# RSA key — required for iPXE HTTPS PXE (ECDSA / YE2 LE defaults break iPXE TLS).
 docker compose --profile proxy run --rm certbot certonly \
   --webroot -w /var/www/certbot \
   --cert-name cdn.pymergetic.com \
   -d cdn.pymergetic.com -d pymergetic.com -d www.pymergetic.com \
+  --key-type rsa --rsa-key-size 2048 \
   --email raudzus@pymergetic.com \
   --agree-tos --no-eff-email --non-interactive
+
+# Re-issue over an existing ECDSA cert:
+#   … certonly … --key-type rsa --force-renewal
 
 # ssl_certificate* in deploy/nginx/cdn.conf →
 #   /etc/letsencrypt/live/cdn.pymergetic.com/{fullchain,privkey}.pem
 docker compose --profile proxy exec nginx nginx -t
 docker compose --profile proxy exec nginx nginx -s reload
 ```
+
+iPXE-friendly TLS knobs live in `deploy/nginx/cdn.conf` (`ssl_ciphers`, `ssl_ecdh_curve`).
 
 Browse: `https://cdn.pymergetic.com/cdn/`
 (Apex / www share the same cert; `/` is the blank landing until you put something there.)

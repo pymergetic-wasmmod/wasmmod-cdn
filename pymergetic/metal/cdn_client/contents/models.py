@@ -12,6 +12,8 @@ class ArtifactBinaryKind(str, Enum):
     WASM = "wasm"
     AOT = "aot"
     ELF = "elf"
+    EFI = "efi"  # UEFI PE/COFF (BOOTX64.EFI)
+    MJS = "mjs"  # Emscripten ES-module loader (browser seat)
     UNKNOWN = "unknown"
 
 
@@ -212,6 +214,8 @@ class PackageContents(BaseModel):
     name: str | None = None
     pkg_version: str | None = None
     pack_files: list[str] = Field(default_factory=list)
+    #: Absolute one-module VFS root when ``name`` is set: ``/mods/<name>``.
+    vfs_root: str | None = None
     source_files: list[str] = Field(default_factory=list)
     exports: list[str] = Field(default_factory=list)
     imports: list[ImportInfo] = Field(default_factory=list)

@@ -64,6 +64,8 @@ class ArtifactKind(str, Enum):
     WASM = "wasm"
     AOT = "aot"
     ELF = "elf"
+    EFI = "efi"  # UEFI PE/COFF (BOOTX64.EFI) — freestanding firmware
+    MJS = "mjs"  # Emscripten ES-module loader (arch.wasm seat)
 
 
 class ArtifactEncoding(str, Enum):
@@ -215,7 +217,7 @@ class PackageSummary(BaseModel):
     # Platform engine/kernel identity (from contents.tags.role or known names).
     role: str | None = Field(
         default=None,
-        description="host | kernel when this is a platform pack; else None",
+        description="host | kernel | arch | engine when this is a platform pack; else None",
     )
 
 
@@ -279,7 +281,7 @@ class PackageNavNode(BaseModel):
 
     @property
     def is_platform(self) -> bool:
-        return self.role in ("host", "kernel")
+        return self.role in ("host", "kernel", "arch", "engine")
 
 
 class HealthResponse(BaseModel):

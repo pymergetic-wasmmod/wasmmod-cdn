@@ -41,6 +41,10 @@ RUN set -eux; \
     chown -R app:app /data /app; \
     if [ ! -f pymergetic/metal/cdn/web/static/repl/micropython.mjs ]; then \
       echo "WARNING: micropython.mjs missing — run scripts/sync-repl-assets.sh / scripts/dev-up.sh before docker build"; \
+    fi; \
+    if [ ! -f pymergetic/metal/inspect/adapter_fastapi.py ]; then \
+      echo "ERROR: pymergetic.metal.inspect missing — run scripts/sync-metal-inspect.sh before docker build"; \
+      exit 1; \
     fi
 USER app
 

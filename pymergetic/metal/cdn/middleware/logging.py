@@ -32,7 +32,31 @@ def metrics_text() -> str:
         ]
         for key, value in sorted(_COUNTERS.items()):
             lines.append(f'metal_cdn_requests_total{{name="{key}"}} {value}')
-        return "\n".join(lines) + "\n"
+    try:
+        from pymergetic.metal.cdn.services.naked_cache import active_naked_cache
+
+        cache = active_naked_cache()
+        if cache is not None:
+            st = cache.stats()
+            lines.extend(
+                [
+                    "# HELP metal_cdn_naked_cache_hits_total Naked decode cache hits",
+                    "# TYPE metal_cdn_naked_cache_hits_total counter",
+                    f"metal_cdn_naked_cache_hits_total {st.hits}",
+                    "# HELP metal_cdn_naked_cache_misses_total Naked decode cache misses",
+                    "# TYPE metal_cdn_naked_cache_misses_total counter",
+                    f"metal_cdn_naked_cache_misses_total {st.misses}",
+                    "# HELP metal_cdn_naked_cache_bytes Cached naked payload bytes",
+                    "# TYPE metal_cdn_naked_cache_bytes gauge",
+                    f"metal_cdn_naked_cache_bytes {st.bytes}",
+                    "# HELP metal_cdn_naked_cache_entries Cached naked payloads",
+                    "# TYPE metal_cdn_naked_cache_entries gauge",
+                    f"metal_cdn_naked_cache_entries {st.entries}",
+                ]
+            )
+    except Exception:
+        pass
+    return "\n".join(lines) + "\n"
 
 
 class RequestLogMiddleware:

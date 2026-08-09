@@ -12,10 +12,15 @@
   const inEl = document.getElementById("mpy-repl-in");
   const toggleBtn = document.getElementById("mpy-repl-toggle");
   const statusEl = document.getElementById("mpy-repl-status");
+  const heapSel = document.getElementById("mpy-repl-heap");
   const basePath = panel.dataset.basePath || "";
   const assetV = panel.dataset.replAssetV || "";
   const autoexecUrl = panel.dataset.autoexecUrl || (basePath + "/repl/autoexec.py");
   let engineId = panel.dataset.replEngine || "mp";
+
+  const HEAP_PRESETS = [4194304, 8388608, 16777216, 33554432, 67108864, 134217728];
+  const HEAP_DEFAULT = 4194304;
+  const HEAP_STORE_PREFIX = "metal-cdn.mpy.heapsize.";
 
   /** @type {Map<string, EngineInst>} */
   const engines = new Map();
@@ -32,8 +37,47 @@
    *   shellSessionId: string|null,
    *   firstOpenWait: boolean,
    *   status: string,
+   *   heapsize: number,
    * }} EngineInst
    */
+
+  function readHeapPref(id) {
+    try {
+      const raw = localStorage.getItem(HEAP_STORE_PREFIX + id);
+      const n = raw != null ? parseInt(raw, 10) : NaN;
+      if (HEAP_PRESETS.indexOf(n) >= 0) return n;
+    } catch (_) {
+      /* private mode */
+    }
+    return HEAP_DEFAULT;
+  }
+
+  function writeHeapPref(id, bytes) {
+    try {
+      localStorage.setItem(HEAP_STORE_PREFIX + id, String(bytes));
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  function syncHeapSelect(id) {
+    if (!heapSel) return;
+    const e = engines.get(id);
+    const v = e ? e.heapsize : readHeapPref(id);
+    heapSel.value = String(v);
+  }
+
+  function disposeEngine(e) {
+    if (!e) return;
+    e.mp = null;
+    e.loading = null;
+    e.sessionReady = false;
+    e.sessionLoading = null;
+    e.shellSessionId = null;
+    e.firstOpenWait = false;
+    if (e.outEl) e.outEl.textContent = "";
+    e.status = "idle";
+  }
 
   function bustUrl(url) {
     if (!assetV) return url;
@@ -47,14 +91,15 @@
   }
 
   function sessionAutoexecUrl() {
-    const cdn = (panel.dataset.cdnBase || "").trim().replace(/\/$/, "");
-    if (!cdn) return autoexecUrl;
     try {
       const u = new URL(autoexecUrl, window.location.origin);
-      u.searchParams.set("cdn", cdn);
+      const cdn = (panel.dataset.cdnBase || "").trim().replace(/\/$/, "");
+      if (cdn) u.searchParams.set("cdn", cdn);
+      u.searchParams.set("engine", engineId || "mp");
       return u.pathname + u.search + u.hash;
     } catch (_) {
-      return autoexecUrl;
+      const sep = autoexecUrl.includes("?") ? "&" : "?";
+      return autoexecUrl + sep + "engine=" + encodeURIComponent(engineId || "mp");
     }
   }
 
@@ -93,6 +138,7 @@
       shellSessionId: null,
       firstOpenWait: false,
       status: "idle",
+      heapsize: readHeapPref(id),
     };
     engines.set(id, e);
     return e;
@@ -103,12 +149,80 @@
     if (el) el.scrollTop = el.scrollHeight;
   }
 
+  /** Minimal ANSI → HTML (SGR + truecolor) for boot tree / FIGlet. */
+  function ansiToHtml(raw) {
+    const s = String(raw ?? "");
+    if (!/\x1b\[/.test(s)) {
+      const t = document.createElement("span");
+      t.textContent = s;
+      return t;
+    }
+    const root = document.createElement("span");
+    const re = /\x1b\[([\d;]*)m/g;
+    let last = 0;
+    let open = null;
+    let m;
+    const flushText = (text) => {
+      if (!text) return;
+      const node = document.createTextNode(text);
+      (open || root).appendChild(node);
+    };
+    const close = () => {
+      open = null;
+    };
+    const styleFrom = (codes) => {
+      const parts = String(codes || "0").split(";").map((x) => parseInt(x, 10) || 0);
+      let color = "";
+      let opacity = "";
+      let bold = false;
+      for (let i = 0; i < parts.length; i++) {
+        const c = parts[i];
+        if (c === 0) {
+          color = "";
+          opacity = "";
+          bold = false;
+        } else if (c === 1) bold = true;
+        else if (c === 2) opacity = "0.65";
+        else if (c === 31) color = "#ff7b72";
+        else if (c === 32) color = "#3fb950";
+        else if (c === 33) color = "#d29922";
+        else if (c === 35) color = "#d2a8ff";
+        else if (c === 36) color = "#39c5cf";
+        else if (c === 38 && parts[i + 1] === 2 && i + 4 < parts.length) {
+          color = `rgb(${parts[i + 2]},${parts[i + 3]},${parts[i + 4]})`;
+          i += 4;
+        }
+      }
+      const st = [];
+      if (color) st.push("color:" + color);
+      if (opacity) st.push("opacity:" + opacity);
+      if (bold) st.push("font-weight:600");
+      return st.join(";");
+    };
+    while ((m = re.exec(s))) {
+      flushText(s.slice(last, m.index));
+      last = m.index + m[0].length;
+      const codes = m[1];
+      if (!codes || codes === "0") {
+        close();
+        continue;
+      }
+      close();
+      open = document.createElement("span");
+      const st = styleFrom(codes);
+      if (st) open.setAttribute("style", st);
+      root.appendChild(open);
+    }
+    flushText(s.slice(last));
+    return root;
+  }
+
   function append(line, cls, eng) {
     const e = eng || cur();
     if (!e || !e.outEl) return;
     const span = document.createElement("div");
     if (cls) span.className = cls;
-    span.textContent = line;
+    span.appendChild(ansiToHtml(line));
     e.outEl.appendChild(span);
     if (e.id === engineId) scrollTerm();
   }
@@ -152,6 +266,7 @@
     engineId = next;
     markEngineActive(next);
     showEngineOut(next);
+    syncHeapSelect(next);
     setStatus(e.status || (e.sessionReady ? "ready" : "idle"), e);
     scrollTerm();
     // Boot this instance if needed; leave others alone.
@@ -262,16 +377,38 @@
     if (!e.mjsUrl) throw new Error("engine " + e.id + " has no mjs");
     e.loading = (async () => {
       setStatus("loading…", e);
-      const mod = await import(e.mjsUrl);
+      const heap = e.heapsize || HEAP_DEFAULT;
+      /* Bust module cache so a heap resize gets a fresh Emscripten Module. */
+      let mjsImport = e.mjsUrl;
+      try {
+        const u = new URL(e.mjsUrl, window.location.href);
+        u.searchParams.set("heap", String(heap));
+        if (assetV) u.searchParams.set("v", assetV);
+        mjsImport = u.href;
+      } catch (_) {
+        mjsImport =
+          e.mjsUrl +
+          (e.mjsUrl.includes("?") ? "&" : "?") +
+          "heap=" +
+          encodeURIComponent(String(heap));
+      }
+      const mod = await import(mjsImport);
       const loadMicroPython = mod.loadMicroPython || mod.default?.loadMicroPython;
       if (!loadMicroPython) throw new Error("loadMicroPython missing from micropython.mjs");
       const loadOpts = {
+        heapsize: heap,
         stdout: (line) => append(String(line).replace(/\n$/, ""), "mpy-out", e),
         stderr: (line) => append(String(line).replace(/\n$/, ""), "mpy-err", e),
       };
-      if (assetV) {
+      // Sibling .wasm of whatever .mjs we imported (CDN arch.wasm or static micropython.*).
+      try {
+        const u = new URL(e.mjsUrl, window.location.href);
+        u.pathname = u.pathname.replace(/\.mjs$/i, ".wasm");
+        u.searchParams.set("heap", String(heap));
+        loadOpts.url = bustUrl(u.href);
+      } catch (_) {
         loadOpts.url = bustUrl(
-          String(e.mjsUrl).replace(/micropython\.mjs(\?.*)?$/i, "micropython.wasm"),
+          String(e.mjsUrl).replace(/\.mjs(\?.*)?$/i, ".wasm$1"),
         );
       }
       e.mp = await loadMicroPython(loadOpts);
@@ -404,10 +541,14 @@
     if (
       pkg === "pymergetic.wasmmod" ||
       pkg === "pymergetic.upy" ||
-      pkg === "pymergetic.metal"
+      pkg === "pymergetic.metal" ||
+      pkg === "pymergetic.metal.inspect" ||
+      pkg.startsWith("pymergetic.metal.arch.")
     ) {
       append(
-        "Try: " + pkg + " is a host/platform module — use Inspect, not Play.",
+        pkg.startsWith("pymergetic.metal.arch.")
+          ? "Try: " + pkg + " is an architecture image — use Inspect / iPXE, not Play."
+          : "Try: " + pkg + " is a host/platform module — use Inspect, not Play.",
         "mpy-err",
       );
       return;
@@ -435,6 +576,30 @@
 
   if (toggleBtn) toggleBtn.addEventListener("click", () => toggle());
 
+  if (heapSel) {
+    heapSel.addEventListener("change", () => {
+      const e = cur();
+      if (!e) return;
+      const n = parseInt(heapSel.value, 10);
+      if (HEAP_PRESETS.indexOf(n) < 0) return;
+      if (n === e.heapsize && !e.mp && !e.loading) {
+        writeHeapPref(e.id, n);
+        return;
+      }
+      e.heapsize = n;
+      writeHeapPref(e.id, n);
+      const wasOpen = panelOpen();
+      disposeEngine(e);
+      setStatus("restarting…", e);
+      append(
+        "heap " + e.id + " → " + n / (1024 * 1024) + " MiB (engine restart)",
+        "mpy-out",
+        e,
+      );
+      void ensureSession({ quiet: !wasOpen }).catch(() => {});
+    });
+  }
+
   // Register all engine pills as separate instances.
   panel.querySelectorAll("[data-mpy-engine]").forEach((btn) => {
     const id = btn.getAttribute("data-mpy-engine");
@@ -456,6 +621,7 @@
   getOrCreateEngine(engineId, defHref);
   markEngineActive(engineId);
   showEngineOut(engineId);
+  syncHeapSelect(engineId);
 
   if (termEl) {
     termEl.addEventListener("click", (ev) => {

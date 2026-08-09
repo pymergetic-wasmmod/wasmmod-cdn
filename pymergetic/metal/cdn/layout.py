@@ -65,7 +65,7 @@ class ChannelLayout:
     def classify_artifact(filename: str) -> tuple[str, str | None, int | None, str]:
         """Return (kind, arch, aot_version, encoding) from a filename.
 
-        kind: wasm|aot ; encoding: raw|mpzl
+        kind: wasm|aot|elf|efi|mjs ; encoding: raw|mpzl
         """
         name = filename
         encoding = "mpzl" if name.endswith(".zlib") else "raw"
@@ -76,7 +76,12 @@ class ChannelLayout:
         arch: str | None = None
         kind = "wasm"
 
-        if name.endswith(".wasm"):
+        if name.endswith(".mjs"):
+            # Emscripten loader for browser seats (raw only; no .mjs.zlib twins).
+            if encoding == "mpzl":
+                raise ValueError(f"mjs artifacts must be raw (not zlib): {filename}")
+            kind = "mjs"
+        elif name.endswith(".wasm"):
             kind = "wasm"
         else:
             # hello.elf / hello.x86_64.elf
@@ -88,15 +93,24 @@ class ChannelLayout:
                 kind = "elf"
                 arch = m_elf.group("arch")
             else:
-                # hello.aot6 / hello.x86_64.aot6 / hello.aot
-                m = re.match(
-                    r"^(?P<stem>.+?)(?:\.(?P<arch>[A-Za-z0-9_]+))?\.aot(?P<ver>\d*)$",
+                # pymergetic.metal.arch.x86_64.efi / metal.efi (UEFI PE)
+                m_efi = re.match(
+                    r"^(?P<stem>.+?)(?:\.(?P<arch>[A-Za-z0-9_]+))?\.efi$",
                     name,
                 )
-                if not m:
-                    raise ValueError(f"unrecognized artifact name: {filename}")
-                kind = "aot"
-                arch = m.group("arch")
-                ver = m.group("ver")
-                aot_version = int(ver) if ver else None
+                if m_efi:
+                    kind = "efi"
+                    arch = m_efi.group("arch")
+                else:
+                    # hello.aot6 / hello.x86_64.aot6 / hello.aot
+                    m = re.match(
+                        r"^(?P<stem>.+?)(?:\.(?P<arch>[A-Za-z0-9_]+))?\.aot(?P<ver>\d*)$",
+                        name,
+                    )
+                    if not m:
+                        raise ValueError(f"unrecognized artifact name: {filename}")
+                    kind = "aot"
+                    arch = m.group("arch")
+                    ver = m.group("ver")
+                    aot_version = int(ver) if ver else None
         return kind, arch, aot_version, encoding

@@ -20,19 +20,32 @@ from pymergetic.metal.cdn.models import (
 from pymergetic.metal.cdn.storage import ObjectStorage
 
 # Known platform FQNs when an older index lacks contents.tags.role.
+# metal.inspect = kernel; metal.arch.* = arch; metal.unix.* = host; wasmmod = engine.
 _KNOWN_PLATFORM_ROLES: dict[str, str] = {
-    "pymergetic.wasmmod": "host",
+    "pymergetic.wasmmod": "engine",
     "pymergetic.metal": "kernel",
+    "pymergetic.metal.inspect": "kernel",
 }
+
+_PLATFORM_ROLES = frozenset({"host", "kernel", "arch", "engine"})
 
 
 def package_role(name: str, entry: PackageEntry | None = None) -> str | None:
-    """Return ``host`` / ``kernel`` from contents tags or known-name fallback."""
-    tags = None
+    """Return ``host`` / ``kernel`` / ``arch`` / ``engine`` from tags or name fallback.
+
+    ``pymergetic.metal.arch.*`` always wins as ``arch`` — browser seat wasm may
+    carry pack tags.role=host/engine from the engine binary; that must not restyle
+    the seat. ``metal.unix.*`` is ``host``; ``wasmmod`` is ``engine``.
+    """
+    if name.startswith("pymergetic.metal.arch."):
+        return "arch"
+    if name.startswith("pymergetic.metal.unix."):
+        return "host"
+    if name == "pymergetic.wasmmod" or name.startswith("pymergetic.wasmmod."):
+        return "engine"
     if entry is not None and entry.contents is not None:
-        tags = entry.contents.tags or {}
-        role = (tags.get("role") or "").strip().lower()
-        if role in ("host", "kernel"):
+        role = ((entry.contents.tags or {}).get("role") or "").strip().lower()
+        if role in _PLATFORM_ROLES:
             return role
     return _KNOWN_PLATFORM_ROLES.get(name)
 
@@ -133,12 +146,24 @@ class IndexService:
         ``needed_by`` is reverse deps from other catalog packages' ``[deps]``.
         """
         groups: dict[str, list[tuple[ChannelRef, PackageEntry, datetime]]] = {}
+        lead_yanked: set[str] = set()
         for channel in await self.discover_channels():
             index = await self.load(channel)
             for name, entry in index.packages.items():
+                if channel.is_lead and entry.yanked:
+                    lead_yanked.add(name)
                 if entry.yanked and not include_yanked:
                     continue
+                # Lead yanked → hide FQN even if a pin is still un-yanked.
+                if not include_yanked and (name in lead_yanked or name == "metal"):
+                    continue
                 groups.setdefault(name, []).append((channel, entry, index.generated))
+
+        # Second pass: drop names whose lead is yanked (lead channel may load after a pin).
+        if not include_yanked:
+            for name in list(groups):
+                if name in lead_yanked or name == "metal":
+                    groups.pop(name, None)
 
         primaries: dict[str, tuple[ChannelRef, PackageEntry, datetime]] = {}
         for name, items in groups.items():
@@ -335,8 +360,20 @@ class IndexService:
         """Package-centric collapsible tree (dots / slash prefixes → folders)."""
         by_name: dict[str, list[PackageVersionOption]] = {}
         roles: dict[str, str | None] = {}
+        # Lead yanked → hide the FQN entirely (pins may still exist for archaeology).
+        lead_yanked: set[str] = set()
+        lead_idx = await self.load(self.parse_channel("lead"))
+        for name, entry in lead_idx.packages.items():
+            if entry.yanked:
+                lead_yanked.add(name)
+        # Legacy bare name from early firmware mis-publish.
+        lead_yanked.add("metal")
+
         for channel in await self.discover_channels():
-            for pkg in await self.list_packages(channel):
+            # Yanked packages stay in the index for archaeology; hide from browse.
+            for pkg in await self.list_packages(channel, include_yanked=False):
+                if pkg.name in lead_yanked or pkg.name == "metal":
+                    continue
                 opt = PackageVersionOption(
                     channel=pkg.channel,
                     version=pkg.version,

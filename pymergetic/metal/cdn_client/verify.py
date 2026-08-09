@@ -203,8 +203,16 @@ def enforce_signed_policy(
     if mode == "off":
         return None
     naked = unwrap_mpzl(data)
-    has = extract_custom_section(naked, SIG_SECTION) is not None
     label = filename or "artifact"
+    # UEFI PE/COFF (BOOTX64.EFI) cannot carry wasmmod.sig — freestanding firmware
+    # exception (iPXE chains the PE; guest packs stay ELF64/wasm-signed).
+    if len(naked) >= 2 and naked[:2] == b"MZ":
+        return VerifyResult(ok=True, signed=False, format="pe")
+    # Emscripten .mjs loader — text/JS, not a wasmmod container.
+    low = (filename or "").lower()
+    if low.endswith(".mjs") or low.endswith(".mjs.zlib"):
+        return VerifyResult(ok=True, signed=False, format="mjs")
+    has = extract_custom_section(naked, SIG_SECTION) is not None
     if mode == "present":
         if not has:
             raise ValueError(f"{label}: wasmmod.sig required (REQUIRE_SIGNED=present)")

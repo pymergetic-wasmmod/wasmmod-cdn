@@ -298,7 +298,17 @@ def _package_from_path(rel: str) -> str | None:
     if not parts:
         return None
     name = parts[-1]
-    for suffix in (".wasm.zlib", ".elf.zlib", ".aot.zlib", ".wasm", ".elf", ".zlib"):
+    for suffix in (
+        ".wasm.zlib",
+        ".elf.zlib",
+        ".efi.zlib",
+        ".aot.zlib",
+        ".wasm",
+        ".mjs",
+        ".elf",
+        ".efi",
+        ".zlib",
+    ):
         if name.endswith(suffix):
             name = name[: -len(suffix)]
             break

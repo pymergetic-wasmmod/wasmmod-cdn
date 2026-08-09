@@ -14,7 +14,7 @@ from pymergetic.metal.cdn.services.federation.catalog import enrich_shell_lists
 from pymergetic.metal.cdn.services.federation.forward import forward_json, resolve_mount
 from pymergetic.metal.cdn.services.federation.proxy import FederationProxy
 from pymergetic.metal.cdn.services.federation.registry import FederationRegistry
-from pymergetic.metal.cdn.web.context import templates
+from pymergetic.metal.cdn.web.context import _cdn_base_url, templates
 from pymergetic.metal.cdn.web.shell_ctx import _shell_context
 
 
@@ -93,6 +93,9 @@ async def _package_page(
             "fed_peer_label": fed_peer_label,
             "fed_peer_browse_url": fed_peer_browse_url,
             "package_role": package_role(name, entry),
+            "cdn_base": _cdn_base_url(request),
+            "is_arch_seat": name.startswith("pymergetic.metal.arch."),
+            "is_unix_seat": name.startswith("pymergetic.metal.unix."),
         }
     )
     return templates.TemplateResponse(request, "package.html", ctx)

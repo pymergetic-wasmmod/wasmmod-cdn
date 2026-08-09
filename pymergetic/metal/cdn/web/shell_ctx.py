@@ -43,7 +43,7 @@ async def _shell_context(
     request: Request | None = None,
     current_user: UserRead | None = None,
 ) -> dict[str, Any]:
-    catalog = await indexes.list_catalog()
+    catalog = await indexes.list_catalog(include_yanked=False)
     nav_roots = await indexes.browse_package_nav()
     package_versions: list = []
     if active_package:
@@ -111,11 +111,26 @@ async def _shell_context(
         if settings is not None and getattr(settings, "experimental_repl", False):
             experimental_repl = True
             repl_dir = Path(__file__).resolve().parent / "static" / "repl"
-            # Separate instances: mp | mpwm | upy (each own runtime + transcript).
-            # Legacy flat micropython.mjs counts as mpwm when nested dir missing.
+            # mp = CDN lead pymergetic.metal.arch.wasm (static/repl/mp fallback).
+            # mpwm / upy stay local static engines.
+            ARCH_WASM_PKG = "pymergetic.metal.arch.wasm"
+            arch_mjs_href = ""
+            try:
+                arch_entry = await indexes.get_package(
+                    IndexService.parse_channel("lead"), ARCH_WASM_PKG
+                )
+            except Exception:
+                arch_entry = None
+            if arch_entry is not None and not arch_entry.yanked:
+                for art in arch_entry.artifacts:
+                    path = art.path
+                    if path.endswith(".mjs") and not path.endswith(".zlib"):
+                        arch_mjs_href = _url("artifacts", "lead", path)
+                        break
+
             engine_specs = (
-                ("mp", "mp", "metalpython (mpwm+metalmod)"),
-                ("mpwm", "mpwm", "metalpython-wasmmod (upy+wasmmod)"),
+                ("mp", "mp", "metal arch.wasm seat (CDN lead)"),
+                ("mpwm", "mpwm", "wasmmod host only (no metal arch)"),
                 ("upy", "upy", "vanilla upstream MicroPython"),
             )
             all_mtimes: list[int] = []
@@ -134,7 +149,6 @@ async def _shell_context(
                     else:
                         mjs = repl_dir / "micropython.mjs"
                         wasm = repl_dir / "micropython.wasm"
-                ready = mjs.is_file()
                 mtimes: list[int] = []
                 try:
                     if mjs.is_file():
@@ -144,30 +158,30 @@ async def _shell_context(
                 except OSError:
                     mtimes = []
                 all_mtimes.extend(mtimes)
-                if ready:
+
+                mjs_href = ""
+                if eng_id == "mp" and arch_mjs_href:
+                    mjs_href = arch_mjs_href
+                    ready = True
+                elif mjs.is_file():
+                    ready = True
                     if (eng_dir / "micropython.mjs").is_file() and eng_dir != repl_dir:
                         mjs_parts = ("static", "repl", subdir, "micropython.mjs")
                     else:
                         mjs_parts = ("static", "repl", "micropython.mjs")
-                    repl_engines.append(
-                        {
-                            "id": eng_id,
-                            "label": eng_id,
-                            "title": label,
-                            "ready": True,
-                            "mjs_href": _url(*mjs_parts),
-                        }
-                    )
+                    mjs_href = _url(*mjs_parts)
                 else:
-                    repl_engines.append(
-                        {
-                            "id": eng_id,
-                            "label": eng_id,
-                            "title": label,
-                            "ready": False,
-                            "mjs_href": "",
-                        }
-                    )
+                    ready = False
+
+                repl_engines.append(
+                    {
+                        "id": eng_id,
+                        "label": eng_id,
+                        "title": label,
+                        "ready": ready,
+                        "mjs_href": mjs_href,
+                    }
+                )
             ready_ids = [e["id"] for e in repl_engines if e["ready"]]
             repl_ready = bool(ready_ids)
             for pref in ("mp", "mpwm", "upy"):

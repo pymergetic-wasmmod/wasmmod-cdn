@@ -31,6 +31,10 @@ deploy/certbot/www/
 *.db
 *.sqlite3
 
+# Shared Inspect contract (synced from metalpython — scripts/sync-metal-inspect.sh)
+pymergetic/metal/inspect/
+!pymergetic/metal/inspect/README.md
+
 # Browser MicroPython REPL binaries (copied from ports/webassembly build)
 pymergetic/metal/cdn/web/static/repl/*.mjs
 pymergetic/metal/cdn/web/static/repl/*.wasm
@@ -41,3 +45,4 @@ pymergetic/metal/cdn/web/static/repl/mp/
 pymergetic/metal/cdn/web/static/repl/upy/
 !pymergetic/metal/cdn/web/static/repl/README.md
 !pymergetic/metal/cdn/web/static/repl/.gitkeep
+metal-unix

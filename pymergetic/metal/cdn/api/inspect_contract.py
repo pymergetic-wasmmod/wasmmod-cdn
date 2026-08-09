@@ -3,8 +3,8 @@
 CDN already owns GET /health (HealthResponse). Adapter mounts capabilities +
 self-desc + stubs with include_health=False, then shared www at /inspect.
 
-Monorepo: pymergetic + pymergetic.metal are PEP 420 namespaces — append the
-metal src portion onto pymergetic.metal.__path__ (never seal with __init__.py).
+Prefer in-tree `pymergetic.metal.inspect` (synced by scripts/sync-metal-inspect.sh
+for Docker). Fall back to appending the metalpython source portion (monorepo).
 """
 
 from __future__ import annotations
@@ -18,14 +18,18 @@ from fastapi.staticfiles import StaticFiles
 log = logging.getLogger(__name__)
 
 
+def _metal_pkg_dir() -> Path:
+    # .../pymergetic/metal/cdn/api/this.py → .../pymergetic/metal
+    return Path(__file__).resolve().parents[2]
+
+
 def _packages_root() -> Path:
     # .../packages/metal-cdn/pymergetic/metal/cdn/api/inspect_contract.py
-    # parents: api, cdn, metal, pymergetic, metal-cdn, packages
     return Path(__file__).resolve().parents[5]
 
 
 def _ensure_metal_inspect_path() -> None:
-    """Add metal's inspect as another PEP 420 portion of pymergetic.metal."""
+    """Ensure pymergetic.metal.inspect is importable (in-tree or monorepo)."""
     try:
         import pymergetic.metal.inspect.adapter_fastapi  # noqa: F401
 
@@ -57,6 +61,11 @@ def _ensure_metal_inspect_path() -> None:
 
 
 def _inspect_www_dir() -> Path | None:
+    # 1) Vendored next to this package (Docker / synced tree).
+    local = _metal_pkg_dir() / "inspect" / "www" / "inspect"
+    if local.is_dir():
+        return local
+    # 2) Monorepo sibling metalpython.
     www = (
         _packages_root()
         / "metalpython"
@@ -75,7 +84,13 @@ def _inspect_www_dir() -> Path | None:
 def mount_inspect_contract(app: FastAPI, *, prefix: str = "") -> None:
     """Register Inspect contract + shared www under optional path prefix (e.g. /cdn)."""
     _ensure_metal_inspect_path()
-    from pymergetic.metal.inspect.adapter_fastapi import FastAPIAdapter
+    try:
+        from pymergetic.metal.inspect.adapter_fastapi import FastAPIAdapter
+    except ImportError as e:
+        raise RuntimeError(
+            "pymergetic.metal.inspect missing — run scripts/sync-metal-inspect.sh "
+            "(or keep a metalpython sibling checkout)"
+        ) from e
 
     router = APIRouter()
     FastAPIAdapter(role="cdn", theme="cdn", app=router, include_health=False)

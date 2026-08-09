@@ -10,9 +10,11 @@ import { hooks, requireUi } from "./ctx.js";
 import { flashMeta, setMetaStatus } from "./view.js";
 
 function roleRank(role) {
-  if (role === "host") return 0;
-  if (role === "kernel") return 1;
-  return 2;
+  if (role === "engine") return 0;
+  if (role === "host") return 1;
+  if (role === "kernel") return 2;
+  if (role === "arch") return 3;
+  return 4;
 }
 
 export async function ensurePackageList() {

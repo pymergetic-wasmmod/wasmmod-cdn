@@ -70,7 +70,7 @@
       {% macro nav_nodes(nodes, depth=0) -%}
       <ul class="tree {% if depth == 0 %}tree-roots{% else %}tree-children{% endif %}"{% if depth > 0 %} hidden{% endif %}>
         {% for node in nodes %}
-        <li class="tree-node {% if node.is_folder %}is-folder{% endif %} {% if node.is_package and not node.is_folder %}is-leaf{% endif %} {% if node.is_package %}is-package{% endif %}{% if node.origin == 'remote' %} is-remote{% endif %}{% if node.role == 'host' %} is-host{% elif node.role == 'kernel' %} is-kernel{% endif %}"
+        <li class="tree-node {% if node.is_folder %}is-folder{% endif %} {% if node.is_package and not node.is_folder %}is-leaf{% endif %} {% if node.is_package %}is-package{% endif %}{% if node.origin == 'remote' %} is-remote{% endif %}{% if node.role == 'host' %} is-host{% elif node.role == 'engine' %} is-engine{% elif node.role == 'kernel' %} is-kernel{% elif node.role == 'arch' %} is-arch{% endif %}"
             data-name="{{ node.name|lower }}"
             data-origin="{{ node.origin or 'local' }}"
             data-role="{{ node.role or '' }}"
@@ -87,7 +87,7 @@
               href="{{ package_href(default_ch if active_package != node.full_name else active_channel, node.full_name) }}"
               data-package="{{ node.full_name }}"
             >{{ node.name }}</a>
-            {% if node.role == 'host' %}<span class="role-mark role-host" title="Host engine — Inspect only; Play disabled" aria-label="host"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="1" y="2" width="14" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4 14h8M8 11v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>{% elif node.role == 'kernel' %}<span class="role-mark role-kernel" title="Kernel module — Inspect only; Play disabled" aria-label="kernel"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>{% endif %}
+            {% if node.role == 'host' %}<span class="role-mark role-host" title="Unix host seat — curl-and-run; Inspect only; Play disabled" aria-label="host"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="1" y="2" width="14" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4 14h8M8 11v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>{% elif node.role == 'engine' %}<span class="role-mark role-engine" title="CDN engine — Inspect only; Play disabled" aria-label="engine"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 1.5 13.5 4.5v7L8 14.5 2.5 11.5v-7L8 1.5z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></span>{% elif node.role == 'kernel' %}<span class="role-mark role-kernel" title="Kernel module — Inspect only; Play disabled" aria-label="kernel"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>{% elif node.role == 'arch' %}<span class="role-mark role-arch" title="Architecture image — freestanding firmware; Inspect only; Play disabled" aria-label="arch"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><ellipse cx="8" cy="4" rx="5.5" ry="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2.5 4v4c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2V4M2.5 8v4c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2V8" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></span>{% endif %}
             {% if node.versions|length > 1 %}
             <label class="tree-ver-wrap">
               <span class="visually-hidden">Version</span>
@@ -120,7 +120,7 @@
               href="{{ package_href(default_ch if active_package != node.full_name else active_channel, node.full_name) }}"
               data-package="{{ node.full_name }}"
             >{{ node.name }}</a>
-            {% if node.role == 'host' %}<span class="role-mark role-host" title="Host engine — Inspect only; Play disabled" aria-label="host"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="1" y="2" width="14" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4 14h8M8 11v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>{% elif node.role == 'kernel' %}<span class="role-mark role-kernel" title="Kernel module — Inspect only; Play disabled" aria-label="kernel"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>{% endif %}
+            {% if node.role == 'host' %}<span class="role-mark role-host" title="Unix host seat — curl-and-run; Inspect only; Play disabled" aria-label="host"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><rect x="1" y="2" width="14" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4 14h8M8 11v3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>{% elif node.role == 'engine' %}<span class="role-mark role-engine" title="CDN engine — Inspect only; Play disabled" aria-label="engine"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 1.5 13.5 4.5v7L8 14.5 2.5 11.5v-7L8 1.5z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></span>{% elif node.role == 'kernel' %}<span class="role-mark role-kernel" title="Kernel module — Inspect only; Play disabled" aria-label="kernel"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>{% elif node.role == 'arch' %}<span class="role-mark role-arch" title="Architecture image — freestanding firmware; Inspect only; Play disabled" aria-label="arch"><svg class="role-icon" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><ellipse cx="8" cy="4" rx="5.5" ry="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M2.5 4v4c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2V4M2.5 8v4c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2V8" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></span>{% endif %}
             {% if node.versions|length > 1 %}
             <label class="tree-ver-wrap">
               <span class="visually-hidden">Version</span>
@@ -197,6 +197,17 @@
         >{{ e.label }}</button>
         {% endfor %}
       </div>
+      <label class="mpy-repl-heap" title="GC heap for the focused engine (restarts that engine)">
+        <span class="visually-hidden">Heap size</span>
+        <select id="mpy-repl-heap" aria-label="GC heap size for focused engine">
+          <option value="4194304">4M</option>
+          <option value="8388608">8M</option>
+          <option value="16777216">16M</option>
+          <option value="33554432">32M</option>
+          <option value="67108864">64M</option>
+          <option value="134217728">128M</option>
+        </select>
+      </label>
       <button type="button" id="mpy-repl-toggle" class="mpy-repl-toggle" title="Toggle MicroPython shell size">
         <span class="mpy-repl-title">µPy</span>
         <span id="mpy-repl-status" class="mpy-repl-status muted">{% if repl_ready %}idle{% else %}loading…{% endif %}</span>

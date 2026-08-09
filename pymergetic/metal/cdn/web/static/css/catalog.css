@@ -211,6 +211,11 @@ a.ver:hover { text-decoration: underline; }
 }
 .artifact-open:hover code { text-decoration: underline; }
 .artifact-open[aria-expanded="true"] code { color: var(--fg); }
+.artifact-open.is-static {
+  cursor: default;
+  color: var(--fg);
+}
+.artifact-open.is-static:hover code { text-decoration: none; }
 .artifact-meta { flex: 1 1 auto; min-width: 0; }
 .artifact-actions {
   display: inline-flex;
@@ -218,6 +223,29 @@ a.ver:hover { text-decoration: underline; }
   align-items: center;
   margin-left: auto;
   flex-shrink: 0;
+}
+.ipxe-url {
+  word-break: break-all;
+  font-size: 0.85em;
+}
+.ipxe-snippet {
+  margin: 1rem 0 0;
+  padding: 0.85rem 1rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  overflow-x: auto;
+  white-space: pre;
+  color: var(--muted);
+}
+.artifact-row > .ipxe-snippet {
+  margin: 0.5rem 1rem 0.85rem;
+}
+.artifact-row > .muted {
+  padding: 0 1rem 0.75rem;
 }
 
 /* Federated / remote packages */
@@ -237,10 +265,20 @@ a.ver:hover { text-decoration: underline; }
   color: var(--host);
   border: 1px solid rgba(106, 159, 181, 0.45);
 }
+.pill-engine {
+  background: var(--engine-dim);
+  color: var(--engine);
+  border: 1px solid rgba(167, 139, 250, 0.5);
+}
 .pill-kernel {
   background: var(--kernel-dim);
   color: var(--kernel);
   border: 1px solid rgba(142, 207, 154, 0.45);
+}
+.pill-arch {
+  background: var(--arch-dim);
+  color: var(--arch);
+  border: 1px solid rgba(208, 138, 90, 0.5);
 }
 .pkg-remote-link {
   margin-left: 0.35rem;

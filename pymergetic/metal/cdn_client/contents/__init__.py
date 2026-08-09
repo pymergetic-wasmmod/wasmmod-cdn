@@ -65,7 +65,9 @@ from pymergetic.metal.cdn_client.contents.models import (
 )
 from pymergetic.metal.cdn_client.contents.mpzl import (
     ensure_zlib_artifacts,
+    install_unwrap_override,
     unwrap_mpzl,
+    unwrap_mpzl_raw,
     wrap_mpzl,
 )
 from pymergetic.metal.cdn_client.contents.parse import (
@@ -152,7 +154,9 @@ __all__ = [
     "parse_source_payload",
     "slice_bytes",
     "split_der_certs",
+    "install_unwrap_override",
     "unwrap_mpzl",
+    "unwrap_mpzl_raw",
     "wasm_func_export_typesigs",
     "without_sig_section",
     "wrap_mpzl",

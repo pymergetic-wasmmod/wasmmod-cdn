@@ -60,20 +60,35 @@ def extract_custom_section_aot(buf: bytes, section_name: str) -> bytes | None:
 
 
 def extract_custom_section_elf(buf: bytes, section_name: str) -> bytes | None:
-    """ELF64 LE PROGBITS/NOTE named ``.wasmmod.*`` (or without leading dot)."""
-    if len(buf) < 64 or buf[:4] != b"\x7fELF" or buf[4] != 2 or buf[5] != 1:
+    """ELF32/ELF64 LE PROGBITS/NOTE named ``.wasmmod.*`` (or without leading dot)."""
+    if len(buf) < 52 or buf[:4] != b"\x7fELF" or buf[5] != 1:
         return None
-    shoff = struct.unpack_from("<Q", buf, 40)[0]
-    shentsize = struct.unpack_from("<H", buf, 58)[0]
-    shnum = struct.unpack_from("<H", buf, 60)[0]
-    shstrndx = struct.unpack_from("<H", buf, 62)[0]
-    if shentsize < 64 or shnum == 0 or shstrndx >= shnum:
+    elfclass = buf[4]
+    if elfclass == 2:  # ELFCLASS64
+        if len(buf) < 64:
+            return None
+        shoff = struct.unpack_from("<Q", buf, 40)[0]
+        shentsize = struct.unpack_from("<H", buf, 58)[0]
+        shnum = struct.unpack_from("<H", buf, 60)[0]
+        shstrndx = struct.unpack_from("<H", buf, 62)[0]
+        min_shentsize = 64
+        off_fmt, size_fmt, str_off_at, str_sz_at = "<Q", "<Q", 24, 32
+    elif elfclass == 1:  # ELFCLASS32 (BIOS trampoline)
+        shoff = struct.unpack_from("<I", buf, 32)[0]
+        shentsize = struct.unpack_from("<H", buf, 46)[0]
+        shnum = struct.unpack_from("<H", buf, 48)[0]
+        shstrndx = struct.unpack_from("<H", buf, 50)[0]
+        min_shentsize = 40
+        off_fmt, size_fmt, str_off_at, str_sz_at = "<I", "<I", 16, 20
+    else:
+        return None
+    if shentsize < min_shentsize or shnum == 0 or shstrndx >= shnum:
         return None
     if shoff + shnum * shentsize > len(buf):
         return None
     shstr = buf[shoff + shstrndx * shentsize :]
-    str_off = struct.unpack_from("<Q", shstr, 24)[0]
-    str_sz = struct.unpack_from("<Q", shstr, 32)[0]
+    str_off = struct.unpack_from(off_fmt, shstr, str_off_at)[0]
+    str_sz = struct.unpack_from(size_fmt, shstr, str_sz_at)[0]
     if str_off + str_sz > len(buf):
         return None
     strtab = buf[str_off : str_off + str_sz]
@@ -93,8 +108,8 @@ def extract_custom_section_elf(buf: bytes, section_name: str) -> bytes | None:
         sname = strtab[name_off:end]
         if sname != want and sname != want_dot and sname.lstrip(b".") != want.lstrip(b"."):
             continue
-        off = struct.unpack_from("<Q", sh, 24)[0]
-        size = struct.unpack_from("<Q", sh, 32)[0]
+        off = struct.unpack_from(off_fmt, sh, 24 if elfclass == 2 else 16)[0]
+        size = struct.unpack_from(size_fmt, sh, 32 if elfclass == 2 else 20)[0]
         if off + size > len(buf) or size == 0:
             return None
         return buf[off : off + size]

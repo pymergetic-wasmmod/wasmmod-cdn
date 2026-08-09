@@ -145,6 +145,12 @@ def test_ensure_zlib_adds_twin() -> None:
     zonly = ensure_zlib_artifacts({"hello.wasm.zlib": wrap_mpzl(raw)})
     assert list(zonly) == ["hello.wasm.zlib"]
 
+    # UEFI PE — same twin law as .elf / .wasm (completeness).
+    pe = b"MZ" + b"\x00" * 64
+    efi_out = ensure_zlib_artifacts({"seat.x86_64.efi": pe})
+    assert set(efi_out) == {"seat.x86_64.efi", "seat.x86_64.efi.zlib"}
+    assert unwrap_mpzl(efi_out["seat.x86_64.efi.zlib"]) == pe
+
 
 def test_inspect_elf_pack_section() -> None:
     """ELF64 ET_REL with .wasmmod.pack is kind=elf and readable."""

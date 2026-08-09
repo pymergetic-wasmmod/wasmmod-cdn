@@ -15,14 +15,24 @@
     {% endif %}
   </p>
   {% endif %}
-  {% if package_role in ('host', 'kernel') %}
+  {% if package_role in ('host', 'kernel', 'arch', 'engine') %}
   <p class="fed-banner" role="status">
     <span class="pill pill-{{ package_role }}">{{ package_role }}</span>
+    {% if is_unix_seat|default(false) %}
+    Unix host seat — curl the lead <code>.elf</code>, <code>chmod +x</code>, run. Inspect + download; Play disabled.
+    {% elif package_role == 'engine' %}
+    CDN engine — browser host that loads guests / packs. Inspect + download; Play disabled.
+    {% elif package_role == 'arch' and name.endswith('.wasm') %}
+    Architecture seat (browser) — CDN UI <code>mp</code> engine loads these artifacts. Inspect + download; Play disabled.
+    {% elif package_role == 'arch' %}
+    Architecture image — freestanding firmware; Inspect + download; iPXE loads these URLs. Play disabled.
+    {% else %}
     Platform {{ package_role }} — Inspect only; Play/Try guest-load is disabled.
+    {% endif %}
   </p>
   {% endif %}
   <div class="hero-title-row">
-    <h1>{{ name }}{% if package_role in ('host', 'kernel') %} <span class="pill pill-{{ package_role }}">{{ package_role }}</span>{% endif %}</h1>
+    <h1>{{ name }}{% if package_role in ('host', 'kernel', 'arch', 'engine') %} <span class="pill pill-{{ package_role }}">{{ package_role }}</span>{% endif %}</h1>
     {% if package_versions %}
     <label class="pkg-ver-picker">
       <span class="muted">channel</span>
@@ -204,9 +214,111 @@
 })();
 </script>
 {% endif %}
+{% if is_unix_seat|default(false) and channel == "lead" %}
+<section>
+  <h2>Run (curl)</h2>
+  <p class="muted">
+    Linux userspace seat — download the lead ELF and execute it (banner + REPL).
+    Inspect / download also in <a href="#artifact-list">Artifacts</a>.
+  </p>
+  <ul class="pkg-list artifact-list" id="unix-run-list">
+    {% for a in entry.artifacts if a.encoding.value == 'raw' and a.path.endswith('.elf') %}
+    <li class="artifact-row">
+      <div class="artifact-main">
+        <span class="artifact-open is-static"><code>curl and run</code></span>
+        <span class="muted artifact-meta">{{ a.path }} · {{ a.size|human_size }}</span>
+      </div>
+      <pre class="ipxe-snippet" tabindex="0">curl -fsSL {{ cdn_base }}/artifacts/lead/{{ a.path }} -o metal-unix
+chmod +x metal-unix
+./metal-unix</pre>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% if is_arch_seat|default(false) and channel == "lead" %}
+{% set ns = namespace(has_fw=false) %}
+{% for a in entry.artifacts if a.encoding.value == 'raw' and (a.path.endswith('.elf') or a.path.endswith('.efi')) %}
+  {% set ns.has_fw = true %}
+{% endfor %}
+{% if ns.has_fw %}
+<section>
+  <h2>Netboot (iPXE)</h2>
+  <p class="muted">
+    Boot server holds NBP + <code>metal.ipxe</code> only; product images stay on this CDN (HTTPS).
+    Inspect / download the images in <a href="#artifact-list">Artifacts</a>.
+  </p>
+  <ul class="pkg-list artifact-list" id="netboot-list">
+    <li class="artifact-row">
+      <div class="artifact-main">
+        <a class="artifact-open" href="{{ cdn_base }}/static/netboot/undionly.kpxe" download="undionly.kpxe"><code>undionly.kpxe</code></a>
+        <span class="muted artifact-meta">BIOS · first-stage NBP (HTTPS-capable Metal build)</span>
+      </div>
+      <div class="artifact-actions">
+        <a class="icon-btn download-btn" href="{{ cdn_base }}/static/netboot/undionly.kpxe" download="undionly.kpxe" title="Download undionly.kpxe" aria-label="Download undionly.kpxe">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
+        </a>
+      </div>
+    </li>
+    <li class="artifact-row">
+      <div class="artifact-main">
+        <a class="artifact-open" href="{{ cdn_base }}/static/netboot/ipxe.efi" download="ipxe.efi"><code>ipxe.efi</code></a>
+        <span class="muted artifact-meta">UEFI · first-stage NBP (HTTPS-capable Metal build)</span>
+      </div>
+      <div class="artifact-actions">
+        <a class="icon-btn download-btn" href="{{ cdn_base }}/static/netboot/ipxe.efi" download="ipxe.efi" title="Download ipxe.efi" aria-label="Download ipxe.efi">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
+        </a>
+      </div>
+    </li>
+    <li class="artifact-row">
+      <div class="artifact-main">
+        <a class="artifact-open" href="{{ cdn_base }}/static/netboot/metal.ipxe" download="metal.ipxe"><code>metal.ipxe</code></a>
+        <span class="muted artifact-meta">iPXE script · chains CDN lead <code>arch.*.elf/efi</code></span>
+      </div>
+      <div class="artifact-actions">
+        <a class="icon-btn download-btn" href="{{ cdn_base }}/static/netboot/metal.ipxe" download="metal.ipxe" title="Download metal.ipxe" aria-label="Download metal.ipxe">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
+        </a>
+      </div>
+    </li>
+    {% for a in entry.artifacts if a.encoding.value == 'raw' and a.path.endswith('.elf') %}
+    <li class="artifact-row">
+      <div class="artifact-main">
+        <span class="artifact-open is-static"><code>BIOS · snippet</code></span>
+        <span class="muted artifact-meta">kernel → copy into iPXE / metal.ipxe</span>
+      </div>
+      <pre class="ipxe-snippet" tabindex="0">#!ipxe
+kernel {{ cdn_base }}/artifacts/lead/{{ a.path }}
+boot</pre>
+    </li>
+    {% endfor %}
+    {% for a in entry.artifacts if a.encoding.value == 'raw' and a.path.endswith('.efi') %}
+    <li class="artifact-row">
+      <div class="artifact-main">
+        <span class="artifact-open is-static"><code>UEFI · snippet</code></span>
+        <span class="muted artifact-meta">chain → copy into iPXE / metal.ipxe</span>
+      </div>
+      <pre class="ipxe-snippet" tabindex="0">#!ipxe
+chain {{ cdn_base }}/artifacts/lead/{{ a.path }}
+boot</pre>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endif %}
 <section>
   <h2>Artifacts</h2>
-  <p class="muted">Click a name to inspect pack guts. The commander navigates package · version · artifact · section · symbol with dual hex/asm/source views.</p>
+  <p class="muted">
+    {% if is_arch_seat|default(false) and name.endswith('.wasm') %}
+    Browser arch seat — <code>.mjs</code> / <code>.wasm</code> for the CDN shell <code>mp</code> pill. Click to inspect.
+    {% elif is_arch_seat|default(false) %}
+    Freestanding arch seat images — click to inspect (sections / signature / hex). Download or use the Netboot rows above in iPXE.
+    {% else %}
+    Click a name to inspect pack guts. The commander navigates package · version · artifact · section · symbol with dual hex/asm/source views.
+    {% endif %}
+  </p>
   <ul class="pkg-list artifact-list" id="artifact-list">
     {% for a in entry.artifacts %}
     {% if channel == "lead" %}
@@ -235,7 +347,9 @@
         <button type="button" class="artifact-open" aria-expanded="false">
           <code>{{ a.path }}</code>
         </button>
-        <span class="muted artifact-meta">{{ a.kind.value }} · {{ a.encoding.value }} · {{ a.size|human_size }}</span>
+        <span class="muted artifact-meta">
+          {% if is_arch_seat|default(false) and a.path.endswith('.efi.zlib') %}UEFI twin · {% elif is_arch_seat|default(false) and a.path.endswith('.elf.zlib') %}BIOS twin · {% elif is_arch_seat|default(false) and a.path.endswith('.efi') %}UEFI · {% elif is_arch_seat|default(false) and a.path.endswith('.elf') %}BIOS · {% endif %}{{ a.kind.value }} · {{ a.encoding.value }} · {{ a.size|human_size }}
+        </span>
         <div class="artifact-actions">
           <button type="button" class="icon-btn inspect-open-btn"
             data-filename="{{ a.path }}"
@@ -254,7 +368,7 @@
               <path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/>
             </svg>
           </a>
-          {% if experimental_repl and repl_ready and package_role not in ('host', 'kernel') and (a.path.endswith('.wasm') or a.path.endswith('.wasm.zlib') or '.aot' in a.path) %}
+          {% if experimental_repl and repl_ready and package_role not in ('host', 'kernel', 'arch', 'engine') and (a.path.endswith('.wasm') or a.path.endswith('.wasm.zlib') or '.aot' in a.path) %}
           <button type="button" class="icon-btn try-btn" data-mpy-try="{{ name }}"
                   title="Try in µPy shell: import {{ name }}; exports({{ name }})"
                   aria-label="Try {{ name }} in MicroPython shell">

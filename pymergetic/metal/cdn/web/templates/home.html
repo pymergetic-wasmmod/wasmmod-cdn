@@ -148,7 +148,9 @@
           <td class="pkg-arts mono">{{ pkg.artifact_count }}</td>
           <td class="pkg-flags">
             {% if pkg.role == 'host' %}<span class="pill pill-host">host</span>{% endif %}
+            {% if pkg.role == 'engine' %}<span class="pill pill-engine">engine</span>{% endif %}
             {% if pkg.role == 'kernel' %}<span class="pill pill-kernel">kernel</span>{% endif %}
+            {% if pkg.role == 'arch' %}<span class="pill pill-arch">arch</span>{% endif %}
             {% if pkg.origin == 'remote' %}<span class="pill pill-remote" title="{{ pkg.peer_label or 'federated' }}">remote</span>{% endif %}
             {% if pkg.yanked %}<span class="pill pill-warn">yanked</span>{% endif %}
             {% if pkg.deprecated %}<span class="pill pill-warn">deprecated</span>{% endif %}

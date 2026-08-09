@@ -17,12 +17,23 @@ from pymergetic.metal.cdn.services.federation.forward import (
 )
 
 
+def _media_type_for_artifact(filename: str = "") -> str:
+    """MIME for browser-loadable seat artifacts (ESM / Wasm); else octet-stream."""
+    low = (filename or "").lower().removesuffix(".zlib")
+    if low.endswith(".mjs"):
+        return "text/javascript"
+    if low.endswith(".wasm"):
+        return "application/wasm"
+    return "application/octet-stream"
+
+
 def _artifact_response(
     data: bytes,
     *,
     request: Request,
     cache_s: int,
     immutable: bool,
+    filename: str = "",
 ) -> Response:
     digest = hashlib.sha256(data).hexdigest()
     etag = f'"{digest}"'
@@ -36,12 +47,13 @@ def _artifact_response(
         "Cache-Control": cache,
         "Content-Length": str(len(data)),
     }
+    media_type = _media_type_for_artifact(filename)
     # Browser wasmmod probes with HEAD (falls back to GET on 405); answer both.
     if request.method.upper() == "HEAD":
-        return Response(status_code=200, media_type="application/octet-stream", headers=headers)
+        return Response(status_code=200, media_type=media_type, headers=headers)
     return Response(
         content=data,
-        media_type="application/octet-stream",
+        media_type=media_type,
         headers=headers,
     )
 
@@ -137,6 +149,7 @@ async def _artifact_or_forward(
         request=request,
         cache_s=cache_s,
         immutable=False,
+        filename=filename,
     )
     if mount is not None:
         for k, v in remote_headers(mount).items():

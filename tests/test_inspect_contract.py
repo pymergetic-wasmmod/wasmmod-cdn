@@ -50,7 +50,7 @@ async def test_inspect_capabilities_and_self(tmp_path: Path) -> None:
         sbody = self.json()
         assert sbody["schema"] == 1
         assert sbody["name"] == "pymergetic.wasmmod"
-        assert sbody["role"] == "host"
+        assert sbody["role"] == "engine"
         assert sbody["has_source"] is False
         assert sbody["static_backend"] == "none"
         assert sbody["source_files"] == []

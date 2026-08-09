@@ -17,6 +17,42 @@ def test_classify_artifacts() -> None:
     kind, arch, ver, enc = ChannelLayout.classify_artifact("hello.x86_64.elf.zlib")
     assert (kind, arch, ver, enc) == ("elf", "x86_64", None, "mpzl")
 
+    kind, arch, ver, enc = ChannelLayout.classify_artifact("metal.x86_64.efi")
+    assert (kind, arch, ver, enc) == ("efi", "x86_64", None, "raw")
+
+    kind, arch, ver, enc = ChannelLayout.classify_artifact(
+        "pymergetic.metal.arch.x86_64.efi"
+    )
+    assert (kind, arch, ver, enc) == ("efi", "x86_64", None, "raw")
+    kind, arch, ver, enc = ChannelLayout.classify_artifact(
+        "pymergetic.metal.arch.x86_64.elf"
+    )
+    assert (kind, arch, ver, enc) == ("elf", "x86_64", None, "raw")
+    kind, arch, ver, enc = ChannelLayout.classify_artifact(
+        "pymergetic.metal.arch.x86_64.efi.zlib"
+    )
+    assert (kind, arch, ver, enc) == ("efi", "x86_64", None, "mpzl")
+    ChannelLayout.validate_package_name("pymergetic.metal.arch.x86_64")
+
+    kind, arch, ver, enc = ChannelLayout.classify_artifact(
+        "pymergetic.metal.arch.wasm.wasm"
+    )
+    assert (kind, arch, ver, enc) == ("wasm", None, None, "raw")
+    kind, arch, ver, enc = ChannelLayout.classify_artifact(
+        "pymergetic.metal.arch.wasm.mjs"
+    )
+    assert (kind, arch, ver, enc) == ("mjs", None, None, "raw")
+    ChannelLayout.validate_package_name("pymergetic.metal.arch.wasm")
+    ChannelLayout.validate_package_name("pymergetic.metal.arch.x86")
+    kind, arch, ver, enc = ChannelLayout.classify_artifact(
+        "pymergetic.metal.arch.x86.elf"
+    )
+    assert (kind, arch, ver, enc) == ("elf", "x86", None, "raw")
+    kind, arch, ver, enc = ChannelLayout.classify_artifact(
+        "pymergetic.metal.arch.x86.efi"
+    )
+    assert (kind, arch, ver, enc) == ("efi", "x86", None, "raw")
+
 
 def test_channel_keys() -> None:
     lead = ChannelLayout.lead()

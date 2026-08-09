@@ -47,19 +47,32 @@ def split_der_certs(blob: bytes) -> list[bytes]:
 
 def _elf_sig_offset_ge(buf: bytes, old_len: int) -> bool:
     """True if ``.wasmmod.sig`` (or bare name) has ``sh_offset >= old_len``."""
-    if len(buf) < 64 or buf[:4] != b"\x7fELF" or buf[4] != 2 or buf[5] != 1:
+    if len(buf) < 52 or buf[:4] != b"\x7fELF" or buf[5] != 1:
         return False
-    shoff = struct.unpack_from("<Q", buf, 40)[0]
-    shentsize = struct.unpack_from("<H", buf, 58)[0]
-    shnum = struct.unpack_from("<H", buf, 60)[0]
-    shstrndx = struct.unpack_from("<H", buf, 62)[0]
-    if shentsize < 64 or shnum == 0 or shstrndx >= shnum:
+    elfclass = buf[4]
+    if elfclass == 2:
+        if len(buf) < 64:
+            return False
+        shoff = struct.unpack_from("<Q", buf, 40)[0]
+        shentsize = struct.unpack_from("<H", buf, 58)[0]
+        shnum = struct.unpack_from("<H", buf, 60)[0]
+        shstrndx = struct.unpack_from("<H", buf, 62)[0]
+        min_sh, off_fmt, str_off_at, str_sz_at, sec_off_at = 64, "<Q", 24, 32, 24
+    elif elfclass == 1:
+        shoff = struct.unpack_from("<I", buf, 32)[0]
+        shentsize = struct.unpack_from("<H", buf, 46)[0]
+        shnum = struct.unpack_from("<H", buf, 48)[0]
+        shstrndx = struct.unpack_from("<H", buf, 50)[0]
+        min_sh, off_fmt, str_off_at, str_sz_at, sec_off_at = 40, "<I", 16, 20, 16
+    else:
+        return False
+    if shentsize < min_sh or shnum == 0 or shstrndx >= shnum:
         return False
     if shoff + shnum * shentsize > len(buf):
         return False
     shstr = buf[shoff + shstrndx * shentsize :]
-    str_off = struct.unpack_from("<Q", shstr, 24)[0]
-    str_sz = struct.unpack_from("<Q", shstr, 32)[0]
+    str_off = struct.unpack_from(off_fmt, shstr, str_off_at)[0]
+    str_sz = struct.unpack_from(off_fmt, shstr, str_sz_at)[0]
     if str_off + str_sz > len(buf):
         return False
     strtab = buf[str_off : str_off + str_sz]
@@ -79,7 +92,7 @@ def _elf_sig_offset_ge(buf: bytes, old_len: int) -> bool:
         sname = strtab[name_off:end]
         if sname != want and sname != want_dot and sname.lstrip(b".") != want.lstrip(b"."):
             continue
-        sec_off = struct.unpack_from("<Q", sh, 24)[0]
+        sec_off = struct.unpack_from(off_fmt, sh, sec_off_at)[0]
         return sec_off >= old_len
     return False
 
@@ -165,9 +178,14 @@ def without_sig_section(buf: bytes) -> bytes:
         if not _elf_sig_offset_ge(buf, old_len):
             raise ValueError("ELF strip of wasmmod.sig needs WPSE cookie")
         out = bytearray(buf[:old_len])
-        struct.pack_into("<Q", out, 40, old_shoff)
-        struct.pack_into("<H", out, 60, old_shnum)
-        struct.pack_into("<H", out, 62, old_shstrndx)
+        if buf[4] == 2:  # ELFCLASS64
+            struct.pack_into("<Q", out, 40, old_shoff)
+            struct.pack_into("<H", out, 60, old_shnum)
+            struct.pack_into("<H", out, 62, old_shstrndx)
+        else:  # ELFCLASS32
+            struct.pack_into("<I", out, 32, old_shoff)
+            struct.pack_into("<H", out, 48, old_shnum)
+            struct.pack_into("<H", out, 50, old_shstrndx)
         return bytes(out)
 
     raise ValueError("not a wasm/aot/elf artifact")

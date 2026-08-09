@@ -41,16 +41,17 @@ async def repl_autoexec(
     shells: ShellSessionServiceDep,
     user: OptionalUserDep,
 ) -> PlainTextResponse:
-    """Return ``autoexec.py``: wasm.cdn + install_hook, intro, packages()/help()."""
+    """Return ``autoexec.py``: metal arch.wasm boot (mp) or CDN shell (mpwm/upy)."""
     settings = getattr(request.app.state, "settings", None)
     if settings is not None and not getattr(settings, "experimental_repl", True):
         raise HTTPException(status_code=404, detail="experimental_repl disabled")
-    catalog = await indexes.list_catalog()
+    catalog = await indexes.list_catalog(include_yanked=False)
     names = sorted({row.name for row in catalog})
     cdn_base = _cdn_base_url(request)
     user_id, anon_id, principal = ensure_principal(request, user)
     ensure_csrf_token(request)
     ua = (request.headers.get("user-agent") or "")[:512]
+    engine = (request.query_params.get("engine") or "mp").strip().lower()
     shell = await shells.ensure_session(
         user_id=user_id,
         anon_id=anon_id,
@@ -74,6 +75,7 @@ async def repl_autoexec(
         session_id=str(shell.id),
         principal=principal,
         driver=shell.driver or "metal-cdn",
+        engine=engine,
     )
     return PlainTextResponse(
         script,

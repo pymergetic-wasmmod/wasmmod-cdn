@@ -22,8 +22,12 @@ def artifact_package_hint(filename: str) -> str | None:
     name = name.removesuffix(".zlib")
     if name.endswith(".wasm"):
         name = name[: -len(".wasm")]
+    elif name.endswith(".mjs"):
+        name = name[: -len(".mjs")]
     elif name.endswith(".elf"):
         name = name[: -len(".elf")]
+    elif name.endswith(".efi"):
+        name = name[: -len(".efi")]
     else:
         name = _AOT_TAIL.sub("", name)
     try:

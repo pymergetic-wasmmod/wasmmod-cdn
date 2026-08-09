@@ -7,35 +7,52 @@ from collections.abc import Sequence
 from functools import lru_cache
 from pathlib import Path
 
-_TEMPLATE_PATH = Path(__file__).with_name("autoexec.tpl.py")
+_WEB = Path(__file__).resolve().parent
+_TEMPLATE_PATH = _WEB / "autoexec.tpl.py"
+_METAL_WASM_VENDORED = _WEB / "autoexec_metal_wasm.tpl.py"
+# Sibling checkout: packages/metalpython/...
+_METAL_WASM_LIVE = (
+    _WEB.parents[4].parent
+    / "metalpython"
+    / "extmod"
+    / "metal"
+    / "src"
+    / "pymergetic"
+    / "metal"
+    / "arch"
+    / "wasm"
+    / "autoexec.py"
+)
 
 
 @lru_cache(maxsize=1)
-def _template() -> str:
+def _cdn_shell_template() -> str:
     return _TEMPLATE_PATH.read_text(encoding="utf-8")
 
 
-def render_autoexec(
+@lru_cache(maxsize=1)
+def _metal_wasm_template() -> str | None:
+    for p in (_METAL_WASM_LIVE, _METAL_WASM_VENDORED):
+        try:
+            if p.is_file():
+                return p.read_text(encoding="utf-8")
+        except OSError:
+            continue
+    return None
+
+
+def _apply_sentinels(
+    out: str,
     *,
     cdn_base: str,
     app_version: str,
     packages: Sequence[str],
-    channel: str = "lead",
-    session_id: str = "",
-    principal: str = "anon",
-    driver: str = "metal-cdn",
+    channel: str,
+    session_id: str,
+    principal: str,
+    driver: str,
 ) -> str:
-    """Return Python source for a fresh REPL session (no pack import).
-
-    Sets ``wasm.cdn`` + ``install_hook``, prints a short intro, and defines
-    ``packages()`` / ``help()`` helpers. ``cdn_base`` is an absolute CDN root
-    (e.g. ``http://127.0.0.1:8000/cdn``).
-
-    Source template: ``autoexec.tpl.py`` (``"__TPL_*__"`` sentinels → literals).
-    """
     base = cdn_base.rstrip("/")
-    # Replace quoted sentinels with JSON/Python literals (incl. quotes or [lists]).
-    out = _template()
     for sentinel, value in (
         ("__TPL_CDN__", json.dumps(base)),
         ("__TPL_CHANNEL__", json.dumps(channel)),
@@ -49,3 +66,46 @@ def render_autoexec(
     ):
         out = out.replace(f'"{sentinel}"', value)
     return out
+
+
+def render_autoexec(
+    *,
+    cdn_base: str,
+    app_version: str,
+    packages: Sequence[str],
+    channel: str = "lead",
+    session_id: str = "",
+    principal: str = "anon",
+    driver: str = "metal-cdn",
+    engine: str = "mpwm",
+) -> str:
+    """Return Python source for a fresh REPL session.
+
+    ``engine=mp`` → metal post-ready CDN autoexec (boot tree is C in the seat).
+    ``mpwm`` / ``upy`` → classic CDN shell template.
+    """
+    eng = (engine or "mpwm").strip().lower()
+    if eng == "mp":
+        metal = _metal_wasm_template()
+        if metal is not None:
+            body = _apply_sentinels(
+                metal,
+                cdn_base=cdn_base,
+                app_version=app_version,
+                packages=packages,
+                channel=channel,
+                session_id=session_id,
+                principal=principal,
+                driver=driver,
+            )
+            return body + "\n\n# metal-cdn: post-ready autoexec (CDN hook)\nrun()\n"
+    return _apply_sentinels(
+        _cdn_shell_template(),
+        cdn_base=cdn_base,
+        app_version=app_version,
+        packages=packages,
+        channel=channel,
+        session_id=session_id,
+        principal=principal,
+        driver=driver,
+    )

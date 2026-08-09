@@ -55,6 +55,10 @@ def inspect_artifact(data: bytes, *, filename: str = "") -> ArtifactContents:
         kind = ArtifactBinaryKind.AOT
     elif len(naked) >= 4 and naked[:4] == b"\x7fELF":
         kind = ArtifactBinaryKind.ELF
+    elif filename.lower().endswith(".efi") or filename.lower().endswith(".efi.zlib"):
+        kind = ArtifactBinaryKind.EFI
+    elif filename.lower().endswith(".mjs") or filename.lower().endswith(".mjs.zlib"):
+        kind = ArtifactBinaryKind.MJS
     else:
         kind = ArtifactBinaryKind.UNKNOWN
 
@@ -67,6 +71,9 @@ def inspect_artifact(data: bytes, *, filename: str = "") -> ArtifactContents:
         aot_version=aot_version_from_filename(filename),
     )
     if kind is ArtifactBinaryKind.UNKNOWN:
+        return info
+    # PE/EFI and Emscripten .mjs: size + kind only (no wasmmod section table).
+    if kind is ArtifactBinaryKind.EFI or kind is ArtifactBinaryKind.MJS:
         return info
 
     try:
@@ -175,10 +182,12 @@ def merge_contents(artifacts: list[ArtifactContents]) -> PackageContents:
 
     deps_map = {d.name: d.version for d in primary.deps}
 
+    name = (source.name if source is not None else None) or (pack.name if pack is not None else None)
     return PackageContents(
-        name=(source.name if source is not None else None) or (pack.name if pack is not None else None),
+        name=name,
         pkg_version=source.pkg_version if source is not None else None,
         pack_files=pack_files,
+        vfs_root=(f"/mods/{name}" if name else None),
         source_files=source_files,
         exports=exports,
         imports=list(primary.imports),

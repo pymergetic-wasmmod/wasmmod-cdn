@@ -124,8 +124,14 @@
 .tree-node.is-host > .tree-row .tree-name {
   color: var(--host);
 }
+.tree-node.is-engine > .tree-row .tree-name {
+  color: var(--engine);
+}
 .tree-node.is-kernel > .tree-row .tree-name {
   color: var(--kernel);
+}
+.tree-node.is-arch > .tree-row .tree-name {
+  color: var(--arch);
 }
 .role-mark {
   flex-shrink: 0;
@@ -139,8 +145,14 @@
 .role-mark.role-host {
   color: var(--host);
 }
+.role-mark.role-engine {
+  color: var(--engine);
+}
 .role-mark.role-kernel {
   color: var(--kernel);
+}
+.role-mark.role-arch {
+  color: var(--arch);
 }
 .role-icon {
   display: block;
@@ -158,10 +170,20 @@
   color: var(--host);
   border: 1px solid rgba(106, 159, 181, 0.45);
 }
+.pill-engine {
+  background: var(--engine-dim);
+  color: var(--engine);
+  border: 1px solid rgba(167, 139, 250, 0.5);
+}
 .pill-kernel {
   background: var(--kernel-dim);
   color: var(--kernel);
   border: 1px solid rgba(142, 207, 154, 0.45);
+}
+.pill-arch {
+  background: var(--arch-dim);
+  color: var(--arch);
+  border: 1px solid rgba(208, 138, 90, 0.5);
 }
 .tree-name {
   font-family: var(--mono);

@@ -25,6 +25,10 @@ from pymergetic.metal.cdn.middleware import (
 )
 from pymergetic.metal.cdn.paths import join_base
 from pymergetic.metal.cdn.services.identity import UserService
+from pymergetic.metal.cdn.services.naked_cache import (
+    install_naked_cache,
+    naked_cache_from_settings,
+)
 from pymergetic.metal.cdn.settings import Settings, get_settings
 from pymergetic.metal.cdn.storage import build_storage
 from pymergetic.metal.cdn.web.routes import configure_web, web_router
@@ -70,6 +74,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 ):
                     print(f"federation bootstrap: {line}")
     yield
+    install_naked_cache(None)
     await db.dispose()
 
 
@@ -97,6 +102,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.state.db = db
     app.state.storage = storage
+    naked_cache = naked_cache_from_settings(settings)
+    app.state.naked_cache = naked_cache
+    install_naked_cache(naked_cache)
 
     # Last added = outermost.
     if settings.cors_origins:
