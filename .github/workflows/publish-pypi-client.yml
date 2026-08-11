@@ -20,7 +20,8 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: pypi
+    # No `environment:` — pending Trusted Publisher registered with empty / any
+    # Environment name (same as wasmmod / wasmmod-tools / wasmmod-test).
     permissions:
       id-token: write
       contents: read
