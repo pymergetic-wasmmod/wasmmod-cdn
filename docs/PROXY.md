@@ -8,7 +8,7 @@ Current public edge: **`https://cdn.pymergetic.com/cdn/`**
 |--------|----------|---------|------|
 | 80 | → 8080 | nginx | ACME HTTP-01 + redirect to HTTPS |
 | 443 | → 8443 | nginx | TLS terminate, proxy to app |
-| — | 8000 | uvicorn (`metal-cdn` container or `serve`) | App (HTTP) |
+| — | 8000 | uvicorn (`wasmmod-cdn` container or `serve`) | App (HTTP) |
 
 ```sh
 # router / firewall DNAT (already in place on this host)
@@ -20,7 +20,7 @@ Current public edge: **`https://cdn.pymergetic.com/cdn/`**
 
 ## Build / run (app on :8000)
 
-From `packages/metal-cdn`:
+From `packages/wasmmod-cdn`:
 
 ```sh
 # full local path: browser µPy → sync REPL → docker build/run → seed packs
@@ -35,16 +35,16 @@ From `packages/metal-cdn`:
 Manual docker (same image `dev-up` builds):
 
 ```sh
-docker build -t metal-cdn .
-docker rm -f metal-cdn 2>/dev/null || true
-docker run -d --name metal-cdn -p 8000:8000 \
-  -e METAL_CDN_SESSION_SECRET="$(openssl rand -hex 32)" \
-  -e METAL_CDN_PUBLIC_ORIGIN=https://cdn.pymergetic.com \
-  -e METAL_CDN_BEHIND_PROXY=true \
-  -e METAL_CDN_EXPERIMENTAL=true \
-  -e METAL_CDN_EXPERIMENTAL_REPL=true \
-  -v metal-cdn-data:/data \
-  metal-cdn
+docker build -t wasmmod-cdn .
+docker rm -f wasmmod-cdn 2>/dev/null || true
+docker run -d --name wasmmod-cdn -p 8000:8000 \
+  -e WASMMOD_CDN_SESSION_SECRET="$(openssl rand -hex 32)" \
+  -e WASMMOD_CDN_PUBLIC_ORIGIN=https://cdn.pymergetic.com \
+  -e WASMMOD_CDN_BEHIND_PROXY=true \
+  -e WASMMOD_CDN_EXPERIMENTAL=true \
+  -e WASMMOD_CDN_EXPERIMENTAL_REPL=true \
+  -v wasmmod-cdn-data:/data \
+  wasmmod-cdn
 ```
 
 Host / venv instead of Docker:
@@ -54,7 +54,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e ./client -e ".[dev]" --config-settings editable_mode=compat
 cp -n .env.example .env
 # ensure: BASE_PATH=/cdn, BEHIND_PROXY=true, PUBLIC_ORIGIN=https://cdn.pymergetic.com
-metal-cdn serve --reload   # :8000
+wasmmod-cdn serve --reload   # :8000
 ```
 
 Smoke:
@@ -67,8 +67,8 @@ curl -sf https://cdn.pymergetic.com/cdn/health   # via nginx + LE
 Stop / logs:
 
 ```sh
-docker logs -f metal-cdn
-docker rm -f metal-cdn
+docker logs -f wasmmod-cdn
+docker rm -f wasmmod-cdn
 ```
 
 ## Proxy (nginx + certbot)
@@ -106,20 +106,20 @@ deploy/certbot/conf/live/cdn.pymergetic.com/privkey.pem
 `.env` / container env:
 
 ```sh
-METAL_CDN_PUBLIC_ORIGIN=https://cdn.pymergetic.com
-METAL_CDN_BEHIND_PROXY=true
-METAL_CDN_BASE_PATH=/cdn
+WASMMOD_CDN_PUBLIC_ORIGIN=https://cdn.pymergetic.com
+WASMMOD_CDN_BEHIND_PROXY=true
+WASMMOD_CDN_BASE_PATH=/cdn
 ```
 
 ## Base path
 
 ```sh
-METAL_CDN_BASE_PATH=/          # whole host is the CDN
-METAL_CDN_BASE_PATH=/cdn       # /cdn → metal-cdn; domain root free for ACME / landing
+WASMMOD_CDN_BASE_PATH=/          # whole host is the CDN
+WASMMOD_CDN_BASE_PATH=/cdn       # /cdn → wasmmod-cdn; domain root free for ACME / landing
 ```
 
 Default nginx assumes **`/cdn`** so ACME stays at `/.well-known/…`. Do **not**
-strip the prefix in `proxy_pass` unless you also set `METAL_CDN_ROOT_PATH=/cdn`.
+strip the prefix in `proxy_pass` unless you also set `WASMMOD_CDN_ROOT_PATH=/cdn`.
 
 Devices and browser shells bind with `wasm.cdn("<origin><base_path>")` (and may
 list several CDN bases). `PUBLIC_ORIGIN` + `BASE_PATH` must match what clients
@@ -127,14 +127,14 @@ actually call, or imports resolve against the wrong host.
 
 ## Branding and CORS (forks)
 
-Upstream [pymergetic/metal-cdn](https://github.com/pymergetic/metal-cdn) is the
+Upstream [pymergetic-wasmmod/wasmmod-cdn](https://github.com/pymergetic-wasmmod/wasmmod-cdn) is the
 reference; forks / private mirrors keep their own name and mark:
 
 ```sh
-METAL_CDN_BRAND_NAME=acme-cdn
-METAL_CDN_BRAND_LOGO_URL=https://assets.example.com/logo.png
+WASMMOD_CDN_BRAND_NAME=acme-cdn
+WASMMOD_CDN_BRAND_LOGO_URL=https://assets.example.com/logo.png
 # or path on this CDN: /cdn/static/img/logo.png
-METAL_CDN_CORS_ORIGINS=["*"]   # default; empty [] = off; list for cookie cross-site
+WASMMOD_CDN_CORS_ORIGINS=["*"]   # default; empty [] = off; list for cookie cross-site
 ```
 
 Static `img/*` also sends `Cross-Origin-Resource-Policy: cross-origin` so other
@@ -183,7 +183,7 @@ Monthly cron/timer recommended (~90-day lifetime).
 | Piece | Command |
 |-------|---------|
 | Rebuild + restart app | `./scripts/dev-up.sh --no-upy` (or full `./scripts/dev-up.sh`) |
-| Restart app only | `docker restart metal-cdn` |
+| Restart app only | `docker restart wasmmod-cdn` |
 | Start / reload TLS edge | `docker compose --profile proxy up -d nginx` / `… exec nginx nginx -s reload` |
 | Renew LE | `certbot renew` + nginx reload (above) |
 | Public health | `curl -sf https://cdn.pymergetic.com/cdn/health` |

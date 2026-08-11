@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pymergetic.metal.cdn.main import create_app
-from pymergetic.metal.cdn.settings import Settings
+from pymergetic.wasmmod.cdn.main import create_app
+from pymergetic.wasmmod.cdn.settings import Settings
 
 
 def _settings(tmp_path: Path) -> Settings:

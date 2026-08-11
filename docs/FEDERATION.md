@@ -11,8 +11,8 @@ Prefix-mounted child CDNs: a parent can mount a peer on a package-name prefix
 | **Pack signatures (MPWS)** | End devices still verify artifacts. Federation does **not** replace pack trust. |
 | **Federation credentials** | Server→server only. Parent stores an encrypted bearer (or later a signing key); child issues a scoped API key (`federation:read`) via **Accept grant**. |
 | **Browser sessions** | Never forwarded to peers. Humans stay on one origin; “Visit on remote CDN” is an explicit egress link. |
-| **SSRF** | Peer URLs must be `http(s)`. Private/link-local peers require `METAL_CDN_FEDERATION_ALLOW_PRIVATE_NET=1` (lab). Enforced when the proxy ships. |
-| **Hops / cycles** | `METAL_CDN_FEDERATION_MAX_HOPS` (default 8) + hop/trace headers on proxy requests. |
+| **SSRF** | Peer URLs must be `http(s)`. Private/link-local peers require `WASMMOD_CDN_FEDERATION_ALLOW_PRIVATE_NET=1` (lab). Enforced when the proxy ships. |
+| **Hops / cycles** | `WASMMOD_CDN_FEDERATION_MAX_HOPS` (default 8) + hop/trace headers on proxy requests. |
 | **Shadowing** | Default: **local wins** over the same FQN on a child. |
 | **Private packs** | Only if the child grant’s bot user has ACL; do not leak private index rows through public merge. |
 
@@ -43,18 +43,18 @@ Audit actions: `fed.peer.*`, `fed.mount.*`, `fed.credential.rotate`, `fed.grant.
 
 1. **Child** admin: `POST …/grants/accept` with `prefix`, `parent_label` → copy `api_key`.
 2. **Parent** admin: create peer (`base_url` = child’s public CDN root), create mount with that `prefix` + `bearer_token` = child’s key.
-3. Devices keep using the **parent** `METAL_CDN_URL` / `wasm.cdn(parent)` once the read proxy exists.
+3. Devices keep using the **parent** `WASMMOD_CDN_URL` / `wasm.cdn(parent)` once the read proxy exists.
 
 ### Settings
 
 ```sh
 # Optional dedicated key for Fernet; else session_secret
-METAL_CDN_FEDERATION_SECRETS_KEY=
-METAL_CDN_FEDERATION_MAX_HOPS=8
-METAL_CDN_FEDERATION_ALLOW_PRIVATE_NET=false
+WASMMOD_CDN_FEDERATION_SECRETS_KEY=
+WASMMOD_CDN_FEDERATION_MAX_HOPS=8
+WASMMOD_CDN_FEDERATION_ALLOW_PRIVATE_NET=false
 # Bootstrap hint — applied idempotently on startup (existing prefixes win):
-# METAL_CDN_FEDERATION_MOUNTS_JSON=[{"prefix":"a.b","url":"https://leaf/cdn","token":"mcdn_…"}]
-# Lab private peers also need METAL_CDN_FEDERATION_ALLOW_PRIVATE_NET=1
+# WASMMOD_CDN_FEDERATION_MOUNTS_JSON=[{"prefix":"a.b","url":"https://leaf/cdn","token":"mcdn_…"}]
+# Lab private peers also need WASMMOD_CDN_FEDERATION_ALLOW_PRIVATE_NET=1
 ```
 
 API keys gain a `scopes` column. Empty scopes = unrestricted (legacy human/CLI keys). Federation bot keys use `["federation:read"]`.
@@ -104,7 +104,7 @@ mirrors locally too (`X-Metal-Fed-Dual-Write: 1`). Peer must allow the federatio
 unclaimed + `auto_claim_on_publish`, **or** an active grant prefix covering the package
 (bot may publish claimed packs under its grant). May set `X-Metal-Origin: remote`.
 
-CLI: `metal-cdn publish pkg 1.0.0 ./pkg.wasm --upstream`  
+CLI: `wasmmod-cdn publish pkg 1.0.0 ./pkg.wasm --upstream`  
 Dual-write: `… --upstream --also-local`
 
 ### Catalog polish
@@ -128,7 +128,7 @@ Browse **Federation** (admin nav) at `/federation`:
 - **Parent**: create peer + mount with bearer in one step
 - List / delete peers & mounts; revoke grants
 
-Optional env bootstrap: ``METAL_CDN_FEDERATION_MOUNTS_JSON`` is applied on startup
+Optional env bootstrap: ``WASMMOD_CDN_FEDERATION_MOUNTS_JSON`` is applied on startup
 (idempotent — existing prefixes are left alone).
 
 ## UI

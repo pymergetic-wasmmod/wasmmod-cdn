@@ -4,10 +4,10 @@ from datetime import UTC, datetime
 
 import pytest
 
-from pymergetic.metal.cdn.layout import ChannelLayout
-from pymergetic.metal.cdn.models import ChannelIndex, PackageEntry
-from pymergetic.metal.cdn.resolve import parse_root, resolve_install_order
-from pymergetic.metal.cdn.services.channel import sign_index, verify_index_signature
+from pymergetic.wasmmod.cdn.layout import ChannelLayout
+from pymergetic.wasmmod.cdn.models import ChannelIndex, PackageEntry
+from pymergetic.wasmmod.cdn.resolve import parse_root, resolve_install_order
+from pymergetic.wasmmod.cdn.services.channel import sign_index, verify_index_signature
 
 
 def test_scoped_package_names() -> None:

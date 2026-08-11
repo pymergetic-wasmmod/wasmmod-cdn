@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pymergetic.metal.cdn.main import create_app
-from pymergetic.metal.cdn.settings import Settings
-from pymergetic.metal.cdn.storage import LocalObjectStorage, collect_orphan_keys
+from pymergetic.wasmmod.cdn.main import create_app
+from pymergetic.wasmmod.cdn.settings import Settings
+from pymergetic.wasmmod.cdn.storage import LocalObjectStorage, collect_orphan_keys
 
 
 @pytest.fixture
@@ -123,7 +123,7 @@ async def test_scoped_claim_private_successor_index(client: AsyncClient) -> None
 
     metrics = await client.get("/cdn/metrics")
     assert metrics.status_code == 200
-    assert "metal_cdn_requests_total" in metrics.text
+    assert "wasmmod_cdn_requests_total" in metrics.text
 
 
 @pytest.mark.asyncio

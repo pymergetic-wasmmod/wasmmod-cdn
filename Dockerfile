@@ -9,15 +9,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     SETUPTOOLS_SCM_PRETEND_VERSION=0.1.0a5 \
     PYTHONPATH=/app \
-    METAL_CDN_HOST=0.0.0.0 \
-    METAL_CDN_PORT=8000 \
-    METAL_CDN_BASE_PATH=/cdn \
-    METAL_CDN_DATA_DIR=/data \
-    METAL_CDN_STORAGE_ROOT=/data/packs \
-    METAL_CDN_DATABASE_URL=sqlite+aiosqlite:////data/metal_cdn.db \
-    METAL_CDN_EXPERIMENTAL=true \
-    METAL_CDN_EXPERIMENTAL_REPL=true \
-    METAL_CDN_REQUIRE_SIGNED=present
+    WASMMOD_CDN_HOST=0.0.0.0 \
+    WASMMOD_CDN_PORT=8000 \
+    WASMMOD_CDN_BASE_PATH=/cdn \
+    WASMMOD_CDN_DATA_DIR=/data \
+    WASMMOD_CDN_STORAGE_ROOT=/data/packs \
+    WASMMOD_CDN_DATABASE_URL=sqlite+aiosqlite:////data/wasmmod_cdn.db \
+    WASMMOD_CDN_EXPERIMENTAL=true \
+    WASMMOD_CDN_EXPERIMENTAL_REPL=true \
+    WASMMOD_CDN_REQUIRE_SIGNED=present
 
 WORKDIR /app
 
@@ -39,7 +39,7 @@ RUN set -eux; \
     useradd --create-home --uid 10001 app; \
     mkdir -p /data/packs; \
     chown -R app:app /data /app; \
-    if [ ! -f pymergetic/metal/cdn/web/static/repl/micropython.mjs ]; then \
+    if [ ! -f pymergetic/wasmmod/cdn/web/static/repl/micropython.mjs ]; then \
       echo "WARNING: micropython.mjs missing — run scripts/sync-repl-assets.sh / scripts/dev-up.sh before docker build"; \
     fi; \
     if [ ! -f pymergetic/metal/inspect/adapter_fastapi.py ]; then \
@@ -54,4 +54,4 @@ VOLUME ["/data"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/cdn/health')" || exit 1
 
-CMD ["metal-cdn", "serve", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["wasmmod-cdn", "serve", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copy ports/webassembly build outputs into metal-cdn static/repl/ (gitignored).
+# Copy ports/webassembly build outputs into wasmmod-cdn static/repl/ (gitignored).
 #
 # Usage:
 #   sync-repl-assets.sh /path/to/build-dir [engine-id]
@@ -11,7 +11,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="${1:-}"
 ENGINE="${2:-mp}"
-DEST_ROOT="$ROOT/pymergetic/metal/cdn/web/static/repl"
+DEST_ROOT="$ROOT/pymergetic/wasmmod/cdn/web/static/repl"
 DEST="$DEST_ROOT/$ENGINE"
 
 if [[ -z "$SRC" || ! -d "$SRC" ]]; then

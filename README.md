@@ -1,7 +1,7 @@
-# metal-cdn
+# wasmmod-cdn
 
-PyPI: **`pymergetic-metal-cdn`** · Client: **`pymergetic-metal-cdn-client`**  
-Live demo: **[cdn.pymergetic.com/cdn](https://cdn.pymergetic.com/cdn/)** · Pack format: [wasmmod](https://github.com/pymergetic/wasmmod)
+PyPI: **`pymergetic-wasmmod-cdn`** · Client: **`pymergetic-wasmmod-cdn-client`**  
+Live demo: **[cdn.pymergetic.com/cdn](https://cdn.pymergetic.com/cdn/)** · Pack format: [wasmmod](https://github.com/pymergetic-wasmmod/wasmmod)
 
 Async FastAPI channel for signed wasmmod packs — browse, publish, inspect
 (hex / asm / source), and try them in a browser MicroPython shell.
@@ -10,12 +10,11 @@ Async FastAPI channel for signed wasmmod packs — browse, publish, inspect
 
 | Component | Role | Repo |
 |-----------|------|------|
-| wasmmod | Runtime + pack tree (`pymergetic-wasmmod`) | [pymergetic/wasmmod](https://github.com/pymergetic/wasmmod) · `main` |
-| wasmmod-tools | Host CLI (`pymergetic-wasmmod-tools`) | [pymergetic/wasmmod-tools](https://github.com/pymergetic/wasmmod-tools) · `main` |
-| wasmmod-test | External pack/CDN consumer sample | [pymergetic/wasmmod-test](https://github.com/pymergetic/wasmmod-test) · `main` |
-| **metal-cdn** | **This repo** — CDN server + client | [pymergetic/metal-cdn](https://github.com/pymergetic/metal-cdn) · `main` |
-| metalpython `wasmmod` | Clean upy host + submodule (upstream-shaped) | [metalpython/tree/wasmmod](https://github.com/pymergetic/metalpython/tree/wasmmod) |
-| metalpython `master` | Metal product µPy; **base = `wasmmod` tip** | [metalpython/tree/master](https://github.com/pymergetic/metalpython/tree/master) |
+| wasmmod | Runtime + pack tree (`pymergetic-wasmmod`) | [pymergetic-wasmmod/wasmmod](https://github.com/pymergetic-wasmmod/wasmmod) · `main` |
+| wasmmod-tools | Host CLI (`pymergetic-wasmmod-tools`) | [pymergetic-wasmmod/wasmmod-tools](https://github.com/pymergetic-wasmmod/wasmmod-tools) · `main` |
+| wasmmod-test | External pack/CDN consumer sample | [pymergetic-wasmmod/wasmmod-test](https://github.com/pymergetic-wasmmod/wasmmod-test) · `main` |
+| **wasmmod-cdn** | **This repo** — CDN server + client | [pymergetic-wasmmod/wasmmod-cdn](https://github.com/pymergetic-wasmmod/wasmmod-cdn) · `main` |
+| metalpython | Metal product µPy — rebuilt on the wasmmod engine | [pymergetic/metalpython](https://github.com/pymergetic/metalpython) · `main` |
 
 <p align="center">
   <img src="screenshots/browse-hello.png" alt="Package browse — hello on lead, dependents, µPy ready" width="820" />
@@ -27,8 +26,8 @@ Devices still verify pack signatures with wasmmod — this service does not repl
 
 UI styles: `static/site.css` barrels `static/css/*.css` (tokens, layout, catalog, artifacts, inspect, chrome, sessions, repl). Inspect JS: `static/inspect/*.js`.
 
-**Forks / mirrors:** set `METAL_CDN_PUBLIC_ORIGIN`, `METAL_CDN_BASE_PATH`, optional
-`METAL_CDN_BRAND_NAME` / `METAL_CDN_BRAND_LOGO_URL`, and `METAL_CDN_CORS_ORIGINS`
+**Forks / mirrors:** set `WASMMOD_CDN_PUBLIC_ORIGIN`, `WASMMOD_CDN_BASE_PATH`, optional
+`WASMMOD_CDN_BRAND_NAME` / `WASMMOD_CDN_BRAND_LOGO_URL`, and `WASMMOD_CDN_CORS_ORIGINS`
 so your UI and `wasm.cdn(...)` clients point at *your* host (see [docs/PROXY.md](docs/PROXY.md)).
 
 ---
@@ -87,26 +86,26 @@ text, hex for binaries:
 ## Install
 
 ```sh
-pip install pymergetic-metal-cdn
+pip install pymergetic-wasmmod-cdn
 # from this repo (client first — server depends on it):
 pip install -e ./client -e ".[dev]" --config-settings editable_mode=compat
 ```
 
-Thin publish/download wheel (no FastAPI): **`pymergetic-metal-cdn-client`**  
-→ `pymergetic.metal.cdn_client` — [docs/CLIENT.md](docs/CLIENT.md) · [client/README.md](client/README.md).
+Thin publish/download wheel (no FastAPI): **`pymergetic-wasmmod-cdn-client`**  
+→ `pymergetic.wasmmod.cdn_client` — [docs/CLIENT.md](docs/CLIENT.md) · [client/README.md](client/README.md).
 
-Version comes from git tags via [setuptools-scm](https://github.com/pypa/setuptools-scm) (`metal-cdn --version`).
+Version comes from git tags via [setuptools-scm](https://github.com/pypa/setuptools-scm) (`wasmmod-cdn --version`).
 
 ---
 
 ## Quick start
 
 ```sh
-# from the metal-cdn repo root
+# from the wasmmod-cdn repo root
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ./client -e ".[dev]" --config-settings editable_mode=compat
 cp .env.example .env
-metal-cdn serve --reload
+wasmmod-cdn serve --reload
 # → http://127.0.0.1:8000/cdn/        UI
 # → http://127.0.0.1:8000/cdn/docs    OpenAPI
 ```
@@ -132,7 +131,7 @@ Engine trees are **siblings of this repo** (or set env) — not an os-sdk `packa
 ```
 
 Flags: `--no-upy`, `--no-seed`, `--seed-only`, `--reseed`.  
-Env: `MICROPYTHON`, `METALPYTHON_WM`, `METALPYTHON`, `METAL_CDN_URL`, `METAL_CDN_PORT`, `METAL_CDN_SESSION_SECRET`.  
+Env: `MICROPYTHON`, `METALPYTHON_WM`, `METALPYTHON`, `WASMMOD_CDN_URL`, `WASMMOD_CDN_PORT`, `WASMMOD_CDN_SESSION_SECRET`.  
 Details: [docs/CLIENT.md](docs/CLIENT.md#public-test-first-boot-auth-on).
 
 ### Public TLS edge
@@ -200,33 +199,33 @@ test_a2.test_b2.test_c2.c2_answer()   # → 42
 ## Client CLI
 
 ```sh
-metal-cdn login --url http://127.0.0.1:8000/cdn --email you@example.com --register
-metal-cdn claim hello
-metal-cdn publish hello 0.1.0 ./hello.wasm ./hello.wasm.zlib
-metal-cdn whoami
+wasmmod-cdn login --url http://127.0.0.1:8000/cdn --email you@example.com --register
+wasmmod-cdn claim hello
+wasmmod-cdn publish hello 0.1.0 ./hello.wasm ./hello.wasm.zlib
+wasmmod-cdn whoami
 ```
 
 Web publish UI: `{BASE_PATH}/publish` after login.  
 One-shot pack→AOT→sign→zlib→upload: `wasmmod.py publish` ([docs/CLIENT.md](docs/CLIENT.md)).  
 Releases / PyPI tags: [docs/RELEASE.md](docs/RELEASE.md).
 
-Optional Postgres: `docker compose up -d db` + `METAL_CDN_DATABASE_URL=…`.
+Optional Postgres: `docker compose up -d db` + `WASMMOD_CDN_DATABASE_URL=…`.
 
 ---
 
 ## Layout
 
 ```text
-client/pyproject.toml          # pymergetic-metal-cdn-client
-pymergetic/metal/
+client/pyproject.toml          # pymergetic-wasmmod-cdn-client
+pymergetic/wasmmod/
   cdn_client/                  # thin HTTP client (shared sources)
   cdn/                         # FastAPI server + UI + REPL
 screenshots/                   # UI stills for this README
 ```
 
 ```python
-from pymergetic.metal.cdn.main import create_app
-from pymergetic.metal.cdn_client import CdnClient
+from pymergetic.wasmmod.cdn.main import create_app
+from pymergetic.wasmmod.cdn_client import CdnClient
 ```
 
 ## API sketch
@@ -244,14 +243,14 @@ from pymergetic.metal.cdn_client import CdnClient
 | GET | `/artifacts/…` | Download / inspect / embedded files |
 
 ```sh
-metal-cdn db upgrade   # Alembic
+wasmmod-cdn db upgrade   # Alembic
 ```
 
 ## Related
 
 - [docs/LAYOUT.md](docs/LAYOUT.md) · [docs/INDEX.md](docs/INDEX.md) · [docs/PROXY.md](docs/PROXY.md) · [docs/FEDERATION.md](docs/FEDERATION.md)
 - [docs/CLIENT.md](docs/CLIENT.md) · [docs/RELEASE.md](docs/RELEASE.md) · [docs/ROADMAP.md](docs/ROADMAP.md)
-- Pack format: [wasmmod PACK.md](https://github.com/pymergetic/wasmmod/blob/main/docs/PACK.md)
+- Pack format: [wasmmod PACK.md](https://github.com/pymergetic-wasmmod/wasmmod/blob/main/docs/PACK.md)
 
 ## License
 

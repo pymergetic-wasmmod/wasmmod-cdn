@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from pymergetic.metal.cdn.models import ChannelIndex, PackageEntry
-from pymergetic.metal.cdn.services.channel import IndexService
-from pymergetic.metal.cdn.storage import LocalObjectStorage
+from pymergetic.wasmmod.cdn.models import ChannelIndex, PackageEntry
+from pymergetic.wasmmod.cdn.services.channel import IndexService
+from pymergetic.wasmmod.cdn.storage import LocalObjectStorage
 
 
 @pytest.mark.asyncio

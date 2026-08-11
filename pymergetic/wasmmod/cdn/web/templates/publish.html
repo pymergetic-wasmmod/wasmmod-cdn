@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% block title %}Publish — wasmmod-cdn{% endblock %}
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">release</p>
+  <h1>Publish pack</h1>
+  <p class="lede">
+    Upload prebuilt artifacts (<code>.wasm</code> / <code>.aotN</code> / <code>.elf</code> / <code>.zlib</code>).
+    Pack → AOT → sign → zlib stays in wasmmod / CI — signing keys never enter the browser.
+  </p>
+</section>
+
+<form id="publish-form" class="auth-form publish-form">
+  <label>Package <input name="package" required placeholder="org/hello or hello" autocomplete="off" /></label>
+  <label>Version <input name="version" required placeholder="0.1.0" autocomplete="off" /></label>
+  <label>Description <input name="description" placeholder="optional" /></label>
+  <label>Homepage <input name="homepage" type="url" placeholder="https://…" /></label>
+  <label>License <input name="license" placeholder="MIT" /></label>
+  <label>AOT format version <input name="aot_version" type="number" min="1" placeholder="e.g. 6" /></label>
+  <label class="check"><input type="checkbox" name="lead" checked /> Update lead channel</label>
+  <label class="check"><input type="checkbox" name="pin" checked /> Write pin @version</label>
+  <label class="check"><input type="checkbox" name="claim" /> Claim package if unclaimed</label>
+  <label class="check"><input type="checkbox" name="force" /> Force overwrite pin</label>
+  <label>
+    Artifacts
+    <input name="files" type="file" multiple required />
+  </label>
+  <button type="submit">Publish</button>
+  <p id="publish-msg" class="muted" role="status"></p>
+</form>
+
+<script>
+  const form = document.getElementById("publish-form");
+  const msg = document.getElementById("publish-msg");
+  const apiBase = "{{ base_path }}";
+
+  async function ensureSession() {
+    const me = await fetch(apiBase + "/auth/me", { credentials: "same-origin" });
+    if (me.status === 401) {
+      window.location.href = apiBase + "/login?next=" + encodeURIComponent(apiBase + "/publish");
+      return false;
+    }
+    return me.ok;
+  }
+
+  async function csrfToken() {
+    const res = await fetch(apiBase + "/auth/csrf", { credentials: "same-origin" });
+    if (!res.ok) throw new Error("CSRF prime failed");
+    const data = await res.json();
+    return data.csrf_token;
+  }
+
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    msg.textContent = "Publishing…";
+    if (!(await ensureSession())) return;
+
+    try {
+      const token = await csrfToken();
+      const packageName = form.package.value.trim();
+
+      if (form.claim.checked) {
+        const claimRes = await fetch(apiBase + "/packages/" + encodeURIComponent(packageName) + "/claim", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "X-CSRF-Token": token, "Accept": "application/json" },
+        });
+        if (!claimRes.ok && claimRes.status !== 409) {
+          const err = await claimRes.json().catch(() => ({}));
+          throw new Error(err.detail || "claim failed");
+        }
+      }
+
+      const meta = {
+        package: packageName,
+        version: form.version.value.trim(),
+        lead: form.lead.checked,
+        pin: form.pin.checked,
+        force: form.force.checked,
+        deps: {},
+      };
+      if (form.description.value.trim()) meta.description = form.description.value.trim();
+      if (form.homepage.value.trim()) meta.homepage = form.homepage.value.trim();
+      if (form.license.value.trim()) meta.license = form.license.value.trim();
+      if (form.aot_version.value) meta.aot_version = Number(form.aot_version.value);
+
+      const body = new FormData();
+      body.append("meta", JSON.stringify(meta));
+      for (const file of form.files.files) {
+        body.append("files", file, file.name);
+      }
+
+      const res = await fetch(apiBase + "/publish", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "X-CSRF-Token": token, "Accept": "application/json" },
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.detail || ("publish failed (" + res.status + ")"));
+      }
+      msg.textContent = "Published " + packageName + " " + meta.version;
+      const href = apiBase + "/channels/lead/packs/" + packageName;
+      window.setTimeout(() => { window.location.href = href; }, 600);
+    } catch (err) {
+      msg.textContent = err.message || String(err);
+    }
+  });
+
+  ensureSession();
+</script>
+{% endblock %}

@@ -10,10 +10,10 @@ import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pymergetic.metal.cdn.main import create_app
-from pymergetic.metal.cdn.services.federation.artifact_name import artifact_package_hint
-from pymergetic.metal.cdn.services.federation.ssrf import validate_peer_url
-from pymergetic.metal.cdn.settings import Settings
+from pymergetic.wasmmod.cdn.main import create_app
+from pymergetic.wasmmod.cdn.services.federation.artifact_name import artifact_package_hint
+from pymergetic.wasmmod.cdn.services.federation.ssrf import validate_peer_url
+from pymergetic.wasmmod.cdn.settings import Settings
 
 
 def test_artifact_package_hint() -> None:
@@ -213,7 +213,7 @@ async def test_negative_cache_skips_repeat_404(
     parent_child: tuple[AsyncClient, AsyncClient],
 ) -> None:
     parent, _child = parent_child
-    from pymergetic.metal.cdn.services.federation.neg_cache import NegativePeerCache
+    from pymergetic.wasmmod.cdn.services.federation.neg_cache import NegativePeerCache
 
     # First miss populates cache; second should still 404 (and use cache).
     r1 = await parent.get("/cdn/packages/leaf.missing")

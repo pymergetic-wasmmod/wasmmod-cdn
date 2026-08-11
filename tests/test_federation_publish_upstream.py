@@ -10,8 +10,8 @@ import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pymergetic.metal.cdn.main import create_app
-from pymergetic.metal.cdn.settings import Settings
+from pymergetic.wasmmod.cdn.main import create_app
+from pymergetic.wasmmod.cdn.settings import Settings
 
 
 def _settings(tmp_path: Path, name: str, **kwargs: object) -> Settings:
@@ -235,7 +235,7 @@ async def test_upstream_publish_claimed_package_via_grant_prefix(
 
 @pytest.mark.asyncio
 async def test_cli_parser_upstream_flag() -> None:
-    from pymergetic.metal.cdn.cli_parser import build_parser
+    from pymergetic.wasmmod.cdn.cli_parser import build_parser
 
     ns = build_parser().parse_args(
         ["publish", "leaf.x", "0.1.0", "x.wasm", "--upstream", "--also-local", "--no-pin"]

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create an annotated setuptools-scm tag for metal-cdn (+ client).
+# Create an annotated setuptools-scm tag for wasmmod-cdn (+ client).
 set -euo pipefail
 
 if [[ $# -ne 1 ]]; then
@@ -32,7 +32,7 @@ if git rev-parse "$tag" >/dev/null 2>&1; then
   exit 1
 fi
 
-git tag -a "$tag" -m "metal-cdn ${ver#v}"
+git tag -a "$tag" -m "wasmmod-cdn ${ver#v}"
 echo "created $tag → $(git rev-parse --short HEAD)"
-echo "verify: pip install -e . && metal-cdn --version"
+echo "verify: pip install -e . && wasmmod-cdn --version"
 echo "push:   git push origin $tag"

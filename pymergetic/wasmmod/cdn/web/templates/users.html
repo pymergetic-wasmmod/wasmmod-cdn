@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Users — wasmmod-cdn{% endblock %}
+{% block content %}
+<section class="hero">
+  <p class="eyebrow">users</p>
+  <h1>Maintainers</h1>
+  <p class="lede">
+    People listed as package maintainers on <code>lead</code>
+    ({{ maintainers|length }}).
+  </p>
+</section>
+<section>
+  <h2>All users</h2>
+  {% if maintainers %}
+  <ul class="pkg-list">
+    {% for m in maintainers %}
+    <li>
+      <a href="{{ author_href(m.email) }}">{{ m.email }}</a>
+      <span class="muted">{{ m.package_count }} package{% if m.package_count != 1 %}s{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">No maintainer emails on published packages yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pymergetic.metal.cdn.main import create_app
-from pymergetic.metal.cdn.settings import Settings
-from pymergetic.metal.cdn.web.repl_autoexec import render_autoexec
+from pymergetic.wasmmod.cdn.main import create_app
+from pymergetic.wasmmod.cdn.settings import Settings
+from pymergetic.wasmmod.cdn.web.repl_autoexec import render_autoexec
 
 
 def test_render_autoexec_contains_boot_and_help() -> None:
@@ -78,7 +78,7 @@ async def test_autoexec_endpoint(tmp_path: Path) -> None:
     assert r.headers.get("X-Shell-Session-Id")
     body = r.text
     assert "wasm.cdn(CDN)" in body
-    assert "metal-cdn" in body
+    assert "wasmmod-cdn" in body
     assert "http://test/cdn" in body
     assert "SESSION_ID" in body
     compile(body, "<autoexec>", "exec")

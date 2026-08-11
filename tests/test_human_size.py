@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pymergetic.metal.cdn_client.format import human_size
+from pymergetic.wasmmod.cdn_client.format import human_size
 
 
 def test_human_size_small() -> None:

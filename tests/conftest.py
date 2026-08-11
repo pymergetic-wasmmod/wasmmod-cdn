@@ -6,9 +6,9 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
-def _isolate_metal_cdn_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def _isolate_wasmmod_cdn_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """HTTP test clients use ``http://test``; a Secure session cookie from
-    ``METAL_CDN_PUBLIC_ORIGIN=https://…`` in a local ``.env`` would never be sent.
+    ``WASMMOD_CDN_PUBLIC_ORIGIN=https://…`` in a local ``.env`` would never be sent.
     """
-    monkeypatch.delenv("METAL_CDN_PUBLIC_ORIGIN", raising=False)
-    monkeypatch.setenv("METAL_CDN_PUBLIC_ORIGIN", "")
+    monkeypatch.delenv("WASMMOD_CDN_PUBLIC_ORIGIN", raising=False)
+    monkeypatch.setenv("WASMMOD_CDN_PUBLIC_ORIGIN", "")

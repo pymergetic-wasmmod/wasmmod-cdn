@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pymergetic.metal.cdn.paths import join_base, normalize_base_path, path_prefix
+from pymergetic.wasmmod.cdn.paths import join_base, normalize_base_path, path_prefix
 
 
 def test_normalize_base_path() -> None:

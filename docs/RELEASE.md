@@ -1,6 +1,6 @@
 # Releases (setuptools-scm)
 
-`pymergetic-metal-cdn` and `pymergetic-metal-cdn-client` share this git repo.
+`pymergetic-wasmmod-cdn` and `pymergetic-wasmmod-cdn-client` share this git repo.
 Versions come from **git tags** via [setuptools-scm](https://github.com/pypa/setuptools-scm).
 
 ## Tag format
@@ -18,8 +18,8 @@ This repo therefore has **two** workflows:
 
 | Workflow file | PyPI project |
 |---------------|--------------|
-| `publish-pypi-client.yml` | `pymergetic-metal-cdn-client` |
-| `publish-pypi-server.yml` | `pymergetic-metal-cdn` |
+| `publish-pypi-client.yml` | `pymergetic-wasmmod-cdn-client` |
+| `publish-pypi-server.yml` | `pymergetic-wasmmod-cdn` |
 
 ### Existing projects (normal publisher)
 
@@ -30,15 +30,15 @@ do **not** use a pending publisher. Pending + existing name fails with:
 
 That failed exchange often **deletes** the pending row. Fix on each project:
 
-1. https://pypi.org/manage/project/pymergetic-metal-cdn/settings/publishing/
-2. https://pypi.org/manage/project/pymergetic-metal-cdn-client/settings/publishing/
+1. https://pypi.org/manage/project/pymergetic-wasmmod-cdn/settings/publishing/
+2. https://pypi.org/manage/project/pymergetic-wasmmod-cdn-client/settings/publishing/
 
 Add a **Trusted Publisher** (not pending) with:
 
 | Field | Client | Server |
 |-------|--------|--------|
 | Owner | `pymergetic` | `pymergetic` |
-| Repository | `metal-cdn` | `metal-cdn` |
+| Repository | `wasmmod-cdn` | `wasmmod-cdn` |
 | Workflow name | `publish-pypi-client.yml` | `publish-pypi-server.yml` |
 | Environment | *(empty)* | *(empty)* |
 
@@ -64,9 +64,9 @@ Account → Publishing → pending publisher — only when the name is **not** o
 
 | Field | Value |
 |-------|--------|
-| PyPI Project Name | `pymergetic-metal-cdn-client` |
+| PyPI Project Name | `pymergetic-wasmmod-cdn-client` |
 | Owner | `pymergetic` |
-| Repository | `metal-cdn` |
+| Repository | `wasmmod-cdn` |
 | Workflow name | `publish-pypi-client.yml` |
 | Environment | *(empty)* |
 
@@ -74,9 +74,9 @@ Account → Publishing → pending publisher — only when the name is **not** o
 
 | Field | Value |
 |-------|--------|
-| PyPI Project Name | `pymergetic-metal-cdn` |
+| PyPI Project Name | `pymergetic-wasmmod-cdn` |
 | Owner | `pymergetic` |
-| Repository | `metal-cdn` |
+| Repository | `wasmmod-cdn` |
 | Workflow name | `publish-pypi-server.yml` |
 | Environment | *(empty)* |
 
@@ -113,5 +113,5 @@ publisher rows afterward if you want OIDC next time.
 
 ```sh
 pip install -e ./client -e ".[dev]" --config-settings editable_mode=compat
-metal-cdn --version   # → 0.1.0a3 on the tagged commit
+wasmmod-cdn --version   # → 0.1.0a3 on the tagged commit
 ```

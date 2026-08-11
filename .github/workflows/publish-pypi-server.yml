@@ -1,4 +1,4 @@
-# Publish pymergetic-metal-cdn.
+# Publish pymergetic-wasmmod-cdn.
 # Prefer Trusted Publishing (OIDC). Until project publishers match this filename,
 # set repo secret PYPI_API_TOKEN (user/org scope covering both packages) — same as a6.
 name: publish-pypi-server
@@ -20,6 +20,7 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: pypi
     permissions:
       id-token: write
       contents: read

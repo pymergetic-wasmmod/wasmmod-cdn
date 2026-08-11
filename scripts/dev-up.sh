@@ -10,7 +10,7 @@
 #   ./scripts/dev-up.sh --seed-only   # packs into already-running container
 #   ./scripts/dev-up.sh --no-upy      # skip Emscripten rebuild (reuse synced assets)
 #   ./scripts/dev-up.sh --no-seed     # docker only
-#   ./scripts/dev-up.sh --reseed      # wipe named volume metal-cdn-data, then docker+seed
+#   ./scripts/dev-up.sh --reseed      # wipe named volume wasmmod-cdn-data, then docker+seed
 #
 # Freestanding / unix host / PXE (opt-in; slow builds):
 #   ./scripts/dev-up.sh --firmware              # arch BIOS+UEFI (+ wasm) → CDN
@@ -30,29 +30,29 @@
 #   METALPYTHON_WM   metalpython-wasmmod → engine mpwm (sibling ../metalpython-wasmmod)
 #   METALPYTHON      metalpython product → engine mp (sibling ../metalpython)
 # CDN URL roles (do not conflate):
-#   METAL_CDN_URL       where *this script* publishes (lab docker default :8000)
+#   WASMMOD_CDN_URL       where *this script* publishes (lab docker default :8000)
 #   METAL_PXE_CDN_URL   what PXE clients fetch (master default = official realm)
 #                       https://cdn.pymergetic.com/cdn — never bake 127.0.0.1 into metal.ipxe
-#   Kernel home bake    METAL_CDN_URL at *make* time on metal port (master = official)
-# Own realm / lab seat: override the make-time METAL_CDN_URL and/or METAL_PXE_CDN_URL.
+#   Kernel home bake    WASMMOD_CDN_URL at *make* time on metal port (master = official)
+# Own realm / lab seat: override the make-time WASMMOD_CDN_URL and/or METAL_PXE_CDN_URL.
 # Trees are discovered as *siblings of this repo* or via env — never os-sdk/packages/.
-#   METAL_CDN_IMAGE metal-cdn
-#   METAL_CDN_NAME  metal-cdn
-#   METAL_CDN_PORT  8000
-#   METAL_CDN_VOLUME metal-cdn-data   # docker volume wiped by --reseed only
-#   METAL_CDN_REQUIRE_SIGNED  off|present|verify (default: present)
-#   METAL_CDN_REQUIRE_AUTH    default true for this script
+#   WASMMOD_CDN_IMAGE wasmmod-cdn
+#   WASMMOD_CDN_NAME  wasmmod-cdn
+#   WASMMOD_CDN_PORT  8000
+#   WASMMOD_CDN_VOLUME wasmmod-cdn-data   # docker volume wiped by --reseed only
+#   WASMMOD_CDN_REQUIRE_SIGNED  off|present|verify (default: present)
+#   WASMMOD_CDN_REQUIRE_AUTH    default true for this script
 #   METAL_PXE_* / METAL_BOOT_IMAGE_URL — passed through to upload-bootserver
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-IMAGE="${METAL_CDN_IMAGE:-metal-cdn}"
-NAME="${METAL_CDN_NAME:-metal-cdn}"
-PORT="${METAL_CDN_PORT:-8000}"
-CDN_URL="${METAL_CDN_URL:-http://127.0.0.1:${PORT}/cdn}"
-VOLUME="${METAL_CDN_VOLUME:-metal-cdn-data}"
+IMAGE="${WASMMOD_CDN_IMAGE:-wasmmod-cdn}"
+NAME="${WASMMOD_CDN_NAME:-wasmmod-cdn}"
+PORT="${WASMMOD_CDN_PORT:-8000}"
+CDN_URL="${WASMMOD_CDN_URL:-http://127.0.0.1:${PORT}/cdn}"
+VOLUME="${WASMMOD_CDN_VOLUME:-wasmmod-cdn-data}"
 SECRETS_DIR="$ROOT/.secrets"
 SECRETS_ENV="$SECRETS_DIR/cdn.env"
 SECRETS_TOKEN="$SECRETS_DIR/token"
@@ -116,7 +116,7 @@ load_secrets() {
   # shellcheck disable=SC1091
   source "$SECRETS_ENV"
   set +a
-  if [[ -z "${METAL_CDN_BOOTSTRAP_ADMIN_EMAIL:-}" || -z "${METAL_CDN_BOOTSTRAP_ADMIN_PASSWORD:-}" ]]; then
+  if [[ -z "${WASMMOD_CDN_BOOTSTRAP_ADMIN_EMAIL:-}" || -z "${WASMMOD_CDN_BOOTSTRAP_ADMIN_PASSWORD:-}" ]]; then
     echo "FAIL: $SECRETS_ENV missing bootstrap email/password" >&2
     exit 1
   fi
@@ -139,15 +139,15 @@ mint_or_load_token() {
     fi
   fi
   local body code
-  body="$(python3 -c 'import json,os; print(json.dumps({"email":os.environ["METAL_CDN_BOOTSTRAP_ADMIN_EMAIL"],"password":os.environ["METAL_CDN_BOOTSTRAP_ADMIN_PASSWORD"],"name":"dev-up-seed"}))')"
-  code="$(curl -sS -o /tmp/metal-cdn-token.json -w '%{http_code}' -X POST "$CDN_URL/auth/token" \
+  body="$(python3 -c 'import json,os; print(json.dumps({"email":os.environ["WASMMOD_CDN_BOOTSTRAP_ADMIN_EMAIL"],"password":os.environ["WASMMOD_CDN_BOOTSTRAP_ADMIN_PASSWORD"],"name":"dev-up-seed"}))')"
+  code="$(curl -sS -o /tmp/wasmmod-cdn-token.json -w '%{http_code}' -X POST "$CDN_URL/auth/token" \
     -H 'Content-Type: application/json' \
     -d "$body")"
   if [[ "$code" != "200" && "$code" != "201" ]]; then
-    echo "FAIL: mint token HTTP $code — $(head -c 240 /tmp/metal-cdn-token.json)" >&2
+    echo "FAIL: mint token HTTP $code — $(head -c 240 /tmp/wasmmod-cdn-token.json)" >&2
     exit 1
   fi
-  python3 -c 'import json; print(json.load(open("/tmp/metal-cdn-token.json"))["key"])' >"$SECRETS_TOKEN"
+  python3 -c 'import json; print(json.load(open("/tmp/wasmmod-cdn-token.json"))["key"])' >"$SECRETS_TOKEN"
   chmod 600 "$SECRETS_TOKEN"
   echo "    minted token → $SECRETS_TOKEN"
 }
@@ -179,7 +179,7 @@ _find_upy_tree() {
 }
 
 find_micropython() {
-  # Vanilla upstream — sibling of metal-cdn (or MICROPYTHON=).
+  # Vanilla upstream — sibling of wasmmod-cdn (or MICROPYTHON=).
   local override="${MICROPYTHON:-}" cand
   if [[ -n "$override" ]]; then
     echo "$override"
@@ -211,7 +211,7 @@ find_metalpython_wm() {
 
 ensure_wasmmod_tools_python() {
   # tools/wasmmod.py imports pymergetic.wasmmod.tools (nested dev/tools).
-  # Prefer editable install in metal-cdn .venv; else PYTHONPATH the src tree.
+  # Prefer editable install in wasmmod-cdn .venv; else PYTHONPATH the src tree.
   local mp="$1" tools_src tools_py
   tools_src="$mp/extmod/wasmmod/dev/tools/src"
   tools_py="$ROOT/.venv/bin/python"
@@ -282,7 +282,7 @@ ensure_emsdk() {
 
 step_upy() {
   local vanilla mp_wm mp any=0
-  # Three DIFFERENT trees / roles (siblings of metal-cdn, or env):
+  # Three DIFFERENT trees / roles (siblings of wasmmod-cdn, or env):
   #   mp    = ../metalpython           (metal arch.wasm seat + wasmmod)
   #   mpwm  = ../metalpython-wasmmod   (upy + wasmmod only)
   #   upy   = ../micropython           (vanilla upstream)
@@ -305,10 +305,10 @@ step_upy() {
     echo "note: vanilla micropython not found (set MICROPYTHON=… or sibling ../micropython) — skip upy"
   fi
   if [[ "$any" -eq 0 ]]; then
-    echo "FAIL: no engine trees found (set MICROPYTHON / METALPYTHON_WM / METALPYTHON, or clone siblings next to metal-cdn)" >&2
+    echo "FAIL: no engine trees found (set MICROPYTHON / METALPYTHON_WM / METALPYTHON, or clone siblings next to wasmmod-cdn)" >&2
     exit 1
   fi
-  local flat="$ROOT/pymergetic/metal/cdn/web/static/repl"
+  local flat="$ROOT/pymergetic/wasmmod/cdn/web/static/repl"
   if [[ ! -f "$flat/micropython.mjs" && -f "$flat/mp/micropython.mjs" ]]; then
     cp -f "$flat/mp/"micropython.mjs "$flat/mp/"micropython.wasm "$flat/" 2>/dev/null || true
   elif [[ ! -f "$flat/micropython.mjs" && -f "$flat/mpwm/micropython.mjs" ]]; then
@@ -317,7 +317,7 @@ step_upy() {
 }
 
 step_reseed_volume() {
-  # Only the named local CDN volume (default metal-cdn-data). Never touches
+  # Only the named local CDN volume (default wasmmod-cdn-data). Never touches
   # compose volumes like pgdata / host bind mounts outside Docker.
   echo "==> reseed: stop $NAME and remove docker volume $VOLUME"
   docker rm -f "$NAME" >/dev/null 2>&1 || true
@@ -341,21 +341,21 @@ step_docker() {
   docker build -t "$IMAGE" "$ROOT"
   echo "==> docker run $NAME :$PORT (require_auth=true)"
   docker rm -f "$NAME" >/dev/null 2>&1 || true
-  local secret="${METAL_CDN_SESSION_SECRET:-}"
+  local secret="${WASMMOD_CDN_SESSION_SECRET:-}"
   if [[ -z "$secret" ]]; then
     secret="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | xxd -p -c 32)"
   fi
   docker run -d --name "$NAME" -p "${PORT}:8000" \
-    -e "METAL_CDN_SESSION_SECRET=$secret" \
-    -e METAL_CDN_EXPERIMENTAL=true \
-    -e METAL_CDN_EXPERIMENTAL_REPL=true \
-    -e "METAL_CDN_PUBLIC_ORIGIN=${METAL_CDN_PUBLIC_ORIGIN:-https://cdn.pymergetic.com}" \
-    -e "METAL_CDN_BEHIND_PROXY=${METAL_CDN_BEHIND_PROXY:-true}" \
-    -e "METAL_CDN_REQUIRE_SIGNED=${METAL_CDN_REQUIRE_SIGNED:-present}" \
-    -e "METAL_CDN_REQUIRE_AUTH=${METAL_CDN_REQUIRE_AUTH:-true}" \
-    -e "METAL_CDN_ALLOW_OPEN_REGISTRATION=${METAL_CDN_ALLOW_OPEN_REGISTRATION:-false}" \
-    -e "METAL_CDN_BOOTSTRAP_ADMIN_EMAIL=${METAL_CDN_BOOTSTRAP_ADMIN_EMAIL}" \
-    -e "METAL_CDN_BOOTSTRAP_ADMIN_PASSWORD=${METAL_CDN_BOOTSTRAP_ADMIN_PASSWORD}" \
+    -e "WASMMOD_CDN_SESSION_SECRET=$secret" \
+    -e WASMMOD_CDN_EXPERIMENTAL=true \
+    -e WASMMOD_CDN_EXPERIMENTAL_REPL=true \
+    -e "WASMMOD_CDN_PUBLIC_ORIGIN=${WASMMOD_CDN_PUBLIC_ORIGIN:-https://cdn.pymergetic.com}" \
+    -e "WASMMOD_CDN_BEHIND_PROXY=${WASMMOD_CDN_BEHIND_PROXY:-true}" \
+    -e "WASMMOD_CDN_REQUIRE_SIGNED=${WASMMOD_CDN_REQUIRE_SIGNED:-present}" \
+    -e "WASMMOD_CDN_REQUIRE_AUTH=${WASMMOD_CDN_REQUIRE_AUTH:-true}" \
+    -e "WASMMOD_CDN_ALLOW_OPEN_REGISTRATION=${WASMMOD_CDN_ALLOW_OPEN_REGISTRATION:-false}" \
+    -e "WASMMOD_CDN_BOOTSTRAP_ADMIN_EMAIL=${WASMMOD_CDN_BOOTSTRAP_ADMIN_EMAIL}" \
+    -e "WASMMOD_CDN_BOOTSTRAP_ADMIN_PASSWORD=${WASMMOD_CDN_BOOTSTRAP_ADMIN_PASSWORD}" \
     -v "${VOLUME}:/data" \
     "$IMAGE"
   echo "==> wait for $CDN_URL/health"
@@ -365,7 +365,7 @@ step_docker() {
       echo "    healthy (${i}s)"
       echo "==> seed API token"
       mint_or_load_token
-      echo "    login: ${METAL_CDN_BOOTSTRAP_ADMIN_EMAIL} (password in $SECRETS_ENV)"
+      echo "    login: ${WASMMOD_CDN_BOOTSTRAP_ADMIN_EMAIL} (password in $SECRETS_ENV)"
       return 0
     fi
     # Container crash → fail immediately (do not burn the full wait).
@@ -416,13 +416,13 @@ pub_pkg() {
   local IFS=,
   echo -n "${names[*]}"
   echo -n ") … "
-  code="$(curl -sS -o /tmp/metal-cdn-dev-pub.json -w '%{http_code}' -X POST "$CDN_URL/publish" \
+  code="$(curl -sS -o /tmp/wasmmod-cdn-dev-pub.json -w '%{http_code}' -X POST "$CDN_URL/publish" \
     -H "Authorization: Bearer $token" \
     -F "meta=$meta;type=application/json" \
     "${form[@]}")"
   echo "HTTP $code"
   if [[ "$code" != "201" && "$code" != "200" ]]; then
-    echo "      $(head -c 240 /tmp/metal-cdn-dev-pub.json)" >&2
+    echo "      $(head -c 240 /tmp/wasmmod-cdn-dev-pub.json)" >&2
     return 1
   fi
 }
@@ -744,7 +744,7 @@ step_firmware() {
 yank_pkg_if_present() {
   local name="$1" reason="${2:-yanked}" token code
   token="$(seed_token)"
-  code="$(curl -sS -o /tmp/metal-cdn-yank.json -w '%{http_code}' -X POST \
+  code="$(curl -sS -o /tmp/wasmmod-cdn-yank.json -w '%{http_code}' -X POST \
     "$CDN_URL/packages/${name}/yank" \
     -H "Authorization: Bearer $token" \
     -H 'Content-Type: application/json' \
@@ -754,7 +754,7 @@ yank_pkg_if_present() {
   elif [[ "$code" == "404" ]]; then
     echo "    yank $name: not present (ok)"
   else
-    echo "    WARN: yank $name HTTP $code — $(head -c 160 /tmp/metal-cdn-yank.json 2>/dev/null)" >&2
+    echo "    WARN: yank $name HTTP $code — $(head -c 160 /tmp/wasmmod-cdn-yank.json 2>/dev/null)" >&2
   fi
 }
 
@@ -772,7 +772,7 @@ step_bootserver() {
   # Boot server = iPXE NBP + metal.ipxe only. Images from PXE-reachable CDN
   # (NOT local docker 127.0.0.1 — PXE clients cannot reach the build host).
   export METAL_PXE_CDN_URL="${METAL_PXE_CDN_URL:-https://cdn.pymergetic.com/cdn}"
-  unset METAL_CDN_URL
+  unset WASMMOD_CDN_URL
   echo "==> upload-bootserver → ${METAL_PXE_HOST:-192.168.10.1}:${METAL_PXE_PATH:-/storage/tftp}"
   echo "    boot server = iPXE + cfg; images from METAL_PXE_CDN_URL=$METAL_PXE_CDN_URL"
   bash "$up"
@@ -791,10 +791,10 @@ if [[ "$SEED_ONLY" -eq 0 && "$DO_UPY" -eq 1 ]]; then
   step_upy
 elif [[ "$DO_DOCKER" -eq 1 ]]; then
   # docker still needs assets if missing
-  if [[ ! -f "$ROOT/pymergetic/metal/cdn/web/static/repl/micropython.mjs" \
-     && ! -f "$ROOT/pymergetic/metal/cdn/web/static/repl/mpwm/micropython.mjs" \
-     && ! -f "$ROOT/pymergetic/metal/cdn/web/static/repl/mp/micropython.mjs" \
-     && ! -f "$ROOT/pymergetic/metal/cdn/web/static/repl/upy/micropython.mjs" ]]; then
+  if [[ ! -f "$ROOT/pymergetic/wasmmod/cdn/web/static/repl/micropython.mjs" \
+     && ! -f "$ROOT/pymergetic/wasmmod/cdn/web/static/repl/mpwm/micropython.mjs" \
+     && ! -f "$ROOT/pymergetic/wasmmod/cdn/web/static/repl/mp/micropython.mjs" \
+     && ! -f "$ROOT/pymergetic/wasmmod/cdn/web/static/repl/upy/micropython.mjs" ]]; then
     echo "note: no synced REPL assets — building µPy first"
     step_upy
   fi
@@ -862,7 +862,7 @@ if [[ "$DO_BOOTSERVER" -eq 1 ]]; then
   echo "    pxe    ${METAL_PXE_HOST:-192.168.10.1} = iPXE NBP + metal.ipxe only"
   echo "           images ← ${pxe_cdn}/artifacts/lead/pymergetic.metal.arch.*"
 fi
-echo "    auth   REQUIRE_AUTH on — login ${METAL_CDN_BOOTSTRAP_ADMIN_EMAIL:-demo@…}"
+echo "    auth   REQUIRE_AUTH on — login ${WASMMOD_CDN_BOOTSTRAP_ADMIN_EMAIL:-demo@…}"
 echo "    secrets $SECRETS_ENV  |  token $SECRETS_TOKEN"
 echo "    shell  open µPy panel → packages()  |  import pymergetic.wasmmod_examples.hello"
 echo "    stop   docker rm -f $NAME"

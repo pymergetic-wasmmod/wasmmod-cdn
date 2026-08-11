@@ -8,9 +8,9 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from pydantic import ValidationError
 
-from pymergetic.metal.cdn.main import create_app
-from pymergetic.metal.cdn.settings import Settings
-from pymergetic.metal.cdn.web.routes import configure_web, resolve_brand_logo_url
+from pymergetic.wasmmod.cdn.main import create_app
+from pymergetic.wasmmod.cdn.settings import Settings
+from pymergetic.wasmmod.cdn.web.routes import configure_web, resolve_brand_logo_url
 
 
 def _settings(tmp_path: Path, **kwargs: object) -> Settings:
@@ -30,7 +30,7 @@ def _settings(tmp_path: Path, **kwargs: object) -> Settings:
 
 def test_display_brand_name_falls_back_to_app_name(tmp_path: Path) -> None:
     s = _settings(tmp_path)
-    assert s.display_brand_name == "metal-cdn"
+    assert s.display_brand_name == "wasmmod-cdn"
     s2 = _settings(tmp_path, brand_name="  acme-cdn  ")
     assert s2.display_brand_name == "acme-cdn"
 

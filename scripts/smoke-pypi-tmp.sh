@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Clean-room smoke: PyPI metal-cdn (+ client) in /tmp, then wasmmod client floor.
+# Clean-room smoke: PyPI wasmmod-cdn (+ client) in /tmp, then wasmmod client floor.
 #
 #   ./scripts/smoke-pypi-tmp.sh
 #   KEEP=1 ./scripts/smoke-pypi-tmp.sh   # leave workdir + server running
 #
 # Env:
-#   METAL_CDN_PORT   default 18080 (avoid clashing with a local :8000 demo)
+#   WASMMOD_CDN_PORT   default 18080 (avoid clashing with a local :8000 demo)
 #   WASMMOD          path to wasmmod checkout (default: sibling metalpython tree)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PORT="${METAL_CDN_PORT:-18080}"
+PORT="${WASMMOD_CDN_PORT:-18080}"
 CDN_URL="http://127.0.0.1:${PORT}/cdn"
 KEEP="${KEEP:-0}"
 EXPECT_VER="${EXPECT_VER:-0.1.0a5}"
@@ -39,7 +39,7 @@ WASMMOD_DIR="$(find_wasmmod)" || {
   exit 1
 }
 
-WORK="$(mktemp -d /tmp/metal-cdn-pypi-smoke.XXXXXX)"
+WORK="$(mktemp -d /tmp/wasmmod-cdn-pypi-smoke.XXXXXX)"
 cleanup() {
   if [[ -n "${SERVER_PID:-}" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
     kill "$SERVER_PID" 2>/dev/null || true
@@ -68,37 +68,37 @@ python -m pip install -U pip -q
 
 echo "==> pip install from PyPI (no local editable)"
 python -m pip install --index-url https://pypi.org/simple \
-  "pymergetic-metal-cdn-client==${EXPECT_VER}" \
-  "pymergetic-metal-cdn==${EXPECT_VER}" -q
+  "pymergetic-wasmmod-cdn-client==${EXPECT_VER}" \
+  "pymergetic-wasmmod-cdn==${EXPECT_VER}" -q
 
 python - <<PY
 from importlib.metadata import version
-cv = version("pymergetic-metal-cdn-client")
-sv = version("pymergetic-metal-cdn")
+cv = version("pymergetic-wasmmod-cdn-client")
+sv = version("pymergetic-wasmmod-cdn")
 assert cv == "${EXPECT_VER}", cv
 assert sv == "${EXPECT_VER}", sv
-import pymergetic.metal.cdn_client as c
-import pymergetic.metal.cdn as s
+import pymergetic.wasmmod.cdn_client as c
+import pymergetic.wasmmod.cdn as s
 print("client", cv, "module", getattr(c, "__version__", "?"))
 print("server", sv)
 PY
 
-metal-cdn --version | tee "$WORK/cli-version.txt"
+wasmmod-cdn --version | tee "$WORK/cli-version.txt"
 grep -q "$EXPECT_VER" "$WORK/cli-version.txt"
 
-echo "==> start metal-cdn on :$PORT"
-export METAL_CDN_DATA_DIR="$WORK/data"
-export METAL_CDN_STORAGE_ROOT="$WORK/data/packs"
-export METAL_CDN_DATABASE_URL="sqlite+aiosqlite:///$WORK/data/metal_cdn.db"
-export METAL_CDN_BASE_PATH="/cdn"
-export METAL_CDN_HOST="127.0.0.1"
-export METAL_CDN_PORT="$PORT"
-export METAL_CDN_EXPERIMENTAL=true
-export METAL_CDN_REQUIRE_AUTH=false
-export METAL_CDN_SESSION_SECRET="smoke-test-secret"
-mkdir -p "$METAL_CDN_STORAGE_ROOT"
+echo "==> start wasmmod-cdn on :$PORT"
+export WASMMOD_CDN_DATA_DIR="$WORK/data"
+export WASMMOD_CDN_STORAGE_ROOT="$WORK/data/packs"
+export WASMMOD_CDN_DATABASE_URL="sqlite+aiosqlite:///$WORK/data/wasmmod_cdn.db"
+export WASMMOD_CDN_BASE_PATH="/cdn"
+export WASMMOD_CDN_HOST="127.0.0.1"
+export WASMMOD_CDN_PORT="$PORT"
+export WASMMOD_CDN_EXPERIMENTAL=true
+export WASMMOD_CDN_REQUIRE_AUTH=false
+export WASMMOD_CDN_SESSION_SECRET="smoke-test-secret"
+mkdir -p "$WASMMOD_CDN_STORAGE_ROOT"
 
-metal-cdn serve >"$WORK/server.log" 2>&1 &
+wasmmod-cdn serve >"$WORK/server.log" 2>&1 &
 SERVER_PID=$!
 
 for i in $(seq 1 40); do
@@ -131,7 +131,7 @@ PY
 
 echo "==> CdnClient against local server"
 python - <<PY
-from pymergetic.metal.cdn_client import CdnClient
+from pymergetic.wasmmod.cdn_client import CdnClient
 c = CdnClient("$CDN_URL")
 h = c.health()
 print("client.health", h)
@@ -147,7 +147,7 @@ import sys
 sys.path.insert(0, "$WASMMOD_DIR/tools")
 from wasmmod_cliutil import CLIENT_MIN_VERSION, require_cdn_client, client_version_ok
 from importlib.metadata import version
-inst = version("pymergetic-metal-cdn-client")
+inst = version("pymergetic-wasmmod-cdn-client")
 print("CLIENT_MIN_VERSION", CLIENT_MIN_VERSION)
 print("installed", inst)
 assert client_version_ok(inst), (inst, CLIENT_MIN_VERSION)
@@ -158,9 +158,9 @@ PY
 echo "==> register + claim via CLI (isolated HOME)"
 export HOME="$WORK/home"
 mkdir -p "$HOME"
-metal-cdn login --url "$CDN_URL" --email "smoke@example.com" --password "smoke-smoke-1" --register
-metal-cdn whoami
-metal-cdn claim smokehello || true
-metal-cdn status
+wasmmod-cdn login --url "$CDN_URL" --email "smoke@example.com" --password "smoke-smoke-1" --register
+wasmmod-cdn whoami
+wasmmod-cdn claim smokehello || true
+wasmmod-cdn status
 
 echo "PASS: PyPI $EXPECT_VER server+client, local CDN, wasmmod client floor"

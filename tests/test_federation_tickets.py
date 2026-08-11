@@ -10,17 +10,17 @@ import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pymergetic.metal.cdn.main import create_app
-from pymergetic.metal.cdn.services.federation.scopes import (
+from pymergetic.wasmmod.cdn.main import create_app
+from pymergetic.wasmmod.cdn.services.federation.scopes import (
     SCOPE_FEDERATION_PUBLISH,
     SCOPE_FEDERATION_READ,
 )
-from pymergetic.metal.cdn.services.federation.tickets import (
+from pymergetic.wasmmod.cdn.services.federation.tickets import (
     generate_keypair,
     sign_ticket,
     verify_ticket,
 )
-from pymergetic.metal.cdn.settings import Settings
+from pymergetic.wasmmod.cdn.settings import Settings
 
 
 def test_ticket_roundtrip() -> None:

@@ -1,7 +1,7 @@
 """Dotted package names → module tree nav."""
 
-from pymergetic.metal.cdn.models import PackageNavNode, PackageVersionOption
-from pymergetic.metal.cdn.services.channel import IndexService
+from pymergetic.wasmmod.cdn.models import PackageNavNode, PackageVersionOption
+from pymergetic.wasmmod.cdn.services.channel import IndexService
 
 
 def _ver(channel: str = "lead", version: str = "0.1.0") -> list[PackageVersionOption]:

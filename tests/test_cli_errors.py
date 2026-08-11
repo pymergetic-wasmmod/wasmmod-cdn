@@ -1,14 +1,14 @@
-"""CLI error formatting (shared by metal-cdn + wasmmod)."""
+"""CLI error formatting (shared by wasmmod-cdn + wasmmod)."""
 
 from __future__ import annotations
 
-from pymergetic.metal.cdn_client import ClientError, format_client_error, format_error
-from pymergetic.metal.cdn_client.errors import hints_for_client_error
+from pymergetic.wasmmod.cdn_client import ClientError, format_client_error, format_error
+from pymergetic.wasmmod.cdn_client.errors import hints_for_client_error
 
 
 def test_format_error_with_hints() -> None:
-    msg = format_error("metal-cdn", "boom", "try this", "and that")
-    assert msg == "metal-cdn: boom\n  try this\n  and that"
+    msg = format_error("wasmmod-cdn", "boom", "try this", "and that")
+    assert msg == "wasmmod-cdn: boom\n  try this\n  and that"
 
 
 def test_409_force_hint() -> None:
@@ -22,11 +22,11 @@ def test_format_client_error_auth() -> None:
     exc = ClientError("unauthorized", status=401)
     text = format_client_error(exc, prog="wasmmod publish")
     assert text.startswith("wasmmod publish: unauthorized")
-    assert "metal-cdn login" in text
+    assert "wasmmod-cdn login" in text
     assert "whoami" in text
 
 
 def test_connection_hint() -> None:
     exc = ClientError("connection failed: Connection refused")
-    text = format_client_error(exc, prog="metal-cdn")
+    text = format_client_error(exc, prog="wasmmod-cdn")
     assert "CDN up" in text

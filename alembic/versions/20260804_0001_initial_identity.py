@@ -21,11 +21,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # create_all in app lifespan covers fresh DBs; this revision documents the
-    # baseline for `metal-cdn db upgrade` / Alembic history.
+    # baseline for `wasmmod-cdn db upgrade` / Alembic history.
     bind = op.get_bind()
     from sqlmodel import SQLModel
 
-    import pymergetic.metal.cdn.models  # noqa: F401
+    import pymergetic.wasmmod.cdn.models  # noqa: F401
 
     SQLModel.metadata.create_all(bind)
 
@@ -34,6 +34,6 @@ def downgrade() -> None:
     bind = op.get_bind()
     from sqlmodel import SQLModel
 
-    import pymergetic.metal.cdn.models  # noqa: F401
+    import pymergetic.wasmmod.cdn.models  # noqa: F401
 
     SQLModel.metadata.drop_all(bind)

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from pymergetic.metal.cdn.settings import Settings
+from pymergetic.wasmmod.cdn.settings import Settings
 
 # Keep in sync with scripts/ensure-secrets.sh DEFAULT_EMAIL.
 DEFAULT_BOOTSTRAP_EMAIL = "demo@cdn.pymergetic.com"

@@ -7,7 +7,7 @@ import zlib
 
 import pytest
 
-from pymergetic.metal.cdn_client.contents import (
+from pymergetic.wasmmod.cdn_client.contents import (
     ensure_zlib_artifacts,
     extract_container_section,
     extract_embedded_bytes,
@@ -215,8 +215,8 @@ def test_without_sig_section_elf_wpse() -> None:
 async def test_publish_stores_contents(tmp_path) -> None:
     from httpx import ASGITransport, AsyncClient
 
-    from pymergetic.metal.cdn.main import create_app
-    from pymergetic.metal.cdn.settings import Settings
+    from pymergetic.wasmmod.cdn.main import create_app
+    from pymergetic.wasmmod.cdn.settings import Settings
 
     settings = Settings(
         data_dir=tmp_path / "data",
@@ -288,7 +288,7 @@ def test_parse_pack_rejects_garbage() -> None:
 
 
 def test_extract_embedded_source_and_pack() -> None:
-    from pymergetic.metal.cdn_client.contents import extract_embedded_file
+    from pymergetic.wasmmod.cdn_client.contents import extract_embedded_file
 
     pack = _pack_v3("hello", [("__init__.py", 1, b"x = 1\n")])
     src = _source("hello", "0.1.0", [("src/__init__.py", b"print('hi')\n")])
@@ -345,7 +345,7 @@ def test_inspect_mpws_signature() -> None:
 
 
 def test_parse_deps_and_publish_fill() -> None:
-    from pymergetic.metal.cdn_client.contents import (
+    from pymergetic.wasmmod.cdn_client.contents import (
         DEPS_SECTION,
         inspect_artifact,
         parse_deps_payload,
@@ -370,7 +370,7 @@ def test_parse_deps_and_publish_fill() -> None:
 
 def test_export_typesig_from_wasm() -> None:
     """Pack binder tag 255 is SIG_AUTO; inspect fills real Wasm types."""
-    from pymergetic.metal.cdn_client.contents import describe_binder_sig
+    from pymergetic.wasmmod.cdn_client.contents import describe_binder_sig
 
     assert describe_binder_sig(255) == "auto"
     assert describe_binder_sig(2) == "(i32, i32) -> i32"
@@ -536,7 +536,7 @@ def test_pack_locations_skips_comment_defs() -> None:
 
 def test_embedded_text_sources_skips_readme() -> None:
     """README.md / docs/ mentioning ``hello(`` must not become locations hits."""
-    from pymergetic.metal.cdn_client.contents.host_ops import _embedded_text_sources
+    from pymergetic.wasmmod.cdn_client.contents.host_ops import _embedded_text_sources
 
     pack = _pack_v3(
         "hello",
@@ -632,8 +632,8 @@ def test_pack_mpy_disasm_hello_elf() -> None:
 async def test_symbols_and_addr2line_api(tmp_path) -> None:
     from httpx import ASGITransport, AsyncClient
 
-    from pymergetic.metal.cdn.main import create_app
-    from pymergetic.metal.cdn.settings import Settings
+    from pymergetic.wasmmod.cdn.main import create_app
+    from pymergetic.wasmmod.cdn.settings import Settings
 
     data = _hello_elf_bytes()
     settings = Settings(

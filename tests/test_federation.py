@@ -8,21 +8,21 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pymergetic.metal.cdn.main import create_app
-from pymergetic.metal.cdn.services.federation.prefix import (
+from pymergetic.wasmmod.cdn.main import create_app
+from pymergetic.wasmmod.cdn.services.federation.prefix import (
     longest_prefix_mount,
     name_under_prefix,
     normalize_mount_prefix,
 )
-from pymergetic.metal.cdn.services.federation.scopes import (
+from pymergetic.wasmmod.cdn.services.federation.scopes import (
     SCOPE_FEDERATION_READ,
     key_allows,
     normalize_scopes,
     scopes_from_storage,
     scopes_to_storage,
 )
-from pymergetic.metal.cdn.services.federation.secrets import decrypt_secret, encrypt_secret
-from pymergetic.metal.cdn.settings import Settings
+from pymergetic.wasmmod.cdn.services.federation.secrets import decrypt_secret, encrypt_secret
+from pymergetic.wasmmod.cdn.settings import Settings
 
 
 def test_normalize_mount_prefix() -> None:

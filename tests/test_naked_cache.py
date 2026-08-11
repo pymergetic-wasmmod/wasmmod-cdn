@@ -6,8 +6,8 @@ import struct
 import time
 import zlib
 
-from pymergetic.metal.cdn.services.naked_cache import NakedDecodeCache, install_naked_cache
-from pymergetic.metal.cdn_client.contents.mpzl import (
+from pymergetic.wasmmod.cdn.services.naked_cache import NakedDecodeCache, install_naked_cache
+from pymergetic.wasmmod.cdn_client.contents.mpzl import (
     install_unwrap_override,
     unwrap_mpzl,
     wrap_mpzl,

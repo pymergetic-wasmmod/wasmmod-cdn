@@ -1,4 +1,4 @@
-from pymergetic.metal.cdn.layout import ChannelLayout
+from pymergetic.wasmmod.cdn.layout import ChannelLayout
 
 
 def test_classify_artifacts() -> None:

@@ -11,8 +11,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
-from pymergetic.metal.cdn_client.format import hexdump
-from pymergetic.metal.cdn_client.verify import enforce_signed_policy, verify_artifact
+from pymergetic.wasmmod.cdn_client.format import hexdump
+from pymergetic.wasmmod.cdn_client.verify import enforce_signed_policy, verify_artifact
 
 
 def _uleb(n: int) -> bytes:

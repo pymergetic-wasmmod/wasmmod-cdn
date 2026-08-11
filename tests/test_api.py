@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pymergetic.metal.cdn.main import create_app
-from pymergetic.metal.cdn.settings import Settings
+from pymergetic.wasmmod.cdn.main import create_app
+from pymergetic.wasmmod.cdn.settings import Settings
 
 
 @pytest.fixture
@@ -153,14 +153,14 @@ async def test_user_and_publish_flow(client: AsyncClient) -> None:
     home = await client.get("/", follow_redirects=True)
     assert home.status_code == 200
     assert b"hello" in home.content
-    assert b"metal-cdn" in home.content
+    assert b"wasmmod-cdn" in home.content
     assert b"Packages" in home.content
     assert b"footer-ver" in home.content
     assert b"footer-health" in home.content
     assert b"footer-links" in home.content
-    assert b"github.com/pymergetic/metal-cdn" in home.content
-    assert b"pypi.org/project/pymergetic-metal-cdn" in home.content
-    assert b"github.com/pymergetic/wasmmod" in home.content
+    assert b"github.com/pymergetic-wasmmod/wasmmod-cdn" in home.content
+    assert b"pypi.org/project/pymergetic-wasmmod-cdn" in home.content
+    assert b"github.com/pymergetic-wasmmod/wasmmod" in home.content
     assert b">ok<" in home.content
 
     pin = await client.get("/channels/pin/0.1.0")

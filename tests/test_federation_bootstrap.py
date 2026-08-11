@@ -9,10 +9,10 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlmodel import select
 
-from pymergetic.metal.cdn.main import create_app
-from pymergetic.metal.cdn.services.federation.registry import FederationRegistry
-from pymergetic.metal.cdn.services.federation.tables import FederationMount, FederationPeer
-from pymergetic.metal.cdn.settings import Settings
+from pymergetic.wasmmod.cdn.main import create_app
+from pymergetic.wasmmod.cdn.services.federation.registry import FederationRegistry
+from pymergetic.wasmmod.cdn.services.federation.tables import FederationMount, FederationPeer
+from pymergetic.wasmmod.cdn.settings import Settings
 
 
 def _settings(tmp_path: Path, **kwargs: object) -> Settings:

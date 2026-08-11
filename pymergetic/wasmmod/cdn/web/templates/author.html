@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ author_email }} — wasmmod-cdn{% endblock %}
+{% block content %}
+<section class="hero">
+  <p class="eyebrow"><a href="{{ href('authors') }}">users</a></p>
+  <h1>{{ author_email }}</h1>
+  <p class="lede">
+    Packages on <code>lead</code> with this maintainer email
+    ({{ packages|length }}).
+  </p>
+</section>
+<section>
+  <h2>Packages</h2>
+  {% if packages %}
+  <ul class="pkg-list">
+    {% for p in packages %}
+    <li>
+      <a href="{{ package_href(p.channel, p.name) }}">{{ p.name }}</a>
+      <span class="ver">{{ p.version }}</span>
+      {% if p.description %}<span class="muted">{{ p.description }}</span>{% endif %}
+      <span class="muted">{{ p.artifact_count }} artifacts</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="muted">No packages list this email as maintainer yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

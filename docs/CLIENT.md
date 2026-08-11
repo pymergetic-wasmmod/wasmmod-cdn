@@ -1,13 +1,13 @@
 # Shared CDN client
 
-PyPI: **`pymergetic-metal-cdn-client`**  
-Import: **`pymergetic.metal.cdn_client`**
+PyPI: **`pymergetic-wasmmod-cdn-client`**  
+Import: **`pymergetic.wasmmod.cdn_client`**
 
 One thin client for the server CLI, wasmmod, and CI. The FastAPI server
-(`pymergetic-metal-cdn`) depends on this package; wasmmod should depend on the
+(`pymergetic-wasmmod-cdn`) depends on this package; wasmmod should depend on the
 **client only**.
 
-Sources: [`pymergetic/metal/cdn_client/`](../pymergetic/metal/cdn_client/)  
+Sources: [`pymergetic/wasmmod/cdn_client/`](../pymergetic/wasmmod/cdn_client/)  
 Packaging: [`client/pyproject.toml`](../client/pyproject.toml) (separate PyPI dist).
 
 ```sh
@@ -29,12 +29,12 @@ OIDC / passkeys will **not** change publish/claim client methods — they only
 change how a Bearer token is obtained. No OAuth redirects or provider SDKs in
 this package.
 
-Config: `~/.config/metal-cdn/config.json`
+Config: `~/.config/wasmmod-cdn/config.json`
 
-Related constellation: [metal-cdn README](https://github.com/pymergetic/metal-cdn#metal-cdn) ·
-[wasmmod](https://github.com/pymergetic/wasmmod) ·
-[wasmmod-tools](https://github.com/pymergetic/wasmmod-tools) ·
-[wasmmod-test](https://github.com/pymergetic/wasmmod-test).
+Related constellation: [wasmmod-cdn README](https://github.com/pymergetic-wasmmod/wasmmod-cdn#wasmmod-cdn) ·
+[wasmmod](https://github.com/pymergetic-wasmmod/wasmmod) ·
+[wasmmod-tools](https://github.com/pymergetic-wasmmod/wasmmod-tools) ·
+[wasmmod-test](https://github.com/pymergetic-wasmmod/wasmmod-test).
 
 ## Surface
 
@@ -51,7 +51,7 @@ Related constellation: [metal-cdn README](https://github.com/pymergetic/metal-cd
 
 ## Public-test first boot (auth on)
 
-`scripts/dev-up.sh` forces **`METAL_CDN_REQUIRE_AUTH=true`** and closed registration.
+`scripts/dev-up.sh` forces **`WASMMOD_CDN_REQUIRE_AUTH=true`** and closed registration.
 Bootstrap identity + seed token live only under **gitignored** `.secrets/`:
 
 ```sh
@@ -61,7 +61,7 @@ Bootstrap identity + seed token live only under **gitignored** `.secrets/`:
 
 | File | Purpose |
 |------|---------|
-| `.secrets/cdn.env` | `METAL_CDN_BOOTSTRAP_ADMIN_EMAIL` / `…_PASSWORD` (create-once admin) |
+| `.secrets/cdn.env` | `WASMMOD_CDN_BOOTSTRAP_ADMIN_EMAIL` / `…_PASSWORD` (create-once admin) |
 | `.secrets/token` | API key for seed/CI (`Authorization: Bearer …`) |
 
 UI login: email from `cdn.env`. Later set a customer password via
@@ -71,29 +71,29 @@ re-minted.
 
 Pack → AOT → sign → zlib stays in wasmmod; this library talks HTTP both ways.
 
-On upload, metal-cdn inspects each `.wasm` / `.aot` / `.elf` / `.zlib` (shared
-`pymergetic.metal.cdn_client.contents`) and stores a `contents` JSON object on
+On upload, wasmmod-cdn inspects each `.wasm` / `.aot` / `.elf` / `.zlib` (shared
+`pymergetic.wasmmod.cdn_client.contents`) and stores a `contents` JSON object on
 the package index entry (`pack_files`, `source_files`, `exports`, `signed`, …).
 Host tools can call `inspect_upload` / `inspect_artifact` directly.
 
 ## Experimental / pre-live
 
-Default **`METAL_CDN_EXPERIMENTAL=true`** advertises a wipe warning (data **will** be
+Default **`WASMMOD_CDN_EXPERIMENTAL=true`** advertises a wipe warning (data **will** be
 wiped often — short tests only, not long-running experiments):
 
 - UI: top banner on all browse pages
 - API: `GET /status`, `GET /health`, `GET /ready` include `experimental` + message
-- Tools: `metal-cdn status`, `metal-cdn publish`, `wasmmod publish` / `cdn` print the warning
+- Tools: `wasmmod-cdn status`, `wasmmod-cdn publish`, `wasmmod publish` / `cdn` print the warning
 
 Disable after go-live:
 
 ```sh
-export METAL_CDN_EXPERIMENTAL=false
+export WASMMOD_CDN_EXPERIMENTAL=false
 # optional custom copy while still on:
-# export METAL_CDN_EXPERIMENTAL_MESSAGE="…"
+# export WASMMOD_CDN_EXPERIMENTAL_MESSAGE="…"
 ```
 
-Publish signature policy (server setting `METAL_CDN_REQUIRE_SIGNED`):
+Publish signature policy (server setting `WASMMOD_CDN_REQUIRE_SIGNED`):
 
 | Mode | Behavior |
 |------|----------|
@@ -111,8 +111,8 @@ Host discovery (pip-style):
 ```sh
 # host CLI (PyPI alpha for now)
 pip install --pre 'pymergetic-wasmmod-tools[cdn]'
-export METAL_CDN_URL=https://cdn.example/cdn
-export METAL_CDN_TOKEN=mcdn_…
+export WASMMOD_CDN_URL=https://cdn.example/cdn
+export WASMMOD_CDN_TOKEN=mcdn_…
 
 wasmmod cdn list
 wasmmod cdn search hello
@@ -124,11 +124,11 @@ wasmmod cdn extract hello -o ./extracted
 wasmmod cdn get hello -o ./packs --unwrap
 wasmmod inspect packs/hello.wasm [--verify --trust root.crt]
 
-# or metal-cdn CLI
-metal-cdn list
-metal-cdn inspect packs/hello.wasm
-metal-cdn trust list|add|rm
-metal-cdn download hello -o ./packs
+# or wasmmod-cdn CLI
+wasmmod-cdn list
+wasmmod-cdn inspect packs/hello.wasm
+wasmmod-cdn trust list|add|rm
+wasmmod-cdn download hello -o ./packs
 ```
 
 ## One-shot (wasmmod)
@@ -138,11 +138,11 @@ pip install --pre 'pymergetic-wasmmod-tools[cdn]'
 export WASMMOD_ROOT=/path/to/wasmmod   # pack needs the checkout
 wasmmod publish examples/hello --version 0.1.0 \
   --key .keys/sign/leaf.key.pem --chain .keys/sign/chain.der \
-  --cdn-url https://cdn.example/cdn --token "$METAL_CDN_TOKEN" --claim
+  --cdn-url https://cdn.example/cdn --token "$WASMMOD_CDN_TOKEN" --claim
 ```
 
 CI: wasmmod `.github/workflows/publish-pack.yml` (build+sign+upload) and
-metal-cdn `.github/workflows/publish-pack.yml` (reusable upload-only).
+wasmmod-cdn `.github/workflows/publish-pack.yml` (reusable upload-only).
 
 ## Web upload
 

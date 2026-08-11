@@ -9,9 +9,9 @@ build/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-pymergetic/metal/cdn/_version.py
+pymergetic/wasmmod/cdn/_version.py
 client/*.egg-info/
-pymergetic_metal_cdn_client.egg-info/
+pymergetic_wasmmod_cdn_client.egg-info/
 .DS_Store
 *.swp
 .env
@@ -36,13 +36,13 @@ pymergetic/metal/inspect/
 !pymergetic/metal/inspect/README.md
 
 # Browser MicroPython REPL binaries (copied from ports/webassembly build)
-pymergetic/metal/cdn/web/static/repl/*.mjs
-pymergetic/metal/cdn/web/static/repl/*.wasm
-pymergetic/metal/cdn/web/static/repl/*.map
-pymergetic/metal/cdn/web/static/repl/mpwm/
-pymergetic/metal/cdn/web/static/repl/mp-wm/
-pymergetic/metal/cdn/web/static/repl/mp/
-pymergetic/metal/cdn/web/static/repl/upy/
-!pymergetic/metal/cdn/web/static/repl/README.md
-!pymergetic/metal/cdn/web/static/repl/.gitkeep
+pymergetic/wasmmod/cdn/web/static/repl/*.mjs
+pymergetic/wasmmod/cdn/web/static/repl/*.wasm
+pymergetic/wasmmod/cdn/web/static/repl/*.map
+pymergetic/wasmmod/cdn/web/static/repl/mpwm/
+pymergetic/wasmmod/cdn/web/static/repl/mp-wm/
+pymergetic/wasmmod/cdn/web/static/repl/mp/
+pymergetic/wasmmod/cdn/web/static/repl/upy/
+!pymergetic/wasmmod/cdn/web/static/repl/README.md
+!pymergetic/wasmmod/cdn/web/static/repl/.gitkeep
 metal-unix

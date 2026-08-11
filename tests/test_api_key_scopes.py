@@ -7,13 +7,13 @@ from pathlib import Path
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from pymergetic.metal.cdn.main import create_app
-from pymergetic.metal.cdn.services.federation.scopes import (
+from pymergetic.wasmmod.cdn.main import create_app
+from pymergetic.wasmmod.cdn.services.federation.scopes import (
     SCOPE_FEDERATION_PUBLISH,
     SCOPE_FEDERATION_READ,
     scopes_permit_request,
 )
-from pymergetic.metal.cdn.settings import Settings
+from pymergetic.wasmmod.cdn.settings import Settings
 
 
 def test_scopes_permit_matrix() -> None:

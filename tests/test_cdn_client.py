@@ -1,4 +1,4 @@
-"""Shared pymergetic.metal.cdn_client surface against a live ASGI app."""
+"""Shared pymergetic.wasmmod.cdn_client surface against a live ASGI app."""
 
 from __future__ import annotations
 
@@ -11,10 +11,10 @@ from urllib.parse import urlparse
 import pytest
 from starlette.testclient import TestClient
 
-import pymergetic.metal.cdn_client.client as client_mod
-from pymergetic.metal.cdn.main import create_app
-from pymergetic.metal.cdn.settings import Settings
-from pymergetic.metal.cdn_client import (
+import pymergetic.wasmmod.cdn_client.client as client_mod
+from pymergetic.wasmmod.cdn.main import create_app
+from pymergetic.wasmmod.cdn.settings import Settings
+from pymergetic.wasmmod.cdn_client import (
     TOKEN_SOURCE_API_KEY,
     CdnClient,
     ClientError,

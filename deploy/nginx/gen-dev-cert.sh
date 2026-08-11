@@ -11,5 +11,5 @@ fi
 openssl req -x509 -nodes -newkey rsa:2048 -days 825 \
   -keyout "$DIR/dev.key" \
   -out "$DIR/dev.crt" \
-  -subj "/CN=localhost/O=metal-cdn-dev"
+  -subj "/CN=localhost/O=wasmmod-cdn-dev"
 echo "wrote $DIR/dev.crt"

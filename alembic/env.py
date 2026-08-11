@@ -1,4 +1,4 @@
-"""Alembic env — uses METAL_CDN_DATABASE_URL / Settings when available."""
+"""Alembic env — uses WASMMOD_CDN_DATABASE_URL / Settings when available."""
 
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlmodel import SQLModel
 
 # Import models so metadata is populated.
-import pymergetic.metal.cdn.models  # noqa: F401
-import pymergetic.metal.cdn.services.federation.tables  # noqa: F401
-from pymergetic.metal.cdn.settings import get_settings
+import pymergetic.wasmmod.cdn.models  # noqa: F401
+import pymergetic.wasmmod.cdn.services.federation.tables  # noqa: F401
+from pymergetic.wasmmod.cdn.settings import get_settings
 
 config = context.config
 if config.config_file_name is not None:

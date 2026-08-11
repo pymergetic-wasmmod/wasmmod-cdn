@@ -1,6 +1,6 @@
 # Screenshots
 
-Stills from the live / local metal-cdn UI (used in the root README).
+Stills from the live / local wasmmod-cdn UI (used in the root README).
 
 | File | Scene |
 |------|--------|

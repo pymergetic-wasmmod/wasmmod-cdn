@@ -1,4 +1,4 @@
-# Reusable workflow: upload prebuilt wasmmod artifacts to a metal-cdn instance.
+# Reusable workflow: upload prebuilt wasmmod artifacts to a wasmmod-cdn instance.
 # Pack → AOT → sign → zlib should run in the caller (see wasmmod's publish-pack.yml).
 name: publish-pack
 
@@ -18,7 +18,7 @@ on:
         required: true
         type: string
       cdn_url:
-        description: metal-cdn base URL (e.g. https://cdn.example/cdn)
+        description: wasmmod-cdn base URL (e.g. https://cdn.example/cdn)
         required: true
         type: string
       claim:
@@ -36,7 +36,7 @@ on:
         type: string
         default: ""
     secrets:
-      METAL_CDN_TOKEN:
+      WASMMOD_CDN_TOKEN:
         required: true
 
 jobs:
@@ -50,12 +50,12 @@ jobs:
           python-version: "3.12"
 
       - name: Install CDN client
-        run: pip install pymergetic-metal-cdn-client
+        run: pip install pymergetic-wasmmod-cdn-client
 
       - name: Publish
         env:
-          METAL_CDN_URL: ${{ inputs.cdn_url }}
-          METAL_CDN_TOKEN: ${{ secrets.METAL_CDN_TOKEN }}
+          WASMMOD_CDN_URL: ${{ inputs.cdn_url }}
+          WASMMOD_CDN_TOKEN: ${{ secrets.WASMMOD_CDN_TOKEN }}
           PACKAGE: ${{ inputs.package }}
           VERSION: ${{ inputs.version }}
           ARTIFACTS: ${{ inputs.artifacts }}
@@ -66,7 +66,7 @@ jobs:
           python - <<'PY'
           import os, shlex, sys
           from pathlib import Path
-          from pymergetic.metal.cdn_client import CdnClient, ClientError
+          from pymergetic.wasmmod.cdn_client import CdnClient, ClientError
 
           package = os.environ["PACKAGE"]
           version = os.environ["VERSION"]
@@ -74,7 +74,7 @@ jobs:
           missing = [p for p in files if not p.is_file()]
           if missing:
               sys.exit(f"missing artifacts: {missing}")
-          client = CdnClient(os.environ["METAL_CDN_URL"], token=os.environ["METAL_CDN_TOKEN"])
+          client = CdnClient(os.environ["WASMMOD_CDN_URL"], token=os.environ["WASMMOD_CDN_TOKEN"])
           if os.environ.get("CLAIM", "").lower() == "true":
               try:
                   print("claim:", client.claim(package))

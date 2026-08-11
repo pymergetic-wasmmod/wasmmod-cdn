@@ -53,7 +53,7 @@ order; import/`load_pack` probes filenames under each root. No index fetch yet.
 **Planned:** resolve `name` or `name@version` via `index.json`, then fetch the
 listed artifact URLs (still multi-root fallback).
 
-## Inspect HTTP (metal-cdn API)
+## Inspect HTTP (wasmmod-cdn API)
 
 Thin wrap over shared ``pymergetic.wasmmod.tools.inspect``
 (``pip install --pre pymergetic-wasmmod-tools``; Docker installs it at image build).
