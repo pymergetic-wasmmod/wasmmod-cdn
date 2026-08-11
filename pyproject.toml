@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Rouven Raudzus", email = "raudzus@pymergetic.com" }]
 dependencies = [
-    "pymergetic-wasmmod-cdn-client>=0.1.0a3",
+    "pymergetic-wasmmod-cdn-client>=0.2.0a1",
     "cryptography>=42",
     "httpx>=0.27.0",
     "fastapi>=0.115.0",
@@ -69,7 +69,7 @@ namespaces = true
 
 [tool.setuptools_scm]
 version_file = "pymergetic/wasmmod/cdn/_version.py"
-fallback_version = "0.1.0a5"
+fallback_version = "0.2.0a1"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

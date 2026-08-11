@@ -9,7 +9,7 @@ authors = [{ name = "Rouven Raudzus", email = "raudzus@pymergetic.com" }]
 dependencies = [
   "pydantic>=2.7",
   "cryptography>=42",
-  "pymergetic-wasmmod-tools>=0.1.0a1",
+  "pymergetic-wasmmod-tools>=0.2.0a1",
 ]
 
 [project.urls]
@@ -37,7 +37,7 @@ namespaces = true
 # Version is exposed via importlib.metadata (editable/wheel); no version_file
 # write (setuptools-scm resolves that path from client/ cwd and fails).
 root = ".."
-fallback_version = "0.1.0a5"
+fallback_version = "0.2.0a1"
 
 [tool.ruff]
 line-length = 100
