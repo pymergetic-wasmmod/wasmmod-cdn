@@ -8,13 +8,16 @@ Async FastAPI channel for signed wasmmod packs — browse, publish, inspect
 
 > **Experimental.** Data on the public demo is wiped often. Short tests only — not for production.
 
-| Component | Role | Repo |
-|-----------|------|------|
-| wasmmod | Runtime + pack tree (`pymergetic-wasmmod`) | [pymergetic-wasmmod/wasmmod](https://github.com/pymergetic-wasmmod/wasmmod) · `main` |
-| wasmmod-tools | Host CLI (`pymergetic-wasmmod-tools`) | [pymergetic-wasmmod/wasmmod-tools](https://github.com/pymergetic-wasmmod/wasmmod-tools) · `main` |
-| wasmmod-test | External pack/CDN consumer sample | [pymergetic-wasmmod/wasmmod-test](https://github.com/pymergetic-wasmmod/wasmmod-test) · `main` |
-| **wasmmod-cdn** | **This repo** — CDN server + client | [pymergetic-wasmmod/wasmmod-cdn](https://github.com/pymergetic-wasmmod/wasmmod-cdn) · `main` |
-| metalpython | Metal product µPy — rebuilt on the wasmmod engine | [pymergetic/metalpython](https://github.com/pymergetic/metalpython) · `main` |
+| Pill | Role | Repo |
+|------|------|------|
+| wasmmod | packs, loader, io, cdn client | [pymergetic-wasmmod/wasmmod](https://github.com/pymergetic-wasmmod/wasmmod) · `main` |
+| **upywm** | upy + wasmmod (CDN engine `upywm`) | [pymergetic-wasmmod/micropython-wasmmod](https://github.com/pymergetic-wasmmod/micropython-wasmmod) · `main` |
+| **mp** | upywm + metal (CDN engine `mp`) | [pymergetic/metalpython](https://github.com/pymergetic/metalpython) · `main` |
+| **upy** | vanilla µPy (CDN engine `upy`) | [micropython/micropython](https://github.com/micropython/micropython) |
+| **metal** | `pymergetic.metal` on mp | [pymergetic/metal](https://github.com/pymergetic/metal) · `main` (cards); `preview` = doom runtime |
+| **wasmmod-cdn** | **This repo** — catalog / inspect / shells | [pymergetic-wasmmod/wasmmod-cdn](https://github.com/pymergetic-wasmmod/wasmmod-cdn) · `main` |
+
+**This repo** builds browser engines `mp` / `upywm` / `upy`. It does not own the runtime.
 
 <p align="center">
   <img src="screenshots/browse-hello.png" alt="Package browse — hello on lead, dependents, µPy ready" width="820" />
