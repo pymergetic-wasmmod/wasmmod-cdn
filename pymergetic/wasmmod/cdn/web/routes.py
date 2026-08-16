@@ -157,7 +157,9 @@ async def publish_page(request: Request, indexes: IndexServiceDep) -> HTMLRespon
 
 
 @web_router.get("/federation", response_class=HTMLResponse, include_in_schema=False)
-async def federation_page(request: Request, indexes: IndexServiceDep) -> HTMLResponse:
+async def federation_page(
+    request: Request, indexes: IndexServiceDep
+) -> HTMLResponse | RedirectResponse:
     ctx = await _shell_context(
         indexes, active_channel="lead", page="federation", request=request
     )
