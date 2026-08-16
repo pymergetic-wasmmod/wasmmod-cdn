@@ -77,14 +77,16 @@ def render_autoexec(
     session_id: str = "",
     principal: str = "anon",
     driver: str = "wasmmod-cdn",
-    engine: str = "mpwm",
+    engine: str = "upywm",
 ) -> str:
     """Return Python source for a fresh REPL session.
 
     ``engine=mp`` → metal post-ready CDN autoexec (boot tree is C in the seat).
-    ``mpwm`` / ``upy`` → classic CDN shell template.
+    ``upywm`` / ``upy`` → classic CDN shell template. ``mpwm`` is an alias for ``upywm``.
     """
-    eng = (engine or "mpwm").strip().lower()
+    eng = (engine or "upywm").strip().lower()
+    if eng in ("mpwm", "mp-wm"):
+        eng = "upywm"
     if eng == "mp":
         metal = _metal_wasm_template()
         if metal is not None:

@@ -120,7 +120,7 @@ Engine trees are **siblings of this repo** (or set env) — not an os-sdk `packa
 | Engine | Env | Default sibling |
 |--------|-----|-----------------|
 | `mp` | `METALPYTHON` | `../metalpython` |
-| `mpwm` | `METALPYTHON_WM` | `../metalpython-wasmmod` |
+| `upywm` | `UPYWM` (alias `METALPYTHON_WM`) | `../micropython-wasmmod` |
 | `upy` | `MICROPYTHON` | `../micropython` |
 
 ```sh
@@ -131,7 +131,7 @@ Engine trees are **siblings of this repo** (or set env) — not an os-sdk `packa
 ```
 
 Flags: `--no-upy`, `--no-seed`, `--seed-only`, `--reseed`.  
-Env: `MICROPYTHON`, `METALPYTHON_WM`, `METALPYTHON`, `WASMMOD_CDN_URL`, `WASMMOD_CDN_PORT`, `WASMMOD_CDN_SESSION_SECRET`.  
+Env: `MICROPYTHON`, `UPYWM` (alias `METALPYTHON_WM`), `METALPYTHON`, `WASMMOD_CDN_URL`, `WASMMOD_CDN_PORT`, `WASMMOD_CDN_SESSION_SECRET`.  
 Details: [docs/CLIENT.md](docs/CLIENT.md#public-test-first-boot-auth-on).
 
 ### Public TLS edge

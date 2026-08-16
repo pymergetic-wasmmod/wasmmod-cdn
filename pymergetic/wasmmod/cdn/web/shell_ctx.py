@@ -112,7 +112,7 @@ async def _shell_context(
             experimental_repl = True
             repl_dir = Path(__file__).resolve().parent / "static" / "repl"
             # mp = CDN lead pymergetic.metal.arch.wasm (static/repl/mp fallback).
-            # mpwm / upy stay local static engines.
+            # upywm / upy stay local static engines.
             ARCH_WASM_PKG = "pymergetic.metal.arch.wasm"
             arch_mjs_href = ""
             try:
@@ -130,7 +130,7 @@ async def _shell_context(
 
             engine_specs = (
                 ("mp", "mp", "metal arch.wasm seat (CDN lead)"),
-                ("mpwm", "mpwm", "wasmmod host only (no metal arch)"),
+                ("upywm", "upywm", "wasmmod host only (no metal arch)"),
                 ("upy", "upy", "vanilla upstream MicroPython"),
             )
             all_mtimes: list[int] = []
@@ -138,14 +138,16 @@ async def _shell_context(
                 eng_dir = repl_dir / subdir
                 mjs = eng_dir / "micropython.mjs"
                 wasm = eng_dir / "micropython.wasm"
-                # Accept former mp-wm/ dir during transition.
-                if eng_id == "mpwm" and not mjs.is_file():
-                    legacy = repl_dir / "mp-wm"
-                    if (legacy / "micropython.mjs").is_file():
-                        eng_dir = legacy
-                        mjs = eng_dir / "micropython.mjs"
-                        wasm = eng_dir / "micropython.wasm"
-                        subdir = "mp-wm"
+                # Accept former mpwm/ and mp-wm/ dirs during the pill rename.
+                if eng_id == "upywm" and not mjs.is_file():
+                    for legacy_name in ("mpwm", "mp-wm"):
+                        legacy = repl_dir / legacy_name
+                        if (legacy / "micropython.mjs").is_file():
+                            eng_dir = legacy
+                            mjs = eng_dir / "micropython.mjs"
+                            wasm = eng_dir / "micropython.wasm"
+                            subdir = legacy_name
+                            break
                     else:
                         mjs = repl_dir / "micropython.mjs"
                         wasm = repl_dir / "micropython.wasm"
@@ -184,7 +186,7 @@ async def _shell_context(
                 )
             ready_ids = [e["id"] for e in repl_engines if e["ready"]]
             repl_ready = bool(ready_ids)
-            for pref in ("mp", "mpwm", "upy"):
+            for pref in ("mp", "upywm", "upy"):
                 if pref in ready_ids:
                     repl_default_engine = pref
                     break

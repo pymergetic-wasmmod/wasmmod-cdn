@@ -39,6 +39,7 @@ pymergetic/metal/inspect/
 pymergetic/wasmmod/cdn/web/static/repl/*.mjs
 pymergetic/wasmmod/cdn/web/static/repl/*.wasm
 pymergetic/wasmmod/cdn/web/static/repl/*.map
+pymergetic/wasmmod/cdn/web/static/repl/upywm/
 pymergetic/wasmmod/cdn/web/static/repl/mpwm/
 pymergetic/wasmmod/cdn/web/static/repl/mp-wm/
 pymergetic/wasmmod/cdn/web/static/repl/mp/

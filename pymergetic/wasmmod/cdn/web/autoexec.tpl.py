@@ -124,7 +124,7 @@ def _boot():
 def packages(limit=40, refresh=False):
     """List lead-channel package names.
 
-    Default: boot-refreshed list (live on mp/mpwm, baked snapshot on upy).
+    Default: boot-refreshed list (live on mp/upywm, baked snapshot on upy).
     refresh=True: call wasm.catalog() again (extra Asyncify fetch).
     """
     global _LEAD_PACKAGES, _PACKAGES_SRC
@@ -154,7 +154,7 @@ def packages(limit=40, refresh=False):
     if why:
         print("WARN:", why)
         if src == "snapshot":
-            print("WARN: switch engine to mp / mpwm for live catalog + imports")
+            print("WARN: switch engine to mp / upywm for live catalog + imports")
     n = len(names)
     show = names[: max(0, int(limit))]
     for name in show:
@@ -196,7 +196,7 @@ def help(topic=None):
         print("└── exports(hello)       inspect after import")
         return
     if t == "packages":
-        print("packages(limit=40) lists names from boot (live on mp/mpwm).")
+        print("packages(limit=40) lists names from boot (live on mp/upywm).")
         print("packages(refresh=True) re-fetches wasm.catalog().")
         print("On stock upy: WARN + baked snapshot (names only; import fails).")
         print("Browse UI:", BROWSE_URL)

@@ -1,18 +1,18 @@
 # Browser MicroPython assets (not committed)
 
-Three **sibling** checkouts next to `wasmmod-cdn` (or set env). Pill order: **mp · mpwm · upy**.
+Three **sibling** checkouts next to `wasmmod-cdn` (or set env). Pill order: **mp · upywm · upy**.
 
 | Dir | Env | Sibling folder | Role |
 |-----|-----|----------------|------|
 | `mp/` | `METALPYTHON` | `../metalpython` | build of metal **arch.wasm** (also published to CDN) |
-| `mpwm/` | `METALPYTHON_WM` | `../metalpython-wasmmod` | upy + wasmmod only |
+| `upywm/` | `UPYWM` | `../micropython-wasmmod` | upy + wasmmod only (old engine id: `mpwm`) |
 | `upy/` | `MICROPYTHON` | `../micropython` | vanilla upstream µPy |
 
 **`mp` source of truth:** lead pack `pymergetic.metal.arch.wasm` (`.mjs` + `.wasm`).
 `static/repl/mp/` is a local fallback when that pack is missing (dev before `--firmware`).
 
 `mp` autoexec is metal’s `arch/wasm/autoexec.py` (post-ready CDN hook only; boot tree runs in C).
-`mpwm`/`upy` keep the CDN shell template. Arch / host / kernel packs stay Inspect-only for guest Play.
+`upywm`/`upy` keep the CDN shell template. Arch / host / kernel packs stay Inspect-only for guest Play.
 
 Spines (metal): **arch** seat · **port** µPy entry · **wamr_host** (firmware hosts guests) · **wasmmod** engine.
 

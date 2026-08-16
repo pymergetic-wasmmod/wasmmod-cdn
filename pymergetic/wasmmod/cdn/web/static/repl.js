@@ -1,7 +1,7 @@
 /**
  * wasmmod-cdn browser MicroPython shell — one panel, N engine *instances*.
  *
- * Engines: mp | mpwm | upy (vanilla) — each keeps its own runtime + transcript.
+ * Engines: mp | upywm | upy (vanilla) — each keeps its own runtime + transcript.
  * Pill click = focus that instance (others stay warm).
  */
 (() => {
@@ -593,10 +593,10 @@
       );
       return;
     }
-    // Prefer mp/mpwm for pack try; vanilla upy can't import wasm packs.
+    // Prefer mp/upywm for pack try; vanilla upy can't import wasm packs.
     if (engineId === "upy") {
       const mpBtn = panel.querySelector('[data-mpy-engine="mp"]:not([disabled])');
-      const wm = panel.querySelector('[data-mpy-engine="mpwm"]:not([disabled])');
+      const wm = panel.querySelector('[data-mpy-engine="upywm"]:not([disabled])');
       const btn = mpBtn || wm;
       if (btn) {
         focusEngine(btn.getAttribute("data-mpy-engine"), btn.getAttribute("data-mjs-href"));

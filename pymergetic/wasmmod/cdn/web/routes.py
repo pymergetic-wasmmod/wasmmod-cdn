@@ -41,7 +41,7 @@ async def repl_autoexec(
     shells: ShellSessionServiceDep,
     user: OptionalUserDep,
 ) -> PlainTextResponse:
-    """Return ``autoexec.py``: metal arch.wasm boot (mp) or CDN shell (mpwm/upy)."""
+    """Return ``autoexec.py``: metal arch.wasm boot (mp) or CDN shell (upywm/upy)."""
     settings = getattr(request.app.state, "settings", None)
     if settings is not None and not getattr(settings, "experimental_repl", True):
         raise HTTPException(status_code=404, detail="experimental_repl disabled")

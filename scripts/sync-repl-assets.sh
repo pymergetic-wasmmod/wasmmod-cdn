@@ -4,9 +4,9 @@
 # Usage:
 #   sync-repl-assets.sh /path/to/build-dir [engine-id]
 #
-# engine-id: mp | mpwm | upy  (default: mp)
+# engine-id: mp | upywm | upy  (default: mp)
 # Writes static/repl/<engine-id>/{micropython.mjs,micropython.wasm,…}
-# Also mirrors mpwm to static/repl/ for legacy paths.
+# Also mirrors mp/upywm to static/repl/ for legacy flat paths.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="${1:-}"
@@ -15,14 +15,14 @@ DEST_ROOT="$ROOT/pymergetic/wasmmod/cdn/web/static/repl"
 DEST="$DEST_ROOT/$ENGINE"
 
 if [[ -z "$SRC" || ! -d "$SRC" ]]; then
-  echo "usage: $0 /path/to/ports/webassembly/build-* [mp|mpwm|upy]" >&2
+  echo "usage: $0 /path/to/ports/webassembly/build-* [mp|upywm|upy]" >&2
   exit 2
 fi
 case "$ENGINE" in
-  mp|mpwm|upy) ;;
-  mp-wm) ENGINE=mpwm; DEST="$DEST_ROOT/$ENGINE" ;; # alias
+  mp|upywm|upy) ;;
+  mpwm|mp-wm) ENGINE=upywm; DEST="$DEST_ROOT/$ENGINE" ;;
   *)
-    echo "FAIL: engine-id must be mp, mpwm, or upy (got $ENGINE)" >&2
+    echo "FAIL: engine-id must be mp, upywm, or upy (got $ENGINE)" >&2
     exit 2
     ;;
 esac
@@ -39,7 +39,7 @@ if [[ ! -f "$DEST/micropython.mjs" ]]; then
   exit 1
 fi
 
-if [[ "$ENGINE" == "mpwm" || "$ENGINE" == "mp" ]]; then
+if [[ "$ENGINE" == "upywm" || "$ENGINE" == "mp" ]]; then
   for f in micropython.mjs micropython.wasm micropython.min.mjs; do
     if [[ -f "$DEST/$f" ]]; then
       cp -f "$DEST/$f" "$DEST_ROOT/$f"
