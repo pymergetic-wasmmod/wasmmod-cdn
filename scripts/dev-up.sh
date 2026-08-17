@@ -720,8 +720,9 @@ step_unix() {
 step_firmware() {
   # Arch seat images → CDN (same shelf; NOT bare "metal", NOT Python guests).
   #   pymergetic.metal.arch.x86_64 — BIOS ELF32 trampoline + UEFI BOOTX64
-  #   pymergetic.metal.arch.x86    — i686 Multiboot ELF32 + UEFI BOOTIA32
   #   pymergetic.metal.arch.wasm   — .mjs + .wasm (CDN UI `mp` engine)
+  # arch.x86 is not published: there is no 32-bit board, and republishing the
+  # 64-bit image under an i686 name hands the CDN an unbootable artifact.
   local mp port jobs outdir
   local wasm_pkg="pymergetic.metal.arch.wasm"
   local wasm_build wasm_src mjs_src wasm_pub mjs_pub
@@ -741,8 +742,6 @@ step_firmware() {
 
   pub_arch_firmware pymergetic.metal.arch.x86_64 \
     X86_64_BIOS X86_64_UEFI BOOTX64.EFI "$port" "$outdir" "$jobs"
-  pub_arch_firmware pymergetic.metal.arch.x86 \
-    X86_BIOS X86_UEFI BOOTIA32.EFI "$port" "$outdir" "$jobs"
 
   # Browser arch.wasm seat → CDN (UI `mp` pill loads these lead artifacts).
   wasm_build="$mp/ports/webassembly/build-metal"
@@ -885,8 +884,6 @@ echo "OK  UI     $CDN_URL/"
 if [[ "$DO_FIRMWARE" -eq 1 ]]; then
   ok_lead fw "pymergetic.metal.arch.x86_64.elf" || true
   ok_lead "" "pymergetic.metal.arch.x86_64.efi" || true
-  ok_lead "" "pymergetic.metal.arch.x86.elf" || true
-  ok_lead "" "pymergetic.metal.arch.x86.efi" || true
   ok_lead "" "pymergetic.metal.arch.wasm.wasm" || true
   ok_lead "" "pymergetic.metal.arch.wasm.mjs" || true
 fi
