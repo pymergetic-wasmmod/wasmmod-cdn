@@ -515,10 +515,25 @@ step_seed() {
   pub_pkg "${EX}.test_a2.test_b2.test_c2" "{\"${EX}.test_a2.test_d2\":\"0.1.0\"}" "$packs/${EX}.test_a2.test_b2.test_c2.wasm"
 
   # First-party host engine (self-describing micropython.wasm + wasmmod.source).
-  local eng_src eng_pub
-  eng_src="$mp/ports/webassembly/build-wasmmod/pymergetic.wasmmod.wasm"
-  [[ -f "$eng_src" ]] || eng_src="$mp/ports/webassembly/build-wasmmod/micropython.wasm"
-  if [[ -f "$eng_src" ]]; then
+  # This is the wasmmod-only engine, which build_and_sync_engine builds as
+  # BUILD=build-wasmmod in the upywm tree. metalpython's webassembly seat is
+  # build-metal and ships separately as pymergetic.metal.arch.wasm, so looking
+  # for build-wasmmod there found nothing and the publish was skipped on every
+  # run. Take the upywm tree when it is around, and still accept a
+  # build-wasmmod under $mp for a tree that built the engine in place.
+  local eng_src eng_pub eng_tree eng_try upywm
+  eng_src=""
+  upywm="$(find_upywm 2>/dev/null || true)"
+  for eng_tree in "$upywm" "$mp"; do
+    [[ -n "$eng_tree" ]] || continue
+    for eng_try in pymergetic.wasmmod.wasm micropython.wasm; do
+      if [[ -f "$eng_tree/ports/webassembly/build-wasmmod/$eng_try" ]]; then
+        eng_src="$eng_tree/ports/webassembly/build-wasmmod/$eng_try"
+        break 2
+      fi
+    done
+  done
+  if [[ -n "$eng_src" ]]; then
     eng_pub="$packs/pymergetic.wasmmod.wasm"
     cp -f "$eng_src" "$eng_pub"
     echo "SIGN $eng_pub (host engine)"
@@ -528,7 +543,8 @@ step_seed() {
       "$eng_pub"
     pub_pkg pymergetic.wasmmod "$eng_pub"
   else
-    echo "WARN: no host engine wasm at build-wasmmod — skip pymergetic.wasmmod publish" >&2
+    echo "WARN: no host engine wasm at ${upywm:-<no upywm tree>}/ports/webassembly/build-wasmmod" \
+      "— skip pymergetic.wasmmod publish (build it with dev-up.sh --upy)" >&2
   fi
 
   # Metal platform packs (kernel + Inspect face) — Play off, Inspect on.
@@ -793,16 +809,20 @@ yank_pkg_if_present() {
   fi
 }
 
+# Returns 1 when this seat cannot be uploaded. The caller decides whether that
+# is fatal: a missing uploader used to exit 1 from here, so `--full` threw away
+# the engines, packs, images and containers it had just built over the line
+# before it.
 step_bootserver() {
   local mp up
   mp="$(find_metalpython)" || {
-    echo "FAIL: metalpython not found (set METALPYTHON=…)" >&2
-    exit 1
+    echo "WARN: metalpython not found (set METALPYTHON=…) — skip bootserver" >&2
+    return 1
   }
   up="$mp/extmod/metal/deploy/upload-bootserver"
   [[ -x "$up" || -f "$up" ]] || {
-    echo "FAIL: missing $up" >&2
-    exit 1
+    echo "WARN: no uploader at $up — skip bootserver" >&2
+    return 1
   }
   # Boot server = iPXE NBP + metal.ipxe only. Images from PXE-reachable CDN
   # (NOT local docker 127.0.0.1 — PXE clients cannot reach the build host).
@@ -864,8 +884,15 @@ if [[ "$DO_UNIX" -eq 1 ]]; then
   step_unix
 fi
 
+BOOTSERVER_OK=0
 if [[ "$DO_BOOTSERVER" -eq 1 ]]; then
-  step_bootserver
+  if step_bootserver; then
+    BOOTSERVER_OK=1
+  elif [[ "$DO_UPY" -eq 0 && "$DO_DOCKER" -eq 0 && "$DO_SEED" -eq 0 \
+    && "$DO_FIRMWARE" -eq 0 && "$DO_UNIX" -eq 0 ]]; then
+    # Nothing else was asked for, so the run did only this and it did not happen.
+    exit 1
+  fi
 fi
 
 ok_lead() {
@@ -891,10 +918,12 @@ if [[ "$DO_UNIX" -eq 1 ]]; then
   ok_lead unix "pymergetic.metal.unix.x86_64.elf" || true
   ok_lead "" "pymergetic.metal.unix.x86.elf" || true
 fi
-if [[ "$DO_BOOTSERVER" -eq 1 ]]; then
+if [[ "$BOOTSERVER_OK" -eq 1 ]]; then
   pxe_cdn="${METAL_PXE_CDN_URL:-https://cdn.pymergetic.com/cdn}"
   echo "    pxe    ${METAL_PXE_HOST:-192.168.10.1} = iPXE NBP + metal.ipxe only"
   echo "           images ← ${pxe_cdn}/artifacts/lead/pymergetic.metal.arch.*"
+elif [[ "$DO_BOOTSERVER" -eq 1 ]]; then
+  echo "    pxe    skipped (no uploader) — boot server untouched"
 fi
 echo "    auth   REQUIRE_AUTH on — login ${WASMMOD_CDN_BOOTSTRAP_ADMIN_EMAIL:-demo@…}"
 echo "    secrets $SECRETS_ENV  |  token $SECRETS_TOKEN"
