@@ -1,47 +1,42 @@
-{% extends "base.html" %}
-{% block title %}{{ name }} — wasmmod-cdn{% endblock %}
-{% block head %}
-  <link rel="stylesheet" href="{{ href('static', 'vendor', 'github-dark.min.css') }}" />
-{% endblock %}
-{% block content %}
+{% args d %}
 <section class="hero">
   <p class="eyebrow">package</p>
-  {% if fed_origin == 'remote' %}
+  {% if d.fed_origin == 'remote' %}
   <p class="fed-banner" role="status">
     <span class="pill pill-remote">remote</span>
-    Federated via {{ fed_peer_label or 'peer CDN' }}.
-    {% if fed_peer_browse_url %}
-    <a href="{{ fed_peer_browse_url }}" rel="noopener" target="_blank">Visit on remote CDN</a>
+    Federated via {{ d.fed_peer_label }}.
+    {% if d.fed_peer_browse_url %}
+    <a href="{{ d.fed_peer_browse_url }}" rel="noopener" target="_blank">Visit on remote CDN</a>
     {% endif %}
   </p>
   {% endif %}
-  {% if package_role in ('host', 'kernel', 'arch', 'engine') %}
+  {% if d.package_role in ('host', 'kernel', 'arch', 'engine') %}
   <p class="fed-banner" role="status">
-    <span class="pill pill-{{ package_role }}">{{ package_role }}</span>
-    {% if is_unix_seat|default(false) %}
+    <span class="pill pill-{{ d.package_role }}">{{ d.package_role }}</span>
+    {% if d.is_unix_seat %}
     Unix host seat — curl the lead <code>.elf</code>, <code>chmod +x</code>, run. Inspect + download; Play disabled.
-    {% elif package_role == 'engine' %}
+    {% elif d.package_role == 'engine' %}
     CDN engine — browser host that loads guests / packs. Inspect + download; Play disabled.
-    {% elif package_role == 'arch' and name.endswith('.wasm') %}
+    {% elif d.package_role == 'arch' and d.name.endswith('.wasm') %}
     Architecture seat (browser) — CDN UI <code>mp</code> engine loads these artifacts. Inspect + download; Play disabled.
-    {% elif package_role == 'arch' %}
+    {% elif d.package_role == 'arch' %}
     Architecture image — freestanding firmware; Inspect + download; iPXE loads these URLs. Play disabled.
     {% else %}
-    Platform {{ package_role }} — Inspect only; Play/Try guest-load is disabled.
+    Platform {{ d.package_role }} — Inspect only; Play/Try guest-load is disabled.
     {% endif %}
   </p>
   {% endif %}
   <div class="hero-title-row">
-    <h1>{{ name }}{% if package_role in ('host', 'kernel', 'arch', 'engine') %} <span class="pill pill-{{ package_role }}">{{ package_role }}</span>{% endif %}</h1>
-    {% if package_versions %}
+    <h1>{{ d.name }}{% if d.package_role in ('host', 'kernel', 'arch', 'engine') %} <span class="pill pill-{{ d.package_role }}">{{ d.package_role }}</span>{% endif %}</h1>
+    {% if d.package_versions %}
     <label class="pkg-ver-picker">
       <span class="muted">channel</span>
       <select id="pkg-version-select" aria-label="Package version">
-        {% for v in package_versions %}
+        {% for v in d.package_versions %}
         <option
           value="{{ v.channel }}"
-          data-href="{{ package_href(v.channel, name) }}"
-          {% if v.channel == channel %}selected{% endif %}
+          data-href="{{ v.href }}"
+          {% if v.is_current %}selected{% endif %}
         >{{ v.label }}</option>
         {% endfor %}
       </select>
@@ -49,100 +44,98 @@
     {% endif %}
   </div>
   <p class="lede">
-    {% if channel == "lead" %}
-    lead · {{ entry.version }}
+    {% if d.channel == "lead" %}
+    lead · {{ d.entry.version }}
     {% else %}
-    pin {{ channel }} · {{ entry.version }}
+    pin {{ d.channel }} · {{ d.entry.version }}
     {% endif %}
-    {% if entry.license %} · {{ entry.license }}{% endif %}
-    {% if package_versions and package_versions|length > 1 %}
-    · <a href="#history">{{ package_versions|length }} channels</a>
+    {% if d.entry.license %} · {{ d.entry.license }}{% endif %}
+    {% if d.package_versions_len > 1 %}
+    · <a href="#history">{{ d.package_versions_len }} channels</a>
     {% endif %}
   </p>
-  {% if entry.description %}
-  <p>{{ entry.description }}</p>
+  {% if d.entry.description %}
+  <p>{{ d.entry.description }}</p>
   {% endif %}
-  {% if entry.homepage %}
-  <p><a href="{{ entry.homepage }}" rel="noopener">{{ entry.homepage }}</a></p>
+  {% if d.entry.homepage %}
+  <p><a href="{{ d.entry.homepage }}" rel="noopener">{{ d.entry.homepage }}</a></p>
   {% endif %}
-  {% if entry.yanked %}
-  <p class="muted">Yanked{% if entry.yank_reason %}: {{ entry.yank_reason }}{% endif %}</p>
+  {% if d.entry.yanked %}
+  <p class="muted">Yanked{% if d.entry.yank_reason %}: {{ d.entry.yank_reason }}{% endif %}</p>
   {% endif %}
-  {% if entry.deprecated %}
+  {% if d.entry.deprecated %}
   <p class="muted">Deprecated</p>
   {% endif %}
-  {% if entry.successor %}
-  <p>Successor: <code>{{ entry.successor }}</code></p>
+  {% if d.entry.successor %}
+  <p>Successor: <code>{{ d.entry.successor }}</code></p>
   {% endif %}
 </section>
 
 <section class="about">
   <h2>About</h2>
   <dl class="meta-grid">
-    <dt>Package</dt><dd><code>{{ name }}</code></dd>
+    <dt>Package</dt><dd><code>{{ d.name }}</code></dd>
     <dt>Version</dt>
     <dd>
-      <a href="#history"><code>{{ entry.version }}</code></a>
-      {% if channel == "lead" %}
+      <a href="#history"><code>{{ d.entry.version }}</code></a>
+      {% if d.channel == "lead" %}
       <span class="pill pill-lead">lead</span>
       {% endif %}
     </dd>
     <dt>Channel</dt>
-    <dd><a href="{{ channel_href(channel) }}"><code>{{ channel }}</code></a></dd>
-    {% if entry.maintainer_email %}
+    <dd><a href="{{ d.channel_href }}"><code>{{ d.channel }}</code></a></dd>
+    {% if d.author_href %}
     <dt>Author</dt>
-    <dd><a href="{{ author_href(entry.maintainer_email) }}">{{ entry.maintainer_email }}</a></dd>
+    <dd><a href="{{ d.author_href }}">{{ d.entry.maintainer_email }}</a></dd>
     {% endif %}
-    {% if entry.license %}
-    <dt>License</dt><dd>{{ entry.license }}</dd>
+    {% if d.entry.license %}
+    <dt>License</dt><dd>{{ d.entry.license }}</dd>
     {% endif %}
-    {% if entry.homepage %}
-    <dt>Homepage</dt><dd><a href="{{ entry.homepage }}" rel="noopener">{{ entry.homepage }}</a></dd>
+    {% if d.entry.homepage %}
+    <dt>Homepage</dt><dd><a href="{{ d.entry.homepage }}" rel="noopener">{{ d.entry.homepage }}</a></dd>
     {% endif %}
-    {% if entry.aot_version is not none %}
-    <dt>AOT</dt><dd>{{ entry.aot_version }}</dd>
+    {% if d.entry.aot_version %}
+    <dt>AOT</dt><dd>{{ d.entry.aot_version }}</dd>
     {% endif %}
   </dl>
 </section>
 
-{% if entry.deps %}
+{% if d.deps_links %}
 <section>
   <h2>Dependencies</h2>
   <p class="muted">Packages this one needs (<code>[deps]</code> / MPWD). Green = exact version published; red = missing/yanked.</p>
   <ul class="pkg-list">
-    {% for dep, ver in entry.deps.items() %}
-    {% set ok = (deps_ok or {}).get(dep, false) %}
+    {% for dep in d.deps_links %}
     <li>
-      <a class="dep-chip {% if ok %}dep-chip-ok{% else %}dep-chip-bad{% endif %}"
-         href="{{ package_href('lead', dep) }}"><code>{{ dep }}</code></a>
-      <a class="ver" href="{{ package_href('@' ~ ver, dep) }}">{{ ver }}</a>
-      {% if not ok %}<span class="pill pill-warn">unfit</span>{% endif %}
+      <a class="dep-chip {% if dep.ok %}dep-chip-ok{% else %}dep-chip-bad{% endif %}"
+         href="{{ dep.href }}"><code>{{ dep.name }}</code></a>
+      <a class="ver" href="{{ dep.ver_href }}">{{ dep.ver }}</a>
+      {% if not dep.ok %}<span class="pill pill-warn">unfit</span>{% endif %}
     </li>
     {% endfor %}
   </ul>
 </section>
 {% endif %}
-{% if needed_by %}
+{% if d.needed_links %}
 <section>
   <h2>Needed by</h2>
   <p class="muted">Known published packages that list this one in their <code>[deps]</code>.</p>
   <ul class="pkg-list">
-    {% for dep in needed_by %}
+    {% for dep in d.needed_links %}
     <li>
-      <a class="dep-chip{% if needed_by|length > 1 %} dep-chip-rev{% endif %}"
-         href="{{ package_href('lead', dep) }}"><code>{{ dep }}</code></a>
+      <a class="dep-chip{{ dep.cls }}" href="{{ dep.href }}"><code>{{ dep.name }}</code></a>
     </li>
     {% endfor %}
   </ul>
 </section>
 {% endif %}
-{% if package_versions %}
+{% if d.package_versions %}
 <section id="history">
   <h2>Version history</h2>
   <p class="muted">Lead channel plus immutable pins. Click a row to open that publish.</p>
   <div class="pkg-table-wrap">
     <table class="pkg-table pkg-history" id="pkg-history"
-           data-show="3" data-total="{{ package_versions|length }}">
+           data-show="3" data-total="{{ d.package_versions_len }}">
       <thead>
         <tr>
           <th scope="col">Channel</th>
@@ -151,11 +144,11 @@
         </tr>
       </thead>
       <tbody>
-        {% for v in package_versions %}
-        <tr class="{% if v.channel == channel %}is-current{% endif %}{% if loop.index0 >= 3 %} history-fold{% endif %}"
-            {% if loop.index0 >= 3 %}hidden{% endif %}>
+        {% for v in d.package_versions %}
+        <tr class="{% if v.is_current %}is-current{% endif %}{% if v.folded %} history-fold{% endif %}"
+            {% if v.folded %}hidden{% endif %}>
           <td>
-            <a href="{{ package_href(v.channel, name) }}">
+            <a href="{{ v.href }}">
               {% if v.channel == 'lead' %}
               <span class="pill pill-lead">lead</span>
               {% else %}
@@ -163,18 +156,18 @@
               {% endif %}
             </a>
           </td>
-          <td><a class="ver" href="{{ package_href(v.channel, name) }}">{{ v.version }}</a></td>
+          <td><a class="ver" href="{{ v.href }}">{{ v.version }}</a></td>
           <td class="mono">{{ v.artifact_count }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  {% if package_versions|length > 3 %}
+  {% if d.version_fold_count > 0 %}
   <p class="history-more-wrap">
     <button type="button" class="history-more-btn" id="history-more-btn"
             aria-expanded="false" aria-controls="pkg-history">
-      Show {{ package_versions|length - 3 }} older
+      Show {{ d.version_fold_count }} older
     </button>
   </p>
   {% endif %}
@@ -192,7 +185,6 @@
   const table = document.getElementById("pkg-history");
   if (!btn || !table) return;
   const folded = () => Array.from(table.querySelectorAll("tr.history-fold"));
-  // Keep the active channel visible even if it's past the fold.
   folded().forEach((tr) => {
     if (tr.classList.contains("is-current")) tr.hidden = false;
   });
@@ -214,7 +206,7 @@
 })();
 </script>
 {% endif %}
-{% if is_unix_seat|default(false) and channel == "lead" %}
+{% if d.is_unix_seat and d.channel == "lead" %}
 <section>
   <h2>Run (curl)</h2>
   <p class="muted">
@@ -222,13 +214,13 @@
     Inspect / download also in <a href="#artifact-list">Artifacts</a>.
   </p>
   <ul class="pkg-list artifact-list" id="unix-run-list">
-    {% for a in entry.artifacts if a.encoding.value == 'raw' and a.path.endswith('.elf') %}
+    {% for a in d.run_artifacts %}
     <li class="artifact-row">
       <div class="artifact-main">
         <span class="artifact-open is-static"><code>curl and run</code></span>
-        <span class="muted artifact-meta">{{ a.path }} · {{ a.size|human_size }}</span>
+        <span class="muted artifact-meta">{{ a.path }} · {{ a.size_str }}</span>
       </div>
-      <pre class="ipxe-snippet" tabindex="0">curl -fsSL {{ cdn_base }}/artifacts/lead/{{ a.path }} -o metal-unix
+      <pre class="ipxe-snippet" tabindex="0">curl -fsSL {{ d.cdn_base }}/artifacts/lead/{{ a.path }} -o metal-unix
 chmod +x metal-unix
 ./metal-unix</pre>
     </li>
@@ -236,12 +228,7 @@ chmod +x metal-unix
   </ul>
 </section>
 {% endif %}
-{% if is_arch_seat|default(false) and channel == "lead" %}
-{% set ns = namespace(has_fw=false) %}
-{% for a in entry.artifacts if a.encoding.value == 'raw' and (a.path.endswith('.elf') or a.path.endswith('.efi')) %}
-  {% set ns.has_fw = true %}
-{% endfor %}
-{% if ns.has_fw %}
+{% if d.is_arch_seat and d.channel == "lead" and (d.has_elf or d.has_efi) %}
 <section>
   <h2>Netboot (iPXE)</h2>
   <p class="muted">
@@ -251,110 +238,85 @@ chmod +x metal-unix
   <ul class="pkg-list artifact-list" id="netboot-list">
     <li class="artifact-row">
       <div class="artifact-main">
-        <a class="artifact-open" href="{{ cdn_base }}/static/netboot/undionly.kpxe" download="undionly.kpxe"><code>undionly.kpxe</code></a>
+        <a class="artifact-open" href="{{ d.cdn_base }}/static/netboot/undionly.kpxe" download="undionly.kpxe"><code>undionly.kpxe</code></a>
         <span class="muted artifact-meta">BIOS · first-stage NBP (HTTPS-capable Metal build)</span>
       </div>
       <div class="artifact-actions">
-        <a class="icon-btn download-btn" href="{{ cdn_base }}/static/netboot/undionly.kpxe" download="undionly.kpxe" title="Download undionly.kpxe" aria-label="Download undionly.kpxe">
+        <a class="icon-btn download-btn" href="{{ d.cdn_base }}/static/netboot/undionly.kpxe" download="undionly.kpxe" title="Download undionly.kpxe" aria-label="Download undionly.kpxe">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
         </a>
       </div>
     </li>
     <li class="artifact-row">
       <div class="artifact-main">
-        <a class="artifact-open" href="{{ cdn_base }}/static/netboot/ipxe.efi" download="ipxe.efi"><code>ipxe.efi</code></a>
+        <a class="artifact-open" href="{{ d.cdn_base }}/static/netboot/ipxe.efi" download="ipxe.efi"><code>ipxe.efi</code></a>
         <span class="muted artifact-meta">UEFI · first-stage NBP (HTTPS-capable Metal build)</span>
       </div>
       <div class="artifact-actions">
-        <a class="icon-btn download-btn" href="{{ cdn_base }}/static/netboot/ipxe.efi" download="ipxe.efi" title="Download ipxe.efi" aria-label="Download ipxe.efi">
+        <a class="icon-btn download-btn" href="{{ d.cdn_base }}/static/netboot/ipxe.efi" download="ipxe.efi" title="Download ipxe.efi" aria-label="Download ipxe.efi">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
         </a>
       </div>
     </li>
     <li class="artifact-row">
       <div class="artifact-main">
-        <a class="artifact-open" href="{{ cdn_base }}/static/netboot/metal.ipxe" download="metal.ipxe"><code>metal.ipxe</code></a>
+        <a class="artifact-open" href="{{ d.cdn_base }}/static/netboot/metal.ipxe" download="metal.ipxe"><code>metal.ipxe</code></a>
         <span class="muted artifact-meta">iPXE script · chains CDN lead <code>arch.*.elf/efi</code></span>
       </div>
       <div class="artifact-actions">
-        <a class="icon-btn download-btn" href="{{ cdn_base }}/static/netboot/metal.ipxe" download="metal.ipxe" title="Download metal.ipxe" aria-label="Download metal.ipxe">
+        <a class="icon-btn download-btn" href="{{ d.cdn_base }}/static/netboot/metal.ipxe" download="metal.ipxe" title="Download metal.ipxe" aria-label="Download metal.ipxe">
           <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg>
         </a>
       </div>
     </li>
-    {% for a in entry.artifacts if a.encoding.value == 'raw' and a.path.endswith('.elf') %}
+    {% for a in d.ipxe_artifacts %}
     <li class="artifact-row">
       <div class="artifact-main">
-        <span class="artifact-open is-static"><code>BIOS · snippet</code></span>
-        <span class="muted artifact-meta">kernel → copy into iPXE / metal.ipxe</span>
+        <span class="artifact-open is-static"><code>{% if a.ends_efi %}UEFI · snippet{% else %}BIOS · snippet{% endif %}</code></span>
+        <span class="muted artifact-meta">{% if a.ends_efi %}chain{% else %}kernel{% endif %} → copy into iPXE / metal.ipxe</span>
       </div>
       <pre class="ipxe-snippet" tabindex="0">#!ipxe
-kernel {{ cdn_base }}/artifacts/lead/{{ a.path }}
-boot</pre>
-    </li>
-    {% endfor %}
-    {% for a in entry.artifacts if a.encoding.value == 'raw' and a.path.endswith('.efi') %}
-    <li class="artifact-row">
-      <div class="artifact-main">
-        <span class="artifact-open is-static"><code>UEFI · snippet</code></span>
-        <span class="muted artifact-meta">chain → copy into iPXE / metal.ipxe</span>
-      </div>
-      <pre class="ipxe-snippet" tabindex="0">#!ipxe
-chain {{ cdn_base }}/artifacts/lead/{{ a.path }}
+{% if a.ends_efi %}chain{% else %}kernel{% endif %} {{ d.cdn_base }}/artifacts/lead/{{ a.path }}
 boot</pre>
     </li>
     {% endfor %}
   </ul>
 </section>
 {% endif %}
-{% endif %}
 <section>
   <h2>Artifacts</h2>
   <p class="muted">
-    {% if is_arch_seat|default(false) and name.endswith('.wasm') %}
+    {% if d.is_arch_seat and d.name.endswith('.wasm') %}
     Browser arch seat — <code>.mjs</code> / <code>.wasm</code> for the CDN shell <code>mp</code> pill. Click to inspect.
-    {% elif is_arch_seat|default(false) %}
+    {% elif d.is_arch_seat %}
     Freestanding arch seat images — click to inspect (sections / signature / hex). Download or use the Netboot rows above in iPXE.
     {% else %}
     Click a name to inspect pack guts. The commander navigates package · version · artifact · section · symbol with dual hex/asm/source views.
     {% endif %}
   </p>
   <ul class="pkg-list artifact-list" id="artifact-list">
-    {% for a in entry.artifacts %}
-    {% if channel == "lead" %}
-      {% set dl_href = href('artifacts', 'lead', a.path) %}
-      {% set inspect_href = href('artifacts', 'lead', a.path, 'inspect') %}
-      {% set files_base = href('artifacts', 'lead', a.path, 'files') %}
-      {% set files_raw = href('artifacts', 'lead', a.path, 'files', 'raw') %}
-      {% set sections_raw = href('artifacts', 'lead', a.path, 'sections', 'raw') %}
-    {% else %}
-      {% set dl_href = href('artifacts', 'pin', channel[1:], a.path) %}
-      {% set inspect_href = href('artifacts', 'pin', channel[1:], a.path, 'inspect') %}
-      {% set files_base = href('artifacts', 'pin', channel[1:], a.path, 'files') %}
-      {% set files_raw = href('artifacts', 'pin', channel[1:], a.path, 'files', 'raw') %}
-      {% set sections_raw = href('artifacts', 'pin', channel[1:], a.path, 'sections', 'raw') %}
-    {% endif %}
+    {% for a in d.entry.artifacts %}
     <li class="artifact-row"
         data-filename="{{ a.path }}"
-        data-package="{{ name }}"
-        data-channel="{{ channel }}"
-        {% if channel != "lead" %}data-version="{{ channel[1:] }}"{% endif %}
-        data-inspect="{{ inspect_href }}"
-        data-files="{{ files_base }}"
-        data-files-raw="{{ files_raw }}"
-        data-sections-raw="{{ sections_raw }}">
+        data-package="{{ d.name }}"
+        data-channel="{{ d.channel }}"
+        {% if d.channel != "lead" %}data-version="{{ a.version_arg }}"{% endif %}
+        data-inspect="{{ a.inspect_href }}"
+        data-files="{{ a.files_base }}"
+        data-files-raw="{{ a.files_raw }}"
+        data-sections-raw="{{ a.sections_raw }}">
       <div class="artifact-main">
         <button type="button" class="artifact-open" aria-expanded="false">
           <code>{{ a.path }}</code>
         </button>
         <span class="muted artifact-meta">
-          {% if is_arch_seat|default(false) and a.path.endswith('.efi.zlib') %}UEFI twin · {% elif is_arch_seat|default(false) and a.path.endswith('.elf.zlib') %}BIOS twin · {% elif is_arch_seat|default(false) and a.path.endswith('.efi') %}UEFI · {% elif is_arch_seat|default(false) and a.path.endswith('.elf') %}BIOS · {% endif %}{{ a.kind.value }} · {{ a.encoding.value }} · {{ a.size|human_size }}
+          {% if d.is_arch_seat and a.ends_efi_zlib %}UEFI twin · {% elif d.is_arch_seat and a.ends_elf_zlib %}BIOS twin · {% elif d.is_arch_seat and a.ends_efi %}UEFI · {% elif d.is_arch_seat and a.ends_elf %}BIOS · {% endif %}{{ a.kind }} · {{ a.encoding }} · {{ a.size_str }}
         </span>
         <div class="artifact-actions">
           <button type="button" class="icon-btn inspect-open-btn"
             data-filename="{{ a.path }}"
-            data-package="{{ name }}"
-            {% if channel != "lead" %}data-version="{{ channel[1:] }}"{% endif %}
+            data-package="{{ d.name }}"
+            {% if d.channel != "lead" %}data-version="{{ a.version_arg }}"{% endif %}
             title="Inspect {{ a.path }}"
             aria-label="Inspect {{ a.path }}">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -363,15 +325,15 @@ boot</pre>
               <circle cx="12" cy="12" r="3.25" fill="none" stroke="currentColor" stroke-width="1.75"/>
             </svg>
           </button>
-          <a class="icon-btn download-btn" href="{{ dl_href }}" download="{{ a.path }}" title="Download {{ a.path }}" aria-label="Download {{ a.path }}">
+          <a class="icon-btn download-btn" href="{{ a.dl_href }}" download="{{ a.path }}" title="Download {{ a.path }}" aria-label="Download {{ a.path }}">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path fill="currentColor" d="M12 3a1 1 0 0 1 1 1v9.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/>
             </svg>
           </a>
-          {% if experimental_repl and repl_ready and package_role not in ('host', 'kernel', 'arch', 'engine') and (a.path.endswith('.wasm') or a.path.endswith('.wasm.zlib') or '.aot' in a.path) %}
-          <button type="button" class="icon-btn try-btn" data-mpy-try="{{ name }}"
-                  title="Try in µPy shell: import {{ name }}; exports({{ name }})"
-                  aria-label="Try {{ name }} in MicroPython shell">
+          {% if d.show_try and a.is_wasm %}
+          <button type="button" class="icon-btn try-btn" data-mpy-try="{{ d.name }}"
+                  title="Try in µPy shell: import {{ d.name }}; exports({{ d.name }})"
+                  aria-label="Try {{ d.name }} in MicroPython shell">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
               <path fill="currentColor" d="M8 5.14v14l11-7-11-7Z"/>
             </svg>
@@ -384,15 +346,15 @@ boot</pre>
     {% endfor %}
   </ul>
 </section>
-{% if entry.contents %}
+{% if d.entry.contents %}
 <section>
   <h2>Package contents (index)</h2>
   <p class="muted">
-    {% if entry.contents.name %}pack <code>{{ entry.contents.name }}</code>{% endif %}
-    {% if entry.contents.pkg_version %} · {{ entry.contents.pkg_version }}{% endif %}
-    · signed={{ entry.contents.signed }}
-    · pack={{ entry.contents.has_pack }}
-    · source={{ entry.contents.has_source }}
+    {% if d.entry.contents.name %}pack <code>{{ d.entry.contents.name }}</code>{% endif %}
+    {% if d.entry.contents.pkg_version %} · {{ d.entry.contents.pkg_version }}{% endif %}
+    · signed={{ d.entry.contents.signed }}
+    · pack={{ d.entry.contents.has_pack }}
+    · source={{ d.entry.contents.has_source }}
   </p>
 </section>
 {% endif %}
@@ -413,31 +375,31 @@ boot</pre>
   <pre id="source-dialog-body" class="source-body"></pre>
 </dialog>
 
-<script src="{{ href('static', 'vendor', 'highlight.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-python.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-c.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-cpp.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-rust.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-javascript.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-typescript.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-json.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-markdown.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-ini.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-yaml.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-xml.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-bash.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-makefile.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-cmake.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-diff.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-llvm.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-go.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-java.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-sql.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-ruby.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-perl.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-dockerfile.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-lisp.min.js') }}"></script>
-<script src="{{ href('static', 'vendor', 'lang-x86asm.min.js') }}"></script>
+<script src="{{ d.vendor_0 }}"></script>
+<script src="{{ d.vendor_1 }}"></script>
+<script src="{{ d.vendor_2 }}"></script>
+<script src="{{ d.vendor_3 }}"></script>
+<script src="{{ d.vendor_4 }}"></script>
+<script src="{{ d.vendor_5 }}"></script>
+<script src="{{ d.vendor_6 }}"></script>
+<script src="{{ d.vendor_7 }}"></script>
+<script src="{{ d.vendor_8 }}"></script>
+<script src="{{ d.vendor_9 }}"></script>
+<script src="{{ d.vendor_10 }}"></script>
+<script src="{{ d.vendor_11 }}"></script>
+<script src="{{ d.vendor_12 }}"></script>
+<script src="{{ d.vendor_13 }}"></script>
+<script src="{{ d.vendor_14 }}"></script>
+<script src="{{ d.vendor_15 }}"></script>
+<script src="{{ d.vendor_16 }}"></script>
+<script src="{{ d.vendor_17 }}"></script>
+<script src="{{ d.vendor_18 }}"></script>
+<script src="{{ d.vendor_19 }}"></script>
+<script src="{{ d.vendor_20 }}"></script>
+<script src="{{ d.vendor_21 }}"></script>
+<script src="{{ d.vendor_22 }}"></script>
+<script src="{{ d.vendor_23 }}"></script>
+<script src="{{ d.vendor_24 }}"></script>
 <script>
 (() => {
   const list = document.getElementById("artifact-list");
@@ -950,4 +912,3 @@ boot</pre>
   });
 })();
 </script>
-{% endblock %}

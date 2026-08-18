@@ -1,6 +1,4 @@
-{% extends "base.html" %}
-{% block title %}Federation — {{ brand_name }}{% endblock %}
-{% block content %}
+{% args d %}
 <section class="hero">
   <p class="eyebrow">admin</p>
   <h1>Federation</h1>
@@ -10,7 +8,7 @@
   </p>
 </section>
 
-<div id="fed-root" class="fed-page" data-base="{{ base_path }}">
+<div id="fed-root" class="fed-page" data-base="{{ d.base_path }}">
   <p id="fed-msg" class="muted" role="status"></p>
 
   <section class="fed-panel" aria-labelledby="fed-status-h">
@@ -72,5 +70,4 @@
   </section>
 </div>
 
-<script src="{{ href('static', 'federation.js') }}{% if site_css_v %}?v={{ site_css_v }}{% endif %}" defer></script>
-{% endblock %}
+<script src="{{ d.federation_js }}" defer></script>

@@ -1,4 +1,4 @@
-"""Jinja-templated browse UI + embedded OpenAPI docs."""
+"""utemplate rendered browse UI + embedded OpenAPI docs."""
 
 from __future__ import annotations
 
@@ -16,12 +16,14 @@ from pymergetic.wasmmod.cdn.web.context import (
     _cdn_base_url,
     _url,
     configure_web,
+    render_page,
     resolve_brand_logo_url,
-    templates,
 )
 from pymergetic.wasmmod.cdn.web.page_helpers import _channel_page, _package_page
 from pymergetic.wasmmod.cdn.web.repl_autoexec import render_autoexec
 from pymergetic.wasmmod.cdn.web.shell_ctx import _shell_context
+
+from pymergetic.wasmmod.cdn.web import render as _render
 
 __all__ = ["configure_web", "resolve_brand_logo_url", "web_router"]
 
@@ -126,37 +128,51 @@ async def package_pin(
 async def authors_page(request: Request, indexes: IndexServiceDep) -> HTMLResponse:
     maintainers = await indexes.list_maintainers()
     ctx = await _shell_context(indexes, active_channel="lead", page="users", request=request)
-    ctx.update({"maintainers": maintainers})
-    return templates.TemplateResponse(request, "users.html", ctx)
+    ctx.update({"maintainers": _render.shape_maintainers(maintainers),
+                "maintainers_len": len(maintainers)})
+    return HTMLResponse(_render.render_page("users.html", ctx))
 
 
 @web_router.get("/authors/{email}", response_class=HTMLResponse)
 async def author_page(request: Request, email: str, indexes: IndexServiceDep) -> HTMLResponse:
     packages = await indexes.packages_by_maintainer(email)
     ctx = await _shell_context(indexes, active_channel="lead", page="users", request=request)
-    ctx.update({"author_email": email, "packages": packages})
-    return templates.TemplateResponse(request, "author.html", ctx)
+    ctx.update({"author_email": email, "packages": _render.shape_author_packages(packages),
+                "packages_len": len(packages)})
+    return HTMLResponse(_render.render_page("author.html", ctx))
 
 
 @web_router.get("/docs", response_class=HTMLResponse, include_in_schema=False)
 async def api_docs(request: Request, indexes: IndexServiceDep) -> HTMLResponse:
     ctx = await _shell_context(indexes, active_channel="lead", page="docs", request=request)
-    return templates.TemplateResponse(request, "docs.html", ctx)
+    ctx.update({
+        "main_class": "main-docs",
+        "openapi_url": _url("openapi.json"),
+        "page_head": (
+            '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" />\n'
+            f'<link rel="stylesheet" href="{_url("static", "swagger-theme.css")}" />'),
+    })
+    return HTMLResponse(_render.render_page("docs.html", ctx))
 
 
 @web_router.get("/login", response_class=HTMLResponse, include_in_schema=False)
 async def login_page(request: Request, indexes: IndexServiceDep) -> HTMLResponse:
     ctx = await _shell_context(indexes, active_channel="lead", page="login", request=request)
-    return templates.TemplateResponse(request, "login.html", ctx)
+    return HTMLResponse(_render.render_page("login.html", ctx))
 
 
 @web_router.get("/publish", response_class=HTMLResponse, include_in_schema=False)
 async def publish_page(request: Request, indexes: IndexServiceDep) -> HTMLResponse:
     ctx = await _shell_context(indexes, active_channel="lead", page="publish", request=request)
-    return templates.TemplateResponse(request, "publish.html", ctx)
+    return HTMLResponse(_render.render_page("publish.html", ctx))
 
 
-@web_router.get("/federation", response_class=HTMLResponse, include_in_schema=False)
+@web_router.get(
+    "/federation",
+    response_class=HTMLResponse,
+    response_model=None,
+    include_in_schema=False,
+)
 async def federation_page(
     request: Request, indexes: IndexServiceDep
 ) -> HTMLResponse | RedirectResponse:
@@ -170,7 +186,9 @@ async def federation_page(
         )
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="admin required")
-    return templates.TemplateResponse(request, "federation.html", ctx)
+    ctx["federation_js"] = _url("static", "federation.js") + (
+        f"?v={ctx.get('site_css_v')}" if ctx.get("site_css_v") else "")
+    return HTMLResponse(_render.render_page("federation.html", ctx))
 
 
 @web_router.get("/sessions", response_class=HTMLResponse, include_in_schema=False)
@@ -192,10 +210,9 @@ async def sessions_page(
     )
     ctx.update(
         {
-            "shell_sessions": rows,
-            "shell_activities": activities,
+            "shell_sessions": _render.shape_sessions(rows[:12], activities),
             "principal_label": label,
             "principal_web_id": principal_web_id,
         }
     )
-    return templates.TemplateResponse(request, "sessions.html", ctx)
+    return HTMLResponse(_render.render_page("sessions.html", ctx))

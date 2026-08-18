@@ -1,53 +1,49 @@
-"""Jinja env, URL helpers, brand logo resolution."""
+"""URL helpers, brand logo resolution, and utemplate render factory.
+
+Replaces the Jinja2Templates environment with the shared micro utemplate render
+layer in :mod:`render`. The browse UI is one source of templates rendered by
+both the CDN (here) and the on-device metal seat (which calls the same functions
+against its own vendored copy).
+"""
+
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from fastapi import Request
-from fastapi.templating import Jinja2Templates
 
 from pymergetic.wasmmod.cdn import __version__
-from pymergetic.wasmmod.cdn.paths import author_path, channel_path, join_base, package_path
-from pymergetic.wasmmod.cdn_client.format import human_size
-
-TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
-templates.env.globals["app_name"] = "wasmmod-cdn"
-templates.env.globals["app_version"] = __version__
-templates.env.globals["project_url"] = "https://github.com/pymergetic-wasmmod/wasmmod-cdn"
-templates.env.globals["pypi_url"] = "https://pypi.org/project/pymergetic-wasmmod-cdn/"
-templates.env.globals["wasmmod_url"] = "https://github.com/pymergetic-wasmmod/wasmmod"
-templates.env.globals["base_path"] = ""
-templates.env.filters["human_size"] = human_size
-templates.env.globals["human_size"] = human_size
-
-_base_path: str = "/"
+from pymergetic.wasmmod.cdn.paths import channel_path, package_path
+from pymergetic.wasmmod.cdn.web import render as _render
 
 
 def configure_web(base_path: str) -> None:
     """Bind URL helpers to the configured mount prefix."""
-    global _base_path
-    _base_path = base_path
-    templates.env.globals["base_path"] = "" if base_path == "/" else base_path
-    templates.env.globals["href"] = lambda *parts: join_base(base_path, *parts)
-    templates.env.globals["channel_href"] = lambda channel: join_base(
-        base_path, channel_path(channel if isinstance(channel, str) else channel.name)
-    )
-    templates.env.globals["package_href"] = lambda channel, name: join_base(
-        base_path,
-        package_path(channel if isinstance(channel, str) else channel.name, name),
-    )
-    templates.env.globals["author_href"] = lambda email: join_base(
-        base_path, author_path(str(email))
-    )
+    _render.configure_web(base_path)
 
 
-configure_web("/")
+def href(*parts: str) -> str:
+    return _render.href(*parts)
+
+
+def channel_href(channel) -> str:
+    return _render.href(channel_path(channel if isinstance(channel, str) else channel.name))
+
+
+def package_href(channel, name) -> str:
+    return _render.href(package_path(channel if isinstance(channel, str) else channel.name, name))
 
 
 def _url(*parts: str) -> str:
-    return join_base(_base_path, *parts)
+    return _render._url(*parts)
+
+
+def render_page(name: str, ctx: dict) -> str:
+    """Render a body template wrapped in the shared shell (server-side)."""
+    return _render.render_page(name, ctx)
+
+
+configure_web("/")
 
 
 def resolve_brand_logo_url(settings: Any, *, default_href: str) -> str:
@@ -79,6 +75,7 @@ def _cdn_base_url(request: Request) -> str:
     if q.startswith(("http://", "https://")) and " " not in q and len(q) < 512:
         return q
     origin = f"{request.url.scheme}://{request.url.netloc}"
-    if _base_path in ("", "/"):
+    base = getattr(_render, "_base_path", "/")
+    if base in ("", "/"):
         return origin
-    return origin + _base_path.rstrip("/")
+    return origin + base.rstrip("/")

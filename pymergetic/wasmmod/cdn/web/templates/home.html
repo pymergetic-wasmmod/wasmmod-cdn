@@ -1,6 +1,4 @@
-{% extends "base.html" %}
-{% block title %}Packages — wasmmod-cdn{% endblock %}
-{% block content %}
+{% args d %}
 <section class="hero">
   <p class="eyebrow">browse</p>
   <h1>Packages</h1>
@@ -11,7 +9,7 @@
 </section>
 
 <section class="pkg-catalog" id="pkg-catalog"
-  data-count="{{ catalog|length if catalog is defined else 0 }}">
+  data-count="{{ d.catalog_len }}">
   <div class="pkg-toolbar">
     <label class="pkg-search">
       <span class="visually-hidden">Search packages</span>
@@ -66,7 +64,7 @@
     <p class="pkg-count muted" id="pkg-count"></p>
   </div>
 
-  {% if catalog %}
+  {% if d.catalog %}
   <div class="pkg-table-wrap">
     <table class="pkg-table" id="pkg-table">
       <thead>
@@ -81,66 +79,59 @@
         </tr>
       </thead>
       <tbody>
-        {% for pkg in catalog %}
+        {% for pkg in d.catalog %}
         <tr class="pkg-row{% if pkg.origin == 'remote' %} is-remote{% endif %}"
-            data-name="{{ pkg.name|lower }}"
-            data-search="{{ (pkg.name ~ ' ' ~ (pkg.maintainer_email or '') ~ ' ' ~ (pkg.description or '') ~ ' ' ~ (pkg.deps.keys()|list|join(' ')) ~ ' ' ~ (pkg.needed_by|join(' ')) ~ ' ' ~ (pkg.peer_label or '') ~ ' ' ~ (pkg.origin or ''))|lower }}"
+            data-name="{{ pkg.name_lower }}"
+            data-search="{{ pkg.data_search }}"
             data-channel="{{ pkg.channel }}"
-            data-origin="{{ pkg.origin or 'local' }}"
-            data-yanked="{{ '1' if pkg.yanked else '0' }}"
-            data-deprecated="{{ '1' if pkg.deprecated else '0' }}"
-            data-updated="{{ pkg.updated_at.isoformat() if pkg.updated_at else '' }}"
+            data-origin="{{ pkg.origin }}"
+            data-yanked="{{ pkg.data_yanked }}"
+            data-deprecated="{{ pkg.data_deprecated }}"
+            data-updated="{{ pkg.data_updated }}"
             data-arts="{{ pkg.artifact_count }}"
             data-versions="{{ pkg.version_count }}"
-            data-deps="{{ pkg.deps|length }}"
-            data-needed="{{ pkg.needed_by|length }}">
+            data-deps="{{ pkg.deps_len }}"
+            data-needed="{{ pkg.needed_len }}">
           <td class="pkg-fqn">
-            <a href="{{ package_href(pkg.channel, pkg.name) }}">{{ pkg.name }}</a>
+            <a href="{{ pkg.href }}">{{ pkg.name }}</a>
             {% if pkg.origin == 'remote' and pkg.peer_browse_url %}
             <a class="pkg-remote-link" href="{{ pkg.peer_browse_url }}" rel="noopener" target="_blank"
-               title="Open on {{ pkg.peer_label or 'remote CDN' }}">Visit remote</a>
+               title="Open on {{ pkg.peer_label }}">Visit remote</a>
             {% endif %}
             {% if pkg.description %}
             <span class="pkg-desc muted">{{ pkg.description }}</span>
             {% endif %}
           </td>
           <td class="pkg-ver">
-            <a class="ver" href="{{ package_href(pkg.channel, pkg.name) }}#history">{{ pkg.version }}</a>
+            <a class="ver" href="{{ pkg.href }}#history">{{ pkg.version }}</a>
             {% if pkg.version_count > 1 %}
-            <a class="muted pkg-ch-count" href="{{ package_href(pkg.channel, pkg.name) }}#history"
+            <a class="muted pkg-ch-count" href="{{ pkg.href }}#history"
                title="{{ pkg.version_count }} published channels">· {{ pkg.version_count }} ch</a>
             {% endif %}
-            {% if pkg.channel == 'lead' %}
-            <span class="pill pill-lead">lead</span>
-            {% else %}
-            <span class="pill">{{ pkg.channel }}</span>
-            {% endif %}
+            <span class="pill{{ pkg.lead_pill }}">{{ pkg.channel }}</span>
           </td>
           <td class="pkg-deps">
-            {% if pkg.deps %}
-            {% for dep, ver in pkg.deps.items() %}
-            {% set ok = pkg.deps_ok.get(dep, false) %}
-            <a class="dep-chip {% if ok %}dep-chip-ok{% else %}dep-chip-bad{% endif %}"
-               href="{{ package_href('lead', dep) }}"
-               title="{% if ok %}{{ dep }}@{{ ver }} available{% else %}{{ dep }}@{{ ver }} missing or yanked{% endif %}">{{ dep }}</a>{% if not loop.last %} {% endif %}
+            {% if pkg.dep_links %}
+            {% for dep in pkg.dep_links %}
+            <a class="dep-chip {{ dep.cls }}" href="{{ dep.href }}"
+               title="{{ dep.title }}">{{ dep.name }}</a>{% if not dep.last %} {% endif %}
             {% endfor %}
             {% else %}
             <span class="muted">—</span>
             {% endif %}
           </td>
           <td class="pkg-needed">
-            {% if pkg.needed_by %}
-            {% for dep in pkg.needed_by %}
-            <a class="dep-chip{% if pkg.needed_by|length > 1 %} dep-chip-rev{% endif %}"
-               href="{{ package_href('lead', dep) }}">{{ dep }}</a>{% if not loop.last %} {% endif %}
+            {% if pkg.needed_links %}
+            {% for dep in pkg.needed_links %}
+            <a class="dep-chip{{ dep.cls }}" href="{{ dep.href }}">{{ dep.name }}</a>{% if not dep.last %} {% endif %}
             {% endfor %}
             {% else %}
             <span class="muted">—</span>
             {% endif %}
           </td>
-          <td class="pkg-date mono" title="{{ pkg.updated_at.isoformat() if pkg.updated_at else '' }}">
-            {% if pkg.updated_at %}
-            {{ pkg.updated_at.strftime('%Y-%m-%d %H:%M') }}
+          <td class="pkg-date mono" title="{{ pkg.data_updated }}">
+            {% if pkg.updated_str %}
+            {{ pkg.updated_str }}
             {% else %}
             <span class="muted">—</span>
             {% endif %}
@@ -151,7 +142,7 @@
             {% if pkg.role == 'engine' %}<span class="pill pill-engine">engine</span>{% endif %}
             {% if pkg.role == 'kernel' %}<span class="pill pill-kernel">kernel</span>{% endif %}
             {% if pkg.role == 'arch' %}<span class="pill pill-arch">arch</span>{% endif %}
-            {% if pkg.origin == 'remote' %}<span class="pill pill-remote" title="{{ pkg.peer_label or 'federated' }}">remote</span>{% endif %}
+            {% if pkg.origin == 'remote' %}<span class="pill pill-remote" title="{{ pkg.peer_label }}">remote</span>{% endif %}
             {% if pkg.yanked %}<span class="pill pill-warn">yanked</span>{% endif %}
             {% if pkg.deprecated %}<span class="pill pill-warn">deprecated</span>{% endif %}
             {% if not pkg.role and pkg.origin != 'remote' and not pkg.yanked and not pkg.deprecated %}<span class="muted">—</span>{% endif %}
@@ -167,7 +158,7 @@
   {% endif %}
 </section>
 
-{% if catalog %}
+{% if d.catalog %}
 <script>
 (() => {
   const root = document.getElementById("pkg-catalog");
@@ -248,4 +239,3 @@
 })();
 </script>
 {% endif %}
-{% endblock %}

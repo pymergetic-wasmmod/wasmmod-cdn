@@ -1,11 +1,4 @@
-{% extends "base.html" %}
-{% block title %}API — wasmmod-cdn{% endblock %}
-{% block main_class %}main-docs{% endblock %}
-{% block head %}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" />
-<link rel="stylesheet" href="{{ href('static', 'swagger-theme.css') }}" />
-{% endblock %}
-{% block content %}
+{% args d %}
 <section class="docs-hero">
   <p class="eyebrow">OpenAPI</p>
   <h1>API</h1>
@@ -15,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin></script>
 <script>
   window.ui = SwaggerUIBundle({
-    url: "{{ href('openapi.json') }}",
+    url: "{{ d.openapi_url }}",
     dom_id: "#swagger-ui",
     deepLinking: true,
     presets: [SwaggerUIBundle.presets.apis],
@@ -27,4 +20,3 @@
     defaultModelsExpandDepth: 1,
   });
 </script>
-{% endblock %}

@@ -1,12 +1,10 @@
-{% extends "base.html" %}
-{% block title %}Login — wasmmod-cdn{% endblock %}
-{% block content %}
+{% args d %}
 <section class="hero">
   <p class="eyebrow">account</p>
   <h1>Login</h1>
   <p class="lede">Session cookie for the browse UI; use API keys for CI publish.</p>
-  {% if experimental and bootstrap_admin_email %}
-  <p class="muted">Public-test bootstrap account: <code>{{ bootstrap_admin_email }}</code>
+  {% if d.experimental and d.bootstrap_admin_email %}
+  <p class="muted">Public-test bootstrap account: <code>{{ d.bootstrap_admin_email }}</code>
     (password in operator <code>.secrets/cdn.env</code>). Change later via
     <code>POST /auth/password</code>.</p>
   {% endif %}
@@ -20,7 +18,7 @@
 <script>
   const form = document.getElementById("login-form");
   const msg = document.getElementById("login-msg");
-  const apiBase = "{{ base_path }}";
+  const apiBase = "{{ d.base_path }}";
   form.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     msg.textContent = "";
@@ -46,4 +44,3 @@
     window.location.href = next && next.startsWith(apiBase || "/") ? next : (apiBase + "/channels/lead");
   });
 </script>
-{% endblock %}

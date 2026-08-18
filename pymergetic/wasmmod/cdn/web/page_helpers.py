@@ -14,8 +14,10 @@ from pymergetic.wasmmod.cdn.services.federation.catalog import enrich_shell_list
 from pymergetic.wasmmod.cdn.services.federation.forward import forward_json, resolve_mount
 from pymergetic.wasmmod.cdn.services.federation.proxy import FederationProxy
 from pymergetic.wasmmod.cdn.services.federation.registry import FederationRegistry
-from pymergetic.wasmmod.cdn.web.context import _cdn_base_url, templates
+from pymergetic.wasmmod.cdn.web.context import _cdn_base_url
 from pymergetic.wasmmod.cdn.web.shell_ctx import _shell_context
+
+from pymergetic.wasmmod.cdn.web import render as _render
 
 
 async def _merge_fed_catalog(
@@ -55,8 +57,8 @@ async def _channel_page(
     ref: ChannelRef,
 ) -> HTMLResponse:
     ctx = await _shell_context(indexes, active_channel=ref.name, request=request)
-    ctx.update({"channel": ref.name})
-    return templates.TemplateResponse(request, "home.html", ctx)
+    ctx.update({"channel": ref.name, "active_channel": ref.name})
+    return HTMLResponse(_render.render_page("home.html", ctx))
 
 
 async def _package_page(
@@ -96,9 +98,11 @@ async def _package_page(
             "cdn_base": _cdn_base_url(request),
             "is_arch_seat": name.startswith("pymergetic.metal.arch."),
             "is_unix_seat": name.startswith("pymergetic.metal.unix."),
+            "author_href": _render.href("channels", "lead", "authors", entry.maintainer_email),
         }
     )
-    return templates.TemplateResponse(request, "package.html", ctx)
+    ctx = _render.shape_package(ctx)
+    return HTMLResponse(_render.render_page("package.html", ctx))
 
 
 async def _fetch_remote_package(

@@ -1,6 +1,4 @@
-{% extends "base.html" %}
-{% block title %}Publish — wasmmod-cdn{% endblock %}
-{% block content %}
+{% args d %}
 <section class="hero">
   <p class="eyebrow">release</p>
   <h1>Publish pack</h1>
@@ -32,7 +30,7 @@
 <script>
   const form = document.getElementById("publish-form");
   const msg = document.getElementById("publish-msg");
-  const apiBase = "{{ base_path }}";
+  const apiBase = "{{ d.base_path }}";
 
   async function ensureSession() {
     const me = await fetch(apiBase + "/auth/me", { credentials: "same-origin" });
@@ -110,4 +108,3 @@
 
   ensureSession();
 </script>
-{% endblock %}

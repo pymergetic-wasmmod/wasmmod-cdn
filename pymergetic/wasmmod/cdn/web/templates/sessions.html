@@ -1,63 +1,57 @@
-{% extends "base.html" %}
-{% block title %}Sessions — wasmmod-cdn{% endblock %}
-{% block content %}
+{% args d %}
 <section class="hero">
   <p class="eyebrow">shell</p>
   <h1>Sessions</h1>
   <p class="lede">
     Browser REPL / CDN loader sessions for
-    <strong>{{ principal_label }}</strong>{% if principal_web_id %}
-    <code class="muted" title="web session principal id">[{{ principal_web_id }}]</code>{% endif %}.
+    <strong>{{ d.principal_label }}</strong>{% if d.principal_web_id %}
+    <code class="muted" title="web session principal id">[{{ d.principal_web_id }}]</code>{% endif %}.
     Hits in the last 30 minutes (pack loads, index fetches, Try / autoexec).
   </p>
 </section>
 
-{% if not shell_sessions %}
+{% if not d.shell_sessions %}
 <p class="muted">No shell sessions yet — open the µPy panel to bind a CDN loader.</p>
 {% else %}
 <ul class="session-list">
-  {% for s in shell_sessions %}
-  {% set act = shell_activities.get(s.id|string) %}
+  {% for s in d.shell_sessions %}
   <li class="session-card">
     <header class="session-card-head">
-      <code class="session-id" title="{{ s.id }}">{{ s.id|string|truncate(8, True, '') }}</code>
+      <code class="session-id" title="{{ s.full_id }}">{{ s.id_short }}</code>
       <span class="muted">{{ s.principal_label }}</span>
       <span class="muted session-time">last {{ s.last_activity_at }}</span>
     </header>
     <div class="session-loader">
       <p class="session-loader-label">loader entered</p>
       <ul class="session-tree">
-        <li><span class="k">base</span> <code>{{ s.cdn_base or '—' }}</code></li>
+        <li><span class="k">base</span> <code>{{ s.base_disp }}</code></li>
         <li><span class="k">channel</span> <code>{{ s.channel }}</code></li>
-        <li><span class="k">driver</span> <code>{{ s.driver or '—' }}{% if s.hook_on %} · hook on{% endif %}</code></li>
+        <li><span class="k">driver</span> <code>{{ s.driver_disp }}</code></li>
       </ul>
     </div>
-    {% if act %}
-    {% set counts = act.buckets|map(attribute='count')|list %}
-    {% set peak = counts|max if counts else 1 %}
-    {% if peak < 1 %}{% set peak = 1 %}{% endif %}
-    <div class="session-spark" role="img" aria-label="Hits over last {{ act.window_minutes }} minutes">
-      {% for b in act.buckets %}
+    {% if s.spark %}
+    <div class="session-spark" role="img" aria-label="Hits over last {{ s.window_minutes }} minutes">
+      {% for b in s.spark %}
       <span
         class="session-spark-bar{% if b.count %} is-hot{% endif %}"
-        style="--h: {{ (b.count / peak * 100)|round(1) }}%"
+        style="--h: {{ b.height }}%"
         title="{{ b.minute }} · {{ b.count }}"
       ></span>
       {% endfor %}
     </div>
     <p class="muted session-spark-caption">
-      {{ act.recent|length }} event(s) in window
-      {% if act.recent %}
+      {{ s.recent_len }} event(s) in window
+      {% if s.last_kind %}
       · last
-      <code>{{ act.recent[0].kind }}{% if act.recent[0].package %} {{ act.recent[0].package }}{% endif %}</code>
+      <code>{{ s.last_kind }}{% if s.last_package %} {{ s.last_package }}{% endif %}</code>
       {% endif %}
     </p>
-    {% if act.recent %}
+    {% if s.recent %}
     <ul class="session-events">
-      {% for ev in act.recent[:8] %}
+      {% for ev in s.recent %}
       <li>
         <span class="session-ev-kind">{{ ev.kind }}</span>
-        {% if ev.package %}<code>{{ ev.package }}</code>{% elif ev.path %}<code class="muted">{{ ev.path|truncate(40, True, '…') }}</code>{% endif %}
+        {% if ev.package %}<code>{{ ev.package }}</code>{% elif ev.path %}<code class="muted">{{ ev.path }}</code>{% endif %}
       </li>
       {% endfor %}
     </ul>
@@ -67,4 +61,3 @@
   {% endfor %}
 </ul>
 {% endif %}
-{% endblock %}
