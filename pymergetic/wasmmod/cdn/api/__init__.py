@@ -22,6 +22,7 @@ from pymergetic.wasmmod.cdn.api.identity_routes import acl_router, users_router
 from pymergetic.wasmmod.cdn.api.packages import packages_router
 from pymergetic.wasmmod.cdn.api.publish import publish_router
 from pymergetic.wasmmod.cdn.api.sessions import sessions_router
+from pymergetic.wasmmod.cdn.api.trust import trust_router
 
 __all__ = ["build_api_router"]
 
@@ -43,4 +44,5 @@ def build_api_router() -> APIRouter:
     api_router.include_router(publish_router)
     api_router.include_router(artifacts_router)
     api_router.include_router(sessions_router)
+    api_router.include_router(trust_router)
     return api_router

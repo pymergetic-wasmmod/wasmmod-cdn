@@ -89,7 +89,7 @@ def mount_inspect_contract(app: FastAPI, *, prefix: str = "") -> None:
     """Register Inspect contract + shared www under optional path prefix (e.g. /cdn)."""
     _ensure_metal_inspect_path()
     try:
-        from pymergetic.metal.inspect.adapter_fastapi import FastAPIAdapter
+        from pymergetic.metal.inspect.adapter_fastapi import FastAPIShell
     except ImportError as e:
         raise RuntimeError(
             "pymergetic.metal.inspect missing — run scripts/sync-metal-inspect.sh "
@@ -97,7 +97,7 @@ def mount_inspect_contract(app: FastAPI, *, prefix: str = "") -> None:
         ) from e
 
     router = APIRouter()
-    FastAPIAdapter(role="cdn", theme="cdn", app=router, include_health=False)
+    FastAPIShell(role="cdn", theme="cdn", app=router, include_health=False)
     # API routes before StaticFiles mount so /inspect/self is not swallowed.
     app.include_router(router, prefix=prefix)
 

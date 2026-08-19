@@ -17,6 +17,7 @@ from pymergetic.wasmmod.cdn.models import (
 from pymergetic.wasmmod.cdn.services.index_service import IndexService
 from pymergetic.wasmmod.cdn.storage import ObjectStorage
 from pymergetic.wasmmod.cdn_client.contents import ensure_zlib_artifacts, inspect_upload
+from pymergetic.wasmmod.cdn_client.trust import SubcaPolicy
 from pymergetic.wasmmod.cdn_client.verify import RequireSignedMode, enforce_signed_policy
 
 
@@ -70,6 +71,7 @@ class PublishService:
         files: dict[str, bytes],
         *,
         trust_roots: list[bytes] | None = None,
+        subca_policy: SubcaPolicy | None = None,
     ) -> PublishResult:
         package = self._layout.validate_package_name(request.package)
         if not request.pin and not request.lead:
@@ -102,6 +104,7 @@ class PublishService:
                 mode=self._require_signed,
                 trust_roots=roots,
                 filename=filename,
+                subca_policy=subca_policy,
             )
 
         written: list[str] = []

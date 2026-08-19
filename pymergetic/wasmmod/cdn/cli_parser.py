@@ -135,6 +135,31 @@ def build_parser() -> argparse.ArgumentParser:
 
     trust_rm.add_argument("id")
 
+    trust_status = trust_sub.add_parser(
+        "status", help="Show current trust bundle / sub-CA policy"
+    )
+
+    trust_status.add_argument("--json", action="store_true")
+
+    trust_fetch = trust_sub.add_parser(
+        "fetch", help="Download the active MPTB bundle to a file"
+    )
+
+    trust_fetch.add_argument(
+        "-o", "--out", type=Path, default=Path("bundle.mptb"), help="Output path"
+    )
+
+    trust_apply = trust_sub.add_parser(
+        "apply",
+        help="Rotate the active trust bundle (admin) from a signed MPTB file",
+    )
+
+    trust_apply.add_argument("bundle", type=Path, help="MPTB from: wasmmod cdn sign bundle-gen")
+
+    trust_clear = trust_sub.add_parser(
+        "clear", help="Clear the active trust bundle (admin) — back to allow-any"
+    )
+
     inspect_p = sub.add_parser("inspect", help="Inspect a local artifact file")
 
     inspect_p.add_argument("file", type=Path)

@@ -30,7 +30,7 @@ rm -rf "$DEST"
 mkdir -p "$DEST"
 # Python contract only (skip C / __pycache__).
 for f in __init__.py app.py adapter_fastapi.py adapter_microdot.py \
-  dispatch.py self_desc.py stubs.py; do
+  api.py shells.py dispatch.py self_desc.py stubs.py; do
   cp -f "$SRC/$f" "$DEST/$f"
 done
 mkdir -p "$DEST/www"

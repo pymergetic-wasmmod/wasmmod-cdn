@@ -10,7 +10,11 @@ from cryptography.hazmat.primitives.serialization import Encoding
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from pymergetic.wasmmod.cdn.models import TrustRoot, TrustRootRead
+from pymergetic.wasmmod.cdn.models import TrustBundle, TrustBundleRead, TrustRoot, TrustRootRead
+from pymergetic.wasmmod.cdn.models.common import utcnow
+from pymergetic.wasmmod.cdn_client.trust import SubcaPolicy, parse_mptb
+
+_ACTIVE_BUNDLE_ID = 1
 
 
 def _subject_from_der(der: bytes) -> str:
@@ -85,3 +89,99 @@ class TrustService:
         await self._session.delete(row)
         await self._session.commit()
         return True
+
+    # ------------------------------------------------------------------
+    # Trust bundle (MPTB) — the active allow/deny sub-CA revocation policy.
+    # ------------------------------------------------------------------
+
+    async def get_bundle(self) -> TrustBundleRead | None:
+        """Metadata of the active bundle, or None if none has been set."""
+        row = await self._session.get(TrustBundle, _ACTIVE_BUNDLE_ID)
+        if row is None:
+            return None
+        return TrustBundleRead(
+            sha256=row.sha256,
+            issued=row.issued,
+            expires=row.expires,
+            n_allow=row.n_allow,
+            n_deny=row.n_deny,
+            created_at=row.created_at,
+        )
+
+    async def get_bundle_blob(self) -> bytes | None:
+        """Raw bytes of the active bundle (verbatim, for device trust_apply)."""
+        row = await self._session.get(TrustBundle, _ACTIVE_BUNDLE_ID)
+        return row.blob if row is not None else None
+
+    async def set_bundle(self, blob: bytes) -> TrustBundleRead:
+        """Rotate the active bundle.
+
+        The blob is parsed (not crypto-authenticated here — that happens at
+        apply on a trust-root-holding device/CDN). Last-writer-wins on the
+        fixed row id so GET always returns one deterministic policy.
+        """
+        parsed = parse_mptb(blob)
+        existing = await self._session.get(TrustBundle, _ACTIVE_BUNDLE_ID)
+        now = _unix_now()
+        digest = hashlib.sha256(blob).hexdigest()
+        if existing is None:
+            existing = TrustBundle(
+                id=_ACTIVE_BUNDLE_ID,
+                blob=blob,
+                sha256=digest,
+                issued=parsed.issued,
+                expires=parsed.expires,
+                n_allow=len(parsed.allow),
+                n_deny=len(parsed.deny),
+                created_at=utcnow(),
+            )
+            self._session.add(existing)
+        else:
+            existing.blob = blob
+            existing.sha256 = digest
+            existing.issued = parsed.issued
+            existing.expires = parsed.expires
+            existing.n_allow = len(parsed.allow)
+            existing.n_deny = len(parsed.deny)
+            existing.created_at = utcnow()
+        await self._session.commit()
+        await self._session.refresh(existing)
+        return TrustBundleRead(
+            sha256=existing.sha256,
+            issued=existing.issued,
+            expires=existing.expires,
+            n_allow=existing.n_allow,
+            n_deny=existing.n_deny,
+            created_at=existing.created_at,
+        )
+
+    async def clear_bundle(self) -> bool:
+        row = await self._session.get(TrustBundle, _ACTIVE_BUNDLE_ID)
+        if row is None:
+            return False
+        await self._session.delete(row)
+        await self._session.commit()
+        return True
+
+    async def active_policy(self, *, now: int | None = None) -> SubcaPolicy:
+        """The allow/deny sub-CA policy an enforcing publisher should apply.
+
+        Empty policy (no active bundle) permits every trusted root — identity
+        only, matching the device's no-policy mode. An expired active bundle
+        revokes *nothing* (fails open to identity-only) so a lapsed CDN cannot
+        silently hard-block all publishing; devices are still free to reject
+        expiry on their side.
+        """
+        row = await self._session.get(TrustBundle, _ACTIVE_BUNDLE_ID)
+        if row is None:
+            return SubcaPolicy()
+        parsed = parse_mptb(row.blob)
+        if parsed.is_expired(now):
+            return SubcaPolicy()
+        return SubcaPolicy(allow=parsed.allow, deny=parsed.deny)
+
+
+def _unix_now() -> int:
+    import time
+
+    return int(time.time())

@@ -25,6 +25,7 @@ from pymergetic.wasmmod.cdn_client import (
     report,
     save_config,
 )
+from pymergetic.wasmmod.cdn_client.trust import parse_mptb
 
 
 def _cmd_db(action: str) -> int:
@@ -272,6 +273,40 @@ def _cmd_trust(args: argparse.Namespace) -> int:
         if args.trust_cmd == "rm":
             client.delete_trust(args.id)
             print(f"deleted {args.id}")
+            return 0
+        if args.trust_cmd == "status":
+            policy = client.get_trust_policy()
+            if args.json:
+                print(json.dumps(policy, indent=2, default=str))
+                return 0
+            applied = bool(policy.get("applied"))
+            print(f"applied={applied}  allow={policy.get('allow', 0)}  deny={policy.get('deny', 0)}")
+            print(f"bundle_sha256={policy.get('bundle_sha256')}")
+            if policy.get("issued"):
+                print(f"issued={policy.get('issued')}  expires={policy.get('expires')}")
+            return 0
+        if args.trust_cmd == "fetch":
+            blob = client.get_trust_bundle()
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_bytes(blob)
+            print(f"wrote {args.out} ({len(blob)}B)")
+            return 0
+        if args.trust_cmd == "apply":
+            if not args.bundle.is_file():
+                report(PROG, f"not a file: {args.bundle}")
+                return 2
+            blob = args.bundle.read_bytes()
+            try:
+                parse_mptb(blob)
+            except ValueError as exc:
+                report(PROG, f"invalid MPTB: {exc}")
+                return 2
+            client.put_trust_bundle(blob, filename=args.bundle.name)
+            print(f"applied {args.bundle.name} ({len(blob)}B)")
+            return 0
+        if args.trust_cmd == "clear":
+            client.clear_trust_bundle()
+            print("cleared active trust bundle")
             return 0
     except ClientError as exc:
         return fail(exc)

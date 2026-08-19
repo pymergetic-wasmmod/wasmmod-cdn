@@ -17,7 +17,7 @@ from pymergetic.wasmmod.cdn.models.common import utcnow
 class User(SQLModel, table=True):
     """Publisher account (email is identity; pack index may mirror it publicly)."""
 
-    __tablename__: ClassVar[str] = "users"
+    __tablename__: ClassVar[str] = "users"  # type: ignore[reportIncompatibleVariableOverride]
 
     id: UUID = SQLField(default_factory=uuid4, primary_key=True)
     email: EmailStr = SQLField(index=True, unique=True, max_length=320)
@@ -34,7 +34,7 @@ class User(SQLModel, table=True):
 class TrustRoot(SQLModel, table=True):
     """Server-wide CA root for optional publish-time MPWS verification."""
 
-    __tablename__: ClassVar[str] = "trust_roots"
+    __tablename__: ClassVar[str] = "trust_roots"  # type: ignore[reportIncompatibleVariableOverride]
 
     id: UUID = SQLField(default_factory=uuid4, primary_key=True)
     name: str = SQLField(default="", max_length=128)
@@ -60,10 +60,43 @@ class TrustRootCreated(TrustRootRead):
     pass
 
 
+class TrustBundle(SQLModel, table=True):
+    """Single active MPTB (MicroPython Trust Bundle) served to devices.
+
+    One row (bundle_id = 1) holds the current signed bundle blob. Rotation is
+    last-writer-wins: the trusted operator PUTs a freshly signed bundle (chained
+    to a revocation sub-CA under a known root) and the CDN serves it verbatim,
+    so the allow/deny sub-CA policy can be revoked/pinned device-wide.
+    """
+
+    __tablename__: ClassVar[str] = "trust_bundles"  # type: ignore[reportIncompatibleVariableOverride]
+
+    id: int = SQLField(primary_key=True)
+    blob: bytes = SQLField(sa_column=Column(LargeBinary, nullable=False))
+    sha256: str = SQLField(default="", max_length=64)
+    issued: int = SQLField(default=0)
+    expires: int = SQLField(default=0)
+    n_allow: int = SQLField(default=0)
+    n_deny: int = SQLField(default=0)
+    created_at: datetime = SQLField(
+        default_factory=utcnow,
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
+
+
+class TrustBundleRead(SQLModel):
+    sha256: str
+    issued: int
+    expires: int
+    n_allow: int
+    n_deny: int
+    created_at: datetime
+
+
 class ApiKey(SQLModel, table=True):
     """CI / CLI bearer token (store hash only)."""
 
-    __tablename__: ClassVar[str] = "api_keys"
+    __tablename__: ClassVar[str] = "api_keys"  # type: ignore[reportIncompatibleVariableOverride]
 
     id: UUID = SQLField(default_factory=uuid4, primary_key=True)
     user_id: UUID = SQLField(foreign_key="users.id", index=True)
@@ -90,7 +123,7 @@ class PackageRole(str, Enum):
 class PackageAcl(SQLModel, table=True):
     """Who may publish / promote a pack name (direct user grant)."""
 
-    __tablename__: ClassVar[str] = "package_acl"
+    __tablename__: ClassVar[str] = "package_acl"  # type: ignore[reportIncompatibleVariableOverride]
     __table_args__ = (UniqueConstraint("package_name", "user_id", name="uq_acl_pkg_user"),)
 
     id: UUID = SQLField(default_factory=uuid4, primary_key=True)
@@ -106,7 +139,7 @@ class PackageAcl(SQLModel, table=True):
 class Organization(SQLModel, table=True):
     """Optional org that owns scoped package namespaces (``org/…``)."""
 
-    __tablename__: ClassVar[str] = "organizations"
+    __tablename__: ClassVar[str] = "organizations"  # type: ignore[reportIncompatibleVariableOverride]
 
     id: UUID = SQLField(default_factory=uuid4, primary_key=True)
     slug: str = SQLField(index=True, unique=True, max_length=64)
@@ -118,7 +151,7 @@ class Organization(SQLModel, table=True):
 
 
 class Team(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "teams"
+    __tablename__: ClassVar[str] = "teams"  # type: ignore[reportIncompatibleVariableOverride]
 
     id: UUID = SQLField(default_factory=uuid4, primary_key=True)
     org_id: UUID = SQLField(foreign_key="organizations.id", index=True)
@@ -131,7 +164,7 @@ class Team(SQLModel, table=True):
 
 
 class TeamMembership(SQLModel, table=True):
-    __tablename__: ClassVar[str] = "team_memberships"
+    __tablename__: ClassVar[str] = "team_memberships"  # type: ignore[reportIncompatibleVariableOverride]
     __table_args__ = (UniqueConstraint("team_id", "user_id", name="uq_team_user"),)
 
     id: UUID = SQLField(default_factory=uuid4, primary_key=True)
@@ -147,7 +180,7 @@ class TeamMembership(SQLModel, table=True):
 class PackageTeamAcl(SQLModel, table=True):
     """Team grant on a package (resolved via team memberships)."""
 
-    __tablename__: ClassVar[str] = "package_team_acl"
+    __tablename__: ClassVar[str] = "package_team_acl"  # type: ignore[reportIncompatibleVariableOverride]
     __table_args__ = (UniqueConstraint("package_name", "team_id", name="uq_acl_pkg_team"),)
 
     id: UUID = SQLField(default_factory=uuid4, primary_key=True)
@@ -168,7 +201,7 @@ class PackageVisibility(str, Enum):
 class PackageMeta(SQLModel, table=True):
     """Identity-side package metadata (visibility / org), not channel index."""
 
-    __tablename__: ClassVar[str] = "package_meta"
+    __tablename__: ClassVar[str] = "package_meta"  # type: ignore[reportIncompatibleVariableOverride]
 
     package_name: str = SQLField(primary_key=True, max_length=128)
     visibility: PackageVisibility = SQLField(default=PackageVisibility.PUBLIC)
@@ -182,7 +215,7 @@ class PackageMeta(SQLModel, table=True):
 class AuditEvent(SQLModel, table=True):
     """Append-only audit log for ACL / publish lifecycle actions."""
 
-    __tablename__: ClassVar[str] = "audit_events"
+    __tablename__: ClassVar[str] = "audit_events"  # type: ignore[reportIncompatibleVariableOverride]
 
     id: UUID = SQLField(default_factory=uuid4, primary_key=True)
     actor_id: UUID | None = SQLField(default=None, foreign_key="users.id", index=True)

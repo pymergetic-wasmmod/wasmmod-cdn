@@ -72,7 +72,7 @@ async def test_autoexec_endpoint(tmp_path: Path) -> None:
         AsyncClient(transport=transport, base_url="http://test") as client,
         app.router.lifespan_context(app),
     ):
-        r = await client.get("/cdn/repl/autoexec.py")
+        r = await client.get("/cdn/repl/autoexec.py", params={"engine": "upywm"})
     assert r.status_code == 200
     assert "text/x-python" in r.headers.get("content-type", "")
     assert r.headers.get("X-Shell-Session-Id")

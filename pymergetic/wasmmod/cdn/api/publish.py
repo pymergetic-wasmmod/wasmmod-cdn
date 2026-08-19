@@ -159,7 +159,15 @@ async def publish_pack(
     if (not upstream) or also_local:
         try:
             roots = await trust.all_der() if settings.require_signed != "off" else []
-            local_result = await publish.publish(request, blob_map, trust_roots=roots)
+            # The active MPTB allow/deny policy also gates the pack's issuing
+            # sub-CA at publish time — same revocation the device enforces.
+            subca_policy = await trust.active_policy() if settings.require_signed == "verify" else None
+            local_result = await publish.publish(
+                request,
+                blob_map,
+                trust_roots=roots,
+                subca_policy=subca_policy,
+            )
         except ValueError as exc:
             msg = str(exc)
             code = (

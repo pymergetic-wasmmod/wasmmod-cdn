@@ -257,6 +257,34 @@ class CdnClient(ArtifactInspectMixin):
     def delete_trust(self, root_id: str) -> None:
         self.request("DELETE", f"admin/trust/{root_id}", accept=None)
 
+    # --- Trust bundle (MPTB) — active allow/deny sub-CA revocation policy ---
+
+    def get_trust_bundle(self) -> bytes:
+        """Fetch the active MPTB as raw bytes (for a device's wasm.trust_apply)."""
+        raw = self.request("GET", "trust/bundle", accept="application/octet-stream")
+        if raw is None:
+            raise ClientError("no trust bundle active", status=404)
+        return raw
+
+    def get_trust_policy(self) -> dict[str, Any]:
+        """Current allow/deny policy summary: {applied, allow, deny, expires, bundle_sha256}."""
+        return self.request("GET", "trust/policy")
+
+    def put_trust_bundle(self, bundle: bytes, *, filename: str = "bundle.mptb") -> None:
+        """Rotate the active trust bundle (admin). Raises ClientError on 4xx."""
+        self.request(
+            "PUT",
+            "trust/bundle",
+            multipart=[
+                ("bundle", (filename, bundle, "application/octet-stream")),
+            ],
+            accept=None,
+        )
+
+    def clear_trust_bundle(self) -> None:
+        """Clear the active trust bundle (admin) — back to allow-any."""
+        self.request("DELETE", "trust/bundle", accept=None)
+
     def download_artifact(
         self,
         filename: str,

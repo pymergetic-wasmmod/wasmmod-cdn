@@ -18,6 +18,7 @@ from pymergetic.wasmmod.cdn_client.contents import (
     unwrap_mpzl,
     without_sig_section,
 )
+from pymergetic.wasmmod.cdn_client.trust import SubcaPolicy, subca_of_chain
 
 RequireSignedMode = Literal["off", "present", "verify"]
 
@@ -127,8 +128,15 @@ def verify_artifact(
     *,
     trust_roots: list[bytes],
     filename: str = "",
+    subca_policy: SubcaPolicy | None = None,
 ) -> VerifyResult:
-    """Verify embedded ``wasmmod.sig`` against DER/PEM trust roots."""
+    """Verify embedded ``wasmmod.sig`` against DER/PEM trust roots.
+
+    When ``subca_policy`` is given (an active MPTB load-deny policy), the pack's
+    issuing sub-CA must also be allowed / not denied — mirroring the device
+    ``verify_pki_chain`` gate. On a policy rejection the chain verify already
+    succeeded, so the result reports the sub-CA fingerprint for diagnostics.
+    """
     del filename
     x509, InvalidSignature, hashes, serialization, ec, padding, rsa = _crypto()
     try:
@@ -158,7 +166,8 @@ def verify_artifact(
         return VerifyResult(ok=False, signed=True, format=fmt, error="no trust roots configured")
 
     try:
-        certs = [x509.load_der_x509_certificate(c) for c in split_der_certs(chain)]
+        der_certs = split_der_certs(chain)
+        certs = [x509.load_der_x509_certificate(c) for c in der_certs]
         roots = _load_roots(trust_roots, x509)
     except Exception as exc:
         return VerifyResult(ok=False, signed=True, format=fmt, error=f"cert parse failed: {exc}")
@@ -189,6 +198,17 @@ def verify_artifact(
             ok=False, signed=True, format=fmt, leaf_sha256=leaf_fp, error=f"ECDSA verify failed: {exc}"
         )
 
+    if subca_policy is not None and not subca_policy.allows(
+        subca_of_chain(tuple(der_certs))
+    ):
+        return VerifyResult(
+            ok=False,
+            signed=True,
+            format=fmt,
+            leaf_sha256=leaf_fp,
+            error="issuing sub-CA denied by active trust policy",
+        )
+
     return VerifyResult(ok=True, signed=True, format=fmt, leaf_sha256=leaf_fp)
 
 
@@ -198,6 +218,7 @@ def enforce_signed_policy(
     mode: RequireSignedMode,
     trust_roots: list[bytes],
     filename: str = "",
+    subca_policy: SubcaPolicy | None = None,
 ) -> VerifyResult | None:
     """Apply ``off`` / ``present`` / ``verify``. Raises ``ValueError`` on reject."""
     if mode == "off":
@@ -218,7 +239,12 @@ def enforce_signed_policy(
             raise ValueError(f"{label}: wasmmod.sig required (REQUIRE_SIGNED=present)")
         return VerifyResult(ok=True, signed=True)
     if mode == "verify":
-        result = verify_artifact(data, trust_roots=trust_roots, filename=filename)
+        result = verify_artifact(
+            data,
+            trust_roots=trust_roots,
+            filename=filename,
+            subca_policy=subca_policy,
+        )
         if not result.ok:
             raise ValueError(f"{label}: signature verify failed: {result.error}")
         return result
