@@ -120,7 +120,11 @@ def _tree_row(node: dict, active_package: str, active_channel: str) -> str:
     versions = node.get("versions") or []
     default_ch = versions[0].get("channel", "lead") if versions else "lead"
     active_here = bool(full_name and active_package == full_name)
-    pkg_href = _url("channels", (active_channel if active_here and versions else default_ch), "packs", full_name) if full_name else "#"
+    # Route pins through package_path so "@1.2.3" becomes /channels/pin/1.2.3/...
+    # Building the URL via _url("channels", channel, "packs", ...) leaves an
+    # "@version" segment that matches no route and gets served as a download.
+    pkg_ch = (active_channel if active_here and versions else default_ch)
+    pkg_href = _url(*_channel_path_and_pack(pkg_ch, full_name)) if full_name else "#"
     if node.get("is_package"):
         classes = "tree-pkg tree-name" + (" is-active" if active_here else "")
         parts.append(f'<a class="{classes}" href="{pkg_href}" data-package="{_esc(full_name)}">{name}</a>')
@@ -144,7 +148,7 @@ def _ver_select(full_name: str, versions: list, active_package: str, active_chan
              f'<select class="tree-ver-select" data-package="{_esc(full_name)}" aria-label="Version for {_esc(full_name)}">']
     for i, v in enumerate(versions):
         vc = v.get("channel", "lead")
-        vhref = _url("channels", vc, "packs", full_name)
+        vhref = _url(*_channel_path_and_pack(vc, full_name))
         sel = " selected" if (active_package == full_name and active_channel == vc) or (active_package != full_name and i == 0) else ""
         parts.append(f'<option value="{_esc(vc)}" data-href="{vhref}"{sel}>{_esc(v.get("label", vc))}</option>')
     parts.append("</select></label>")
