@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# Copy shared Inspect contract (Py + www) from metalpython into this package
-# so Docker / pip installs can `import pymergetic.metal.inspect` without a
-# sibling checkout.
+# Copy the shared Inspect contract (Python only) from metalpython into this
+# package so Docker / pip installs can `import pymergetic.metal.inspect`
+# without a sibling checkout.
+#
+# No www/ is copied: the seat's pages are rendered from *this* package's own
+# templates (web/templates/shell.html et al, the one UI source) and served from
+# web/static. There is no separate metal console to ship.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEST="$ROOT/pymergetic/metal/inspect"
@@ -33,8 +37,6 @@ for f in __init__.py app.py adapter_fastapi.py adapter_microdot.py \
   api.py shells.py dispatch.py self_desc.py stubs.py; do
   cp -f "$SRC/$f" "$DEST/$f"
 done
-mkdir -p "$DEST/www"
-cp -a "$SRC/www/inspect" "$DEST/www/inspect"
 cat >"$DEST/README.md" <<'EOF'
 # pymergetic.metal.inspect (synced)
 

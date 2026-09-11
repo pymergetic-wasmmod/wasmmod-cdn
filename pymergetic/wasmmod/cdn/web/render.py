@@ -12,6 +12,7 @@ dialect cannot express recursion in a template.
 from __future__ import annotations
 
 from pathlib import Path
+from types import ModuleType
 
 from pymergetic.wasmmod.cdn import __version__
 from pymergetic.wasmmod.cdn.paths import join_base
@@ -50,7 +51,7 @@ class _FSTemplateLoader:
         self.template_dir = template_dir
         self.compiled_dir = compiled_dir
         self.compiled_dir.mkdir(parents=True, exist_ok=True)
-        self._cache: dict[str, object] = {}
+        self._cache: dict[str, ModuleType] = {}
 
     def input_open(self, template: str):
         return open(self.template_dir / template)
@@ -64,6 +65,11 @@ class _FSTemplateLoader:
         if mod is None:
             path = self.compiled_path(name)
             spec = importlib.util.spec_from_file_location(f"_utcompiled_{name.replace('.', '_')}", path)
+            # A spec without a loader is a compiled file that is not there or
+            # not importable; say which template, rather than failing one line
+            # later on None.
+            if spec is None or spec.loader is None:
+                raise ImportError(f"no compiled template module at {path}")
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
             self._cache[name] = mod
@@ -115,7 +121,10 @@ def _tree_row(node: dict, active_package: str, active_channel: str) -> str:
     else:
         parts.append('<span class="tree-toggle-spacer" aria-hidden="true"></span>')
     name = _esc(node.get("name", ""))
-    full_name = node.get("full_name")
+    # A node with no full_name is a folder, and "" is falsy the same way None
+    # is in every test below it — it just also matches the `str` the helpers
+    # take.
+    full_name = node.get("full_name") or ""
     role = node.get("role")
     versions = node.get("versions") or []
     default_ch = versions[0].get("channel", "lead") if versions else "lead"
@@ -274,6 +283,10 @@ def build_shell_ctx(ctx: dict, content: str, tree: str) -> dict:
     is_admin = bool(current_user and getattr(current_user, "is_admin", False))
     d["nav_federation"] = href("federation") if is_admin else ""
     d["nav_federation_cls"] = nav_cls("federation")
+    # Seat-only top-nav links (metal's Registry / Factory pages) render into this
+    # slot. The CDN has no seat-local faces to point at, so it stays empty — the
+    # slot exists so shell.html remains one byte-identical UI source.
+    d["nav_extra"] = ""
 
     repl = bool(ctx.get("experimental_repl"))
     d["experimental_repl"] = repl
@@ -678,7 +691,7 @@ def _to_attr(value):
     handful of Python-side helpers that read context.
     """
     if isinstance(value, dict):
-        return AttrDict({k: _to_attr(v) for k, v in value.items()})
+        return _to_attr_mapping(value)
     if isinstance(value, (list, tuple)):
         return [_to_attr(v) for v in value]
     if isinstance(value, set):
@@ -696,9 +709,16 @@ class AttrDict(dict):
             raise AttributeError(item) from None
 
 
+def _to_attr_mapping(value: dict) -> AttrDict:
+    """A dict in, an AttrDict out. ``_to_attr`` preserves the shape it was
+    given, so it can return a list; a caller that starts from a dict — the
+    template context — gets a dict back, and says so here."""
+    return AttrDict({k: _to_attr(v) for k, v in value.items()})
+
+
 def _render_ctx(ctx: dict, name: str) -> str:
     """Render ``name`` against ``ctx`` where nested dicts are attr-addressable."""
-    return render_raw(name, _to_attr(ctx))
+    return render_raw(name, _to_attr_mapping(ctx))
 
 
 def render_page(name: str, ctx: dict, nav: str | None = None) -> str:
@@ -714,7 +734,8 @@ def render_page(name: str, ctx: dict, nav: str | None = None) -> str:
     pre = build_shell_ctx(body_ctx, "", "")
     body_html = _render_ctx(pre, name)
     if nav is None:
-        nav = nav_html(body_ctx["nav_roots"], ctx.get("active_package"), ctx.get("active_channel", "lead"))
+        nav = nav_html(body_ctx["nav_roots"], ctx.get("active_package") or "",
+                       ctx.get("active_channel", "lead"))
     d = build_shell_ctx(body_ctx, body_html, nav or "<p class=\"tree-empty\">No packages yet</p>")
     return _render_ctx(d, "shell.html")
 

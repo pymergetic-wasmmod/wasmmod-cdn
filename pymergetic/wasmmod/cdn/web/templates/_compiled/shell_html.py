@@ -48,6 +48,9 @@ def render(d):
     yield str(d.nav_browse_cls)
     yield """\">Browse</a>
         """
+    yield str(d.nav_extra)
+    yield """
+        """
     if d.nav_users:
         yield """<a href=\""""
         yield str(d.nav_users)

@@ -69,8 +69,6 @@ for f in __init__.py app.py adapter_fastapi.py adapter_microdot.py \
   dispatch.py self_desc.py stubs.py; do
   cp -f "$METAL/src/pymergetic/metal/inspect/$f" "$STAGING/inspect/src/$f"
 done
-mkdir -p "$STAGING/inspect/src/www"
-cp -a "$METAL/src/pymergetic/metal/inspect/www/inspect" "$STAGING/inspect/src/www/inspect"
 printf '%s\n' 'void pm_pack_load(void) {}' 'void pm_pack_unload(void) {}' \
   >"$STAGING/inspect/src/stub.c"
 cat >"$STAGING/inspect/pack.toml" <<'EOF'
@@ -78,7 +76,7 @@ type = "package"
 name = "pymergetic.metal.inspect"
 version = "0.1.0"
 impl = ["c"]
-description = "Metal Inspect contract + UI (Inspect only; Play off)."
+description = "Metal Inspect contract (Inspect only; Play off)."
 [python]
 keep_source = true
 freeze = false
